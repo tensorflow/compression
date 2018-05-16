@@ -1,4 +1,4 @@
-# TensorFlow data compression tools
+# TensorFlow data compression library
 
 This package contains data compression ops and layers for TensorFlow.
 
@@ -47,11 +47,11 @@ tensor values are good enough for practical purposes, the training phase must
 be used to balance the quality of the approximation with the entropy, by
 adding an entropy term to the training loss, as in the following example.
 
-Here, we use the entropy bottleneck to compress the latent representation of
-an autoencoder. The data vectors `x` in this case are 4D tensors in
-`'channels_last'` format (for example, 16x16 pixel grayscale images).
-
 ### Compiling
+
+*Please note*: You need TensorFlow 1.9 (or the master branch as of May 2018)
+or later.
+
 First, compile the custom ops needed by TensorFlow.
 ```shell
 cd compression
@@ -60,14 +60,18 @@ chmod +x compile.sh
 cd ..
 ```
 
-To make sure the compilation and library imports succeed, try running the two tests.
+To make sure the compilation and library imports succeed, try running the two
+tests.
 ```
 python compression/python/ops/coder_ops_test.py
 python compression/python/layers/entropybottleneck_test.py
 ```
 
-
 ### Training
+
+Here, we use the entropy bottleneck to compress the latent representation of
+an autoencoder. The data vectors `x` in this case are 4D tensors in
+`'channels_last'` format (for example, 16x16 pixel grayscale images).
 
 ```python
 # Build autoencoder.
