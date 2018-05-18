@@ -2,6 +2,29 @@
 
 This package contains data compression ops and layers for TensorFlow.
 
+For usage questions and discussions, please head over to our
+[Google group](https://groups.google.com/forum/#!forum/tensorflow-compression)!
+
+## Compiling
+
+**Please note**: You need TensorFlow 1.9 (or the master branch as of May 2018)
+or later.
+
+First, compile the custom ops needed by TensorFlow.
+```shell
+cd compression
+chmod +x compile.sh
+./compile.sh
+cd ..
+```
+
+To make sure the compilation and library imports succeed, try running the two
+tests.
+```
+python compression/python/ops/coder_ops_test.py
+python compression/python/layers/entropybottleneck_test.py
+```
+
 ## Entropy bottleneck layer
 
 This layer exposes a high-level interface to model the entropy (the amount of
@@ -23,11 +46,9 @@ The layer implements a flexible probability density model to estimate entropy,
 which is described in the appendix of the paper (please cite the paper if you
 use this code for scientific work):
 
-"Variational image compression with a scale hyperprior"
-
-Johannes Ballé, David Minnen, Saurabh Singh, Sung Jin Hwang, Nick Johnston
-
-https://arxiv.org/abs/1802.01436
+> "Variational image compression with a scale hyperprior"
+> Johannes Ballé, David Minnen, Saurabh Singh, Sung Jin Hwang, Nick Johnston
+> https://arxiv.org/abs/1802.01436
 
 The layer assumes that the input tensor is at least 2D, with a batch dimension
 at the beginning and a channel dimension as specified by `data_format`. The
@@ -47,31 +68,17 @@ tensor values are good enough for practical purposes, the training phase must
 be used to balance the quality of the approximation with the entropy, by
 adding an entropy term to the training loss, as in the following example.
 
-### Compiling
-
-*Please note*: You need TensorFlow 1.9 (or the master branch as of May 2018)
-or later.
-
-First, compile the custom ops needed by TensorFlow.
-```shell
-cd compression
-chmod +x compile.sh
-./compile.sh
-cd ..
-```
-
-To make sure the compilation and library imports succeed, try running the two
-tests.
-```
-python compression/python/ops/coder_ops_test.py
-python compression/python/layers/entropybottleneck_test.py
-```
-
 ### Training
 
 Here, we use the entropy bottleneck to compress the latent representation of
 an autoencoder. The data vectors `x` in this case are 4D tensors in
 `'channels_last'` format (for example, 16x16 pixel grayscale images).
+
+Note that `forward_transform` and `backward_transform` are placeholders and can
+be any appropriate artifical neural network. We've found that it generally helps
+*not* to use batch normalization, and to sandwich the bottleneck between two
+linear transforms or convolutions (i.e. to have no nonlinearities directly
+before and after).
 
 ```python
 # Build autoencoder.
