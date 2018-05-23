@@ -21,8 +21,14 @@ from __future__ import print_function
 
 # pylint: disable=wildcard-import
 from compression.python.layers.entropybottleneck import *
-from compression.python.ops.coder_ops import *
+# TODO(jonycgn,nmjohn): revert to importing from here once we figure out why the
+# nightlies don't work.
+# from compression.python.ops.coder_ops import *
+from tensorflow.contrib.coder.python.ops.coder_ops import *
 # pylint: enable=wildcard-import
 
 from tensorflow.python.util.all_util import remove_undocumented
-remove_undocumented(__name__)
+remove_undocumented(__name__, [
+    "EntropyBottleneck",
+    "pmf_to_quantized_cdf", "range_decode", "range_encode",
+])
