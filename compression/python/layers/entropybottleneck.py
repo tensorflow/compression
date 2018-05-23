@@ -19,7 +19,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from compression.python.ops import coder_ops
+# TODO(jonycgn,nmjohn): revert to using this implementation once we figure out
+# why the nightlies don't work.
+# from compression.python.ops import coder_ops
+from tensorflow.contrib.coder.python.ops import coder_ops
 
 import numpy as np
 
@@ -28,7 +31,7 @@ from tensorflow.python.framework import constant_op
 from tensorflow.python.framework import dtypes
 from tensorflow.python.framework import ops
 from tensorflow.python.framework import tensor_shape
-from tensorflow.python.keras._impl.keras import engine
+from tensorflow.python.keras import engine
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import functional_ops
 from tensorflow.python.ops import init_ops
