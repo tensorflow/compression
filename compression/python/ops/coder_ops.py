@@ -20,11 +20,11 @@ from __future__ import division
 from __future__ import print_function
 
 import os
-
 import tensorflow as tf
 
 
-_coder_ops = tf.load_op_library(os.path.join(tf.resource_loader.get_data_files_path(), "../../_coder_ops.so"))
+_coder_ops = tf.load_op_library(os.path.join(
+    tf.resource_loader.get_data_files_path(), "../../_coder_ops.so"))
 
 # TODO(nmjohn): Find a way to do the below mapping in this module automatically.
 pmf_to_quantized_cdf = _coder_ops.pmf_to_quantized_cdf
