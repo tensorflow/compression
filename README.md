@@ -104,10 +104,10 @@ main_loss = 0.5 * tf.reduce_mean(squared_error) + tf.reduce_mean(bits)
 # Minimize loss and auxiliary loss, and execute update op.
 main_optimizer = tf.train.AdamOptimizer(learning_rate=1e-4)
 main_step = optimizer.minimize(main_loss)
-# 1e-2 is a good starting point for the learning rate of the auxiliary loss,
+# 1e-3 is a good starting point for the learning rate of the auxiliary loss,
 # assuming Adam is used.
-aux_optimizer = tf.train.AdamOptimizer(learning_rate=1e-2)
-aux_step = optimizer.minimize(entropy_bottleneck.losses[0])
+aux_optimizer = tf.train.AdamOptimizer(learning_rate=1e-3)
+aux_step = aux_optimizer.minimize(entropy_bottleneck.losses[0])
 step = tf.group(main_step, aux_step, entropy_bottleneck.updates[0])
 ```
 
