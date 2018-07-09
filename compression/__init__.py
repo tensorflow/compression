@@ -21,9 +21,6 @@ from __future__ import print_function
 
 # pylint: disable=wildcard-import
 from compression.python.layers.entropybottleneck import *
-# TODO(jonycgn,nmjohn): revert to importing from here once we figure out why the
-# nightlies don't work.
-# from compression.python.ops.coder_ops import *
 from tensorflow.contrib.coder.python.ops.coder_ops import *
 # pylint: enable=wildcard-import
 
