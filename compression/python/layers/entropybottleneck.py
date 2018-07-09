@@ -19,9 +19,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-# TODO(jonycgn,nmjohn): revert to using this implementation once we figure out
-# why the nightlies don't work.
-# from compression.python.ops import coder_ops
 from tensorflow.contrib.coder.python.ops import coder_ops
 
 import numpy as np
@@ -31,7 +28,7 @@ from tensorflow.python.framework import constant_op
 from tensorflow.python.framework import dtypes
 from tensorflow.python.framework import ops
 from tensorflow.python.framework import tensor_shape
-from tensorflow.python.keras import engine
+from tensorflow.python.keras.engine import base_layer
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import functional_ops
 from tensorflow.python.ops import init_ops
@@ -43,7 +40,7 @@ from tensorflow.python.ops import variable_scope
 from tensorflow.python.summary import summary
 
 
-class EntropyBottleneck(engine.Layer):
+class EntropyBottleneck(base_layer.Layer):
   """Entropy bottleneck layer.
 
   This layer models the entropy of the tensor passing through it. During
@@ -167,7 +164,7 @@ class EntropyBottleneck(engine.Layer):
     self._range_coder_precision = int(range_coder_precision)
     self._data_format = data_format
     self._channel_axis(2)  # trigger ValueError early
-    self.input_spec = engine.InputSpec(min_ndim=2)
+    self.input_spec = base_layer.InputSpec(min_ndim=2)
 
   @property
   def init_scale(self):
@@ -262,7 +259,7 @@ class EntropyBottleneck(engine.Layer):
     channels = input_shape[channel_axis].value
     if channels is None:
       raise ValueError("The channel dimension of the inputs must be defined.")
-    self.input_spec = engine.InputSpec(
+    self.input_spec = base_layer.InputSpec(
         ndim=input_shape.ndims, axes={channel_axis: channels})
     filters = (1,) + self.filters + (1,)
     scale = self.init_scale ** (1 / (len(self.filters) + 1))

@@ -5,20 +5,12 @@ This package contains data compression ops and layers for TensorFlow.
 For usage questions and discussions, please head over to our
 [Google group](https://groups.google.com/forum/#!forum/tensorflow-compression)!
 
-## Compiling
+## Prerequisite
 
 **Please note**: You need TensorFlow 1.9 (or the master branch as of May 2018)
 or later.
 
-First, compile the custom ops needed by TensorFlow.
-```shell
-cd compression
-chmod +x compile.sh
-./compile.sh
-cd ..
-```
-
-To make sure the compilation and library imports succeed, try running the two
+To make sure the library imports succeed, try running the two
 tests.
 ```
 python compression/python/ops/coder_ops_test.py
