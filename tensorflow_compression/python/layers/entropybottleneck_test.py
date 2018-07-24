@@ -21,7 +21,7 @@ from __future__ import print_function
 
 import numpy as np
 
-import entropybottleneck
+from tensorflow_compression.python.layers import entropybottleneck
 
 from tensorflow.python.framework import dtypes
 from tensorflow.python.ops import array_ops

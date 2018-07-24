@@ -19,7 +19,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from compression.python.ops import coder_ops
+from tensorflow_compression.python.ops import coder_ops
 
 from tensorflow.python.framework import dtypes
 from tensorflow.python.ops import array_ops
