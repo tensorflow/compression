@@ -13,8 +13,8 @@ or later.
 To make sure the library imports succeed, try running the two
 tests.
 ```
-python compression/python/ops/coder_ops_test.py
-python compression/python/layers/entropybottleneck_test.py
+python tensorflow_compression/python/ops/coder_ops_test.py
+python tensorflow_compression/python/layers/entropybottleneck_test.py
 ```
 
 ## Entropy bottleneck layer
