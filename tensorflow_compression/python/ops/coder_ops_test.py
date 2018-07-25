@@ -19,13 +19,15 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from tensorflow_compression.python.ops import coder_ops
+# Dependency imports
 
 from tensorflow.python.framework import dtypes
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import random_ops
 from tensorflow.python.platform import test
+
+from tensorflow_compression.python.ops import coder_ops
 
 
 class CoderOpsTest(test.TestCase):
@@ -51,5 +53,5 @@ class CoderOpsTest(test.TestCase):
       self.assertAllEqual(*sess.run((data, decoded)))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
   test.main()

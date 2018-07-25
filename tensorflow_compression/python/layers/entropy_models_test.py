@@ -19,9 +19,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import numpy as np
+# Dependency imports
 
-from tensorflow_compression.python.layers import entropybottleneck
+import numpy as np
 
 from tensorflow.python.framework import dtypes
 from tensorflow.python.ops import array_ops
@@ -30,13 +30,15 @@ from tensorflow.python.ops import variables
 from tensorflow.python.platform import test
 from tensorflow.python.training import gradient_descent
 
+from tensorflow_compression.python.layers import entropy_models
+
 
 class EntropyBottleneckTest(test.TestCase):
 
   def test_noise(self):
     # Tests that the noise added is uniform noise between -0.5 and 0.5.
     inputs = array_ops.placeholder(dtypes.float32, (None, 1))
-    layer = entropybottleneck.EntropyBottleneck()
+    layer = entropy_models.EntropyBottleneck()
     noisy, _ = layer(inputs, training=True)
     with self.test_session() as sess:
       sess.run(variables.global_variables_initializer())
@@ -49,7 +51,7 @@ class EntropyBottleneckTest(test.TestCase):
     # Tests that inputs are quantized to full integer values, even after
     # quantiles have been updated.
     inputs = array_ops.placeholder(dtypes.float32, (None, 1))
-    layer = entropybottleneck.EntropyBottleneck(optimize_integer_offset=False)
+    layer = entropy_models.EntropyBottleneck(optimize_integer_offset=False)
     quantized, _ = layer(inputs, training=False)
     opt = gradient_descent.GradientDescentOptimizer(learning_rate=1)
     self.assertTrue(len(layer.losses) == 1)
@@ -66,7 +68,7 @@ class EntropyBottleneckTest(test.TestCase):
     # have been updated. However, the difference between input and output should
     # be between -0.5 and 0.5, and the offset must be consistent.
     inputs = array_ops.placeholder(dtypes.float32, (None, 1))
-    layer = entropybottleneck.EntropyBottleneck(optimize_integer_offset=True)
+    layer = entropy_models.EntropyBottleneck(optimize_integer_offset=True)
     quantized, _ = layer(inputs, training=False)
     opt = gradient_descent.GradientDescentOptimizer(learning_rate=1)
     self.assertTrue(len(layer.losses) == 1)
@@ -85,7 +87,7 @@ class EntropyBottleneckTest(test.TestCase):
     # Tests that inputs are compressed and decompressed correctly, and quantized
     # to full integer values, even after quantiles have been updated.
     inputs = array_ops.placeholder(dtypes.float32, (1, None, 1))
-    layer = entropybottleneck.EntropyBottleneck(
+    layer = entropy_models.EntropyBottleneck(
         data_format="channels_last", init_scale=60,
         optimize_integer_offset=False)
     bitstrings = layer.compress(inputs)
@@ -108,7 +110,7 @@ class EntropyBottleneckTest(test.TestCase):
     # However, the difference between input and output should be between -0.5
     # and 0.5, and the offset must be consistent.
     inputs = array_ops.placeholder(dtypes.float32, (1, None, 1))
-    layer = entropybottleneck.EntropyBottleneck(
+    layer = entropy_models.EntropyBottleneck(
         data_format="channels_last", init_scale=60,
         optimize_integer_offset=True)
     bitstrings = layer.compress(inputs)
@@ -132,7 +134,7 @@ class EntropyBottleneckTest(test.TestCase):
     # Tests that inputs are compressed and decompressed correctly, and clipped
     # to the expected range.
     inputs = array_ops.placeholder(dtypes.float32, (1, None, 1))
-    layer = entropybottleneck.EntropyBottleneck(
+    layer = entropy_models.EntropyBottleneck(
         data_format="channels_last", init_scale=40)
     bitstrings = layer.compress(inputs)
     decoded = layer.decompress(bitstrings, array_ops.shape(inputs)[1:])
@@ -149,7 +151,7 @@ class EntropyBottleneckTest(test.TestCase):
     # Test the layer with more than one channel and multiple input dimensions,
     # with the channels in the last dimension.
     inputs = array_ops.placeholder(dtypes.float32, (None, None, None, 2))
-    layer = entropybottleneck.EntropyBottleneck(
+    layer = entropy_models.EntropyBottleneck(
         data_format="channels_last", init_scale=50)
     noisy, _ = layer(inputs, training=True)
     quantized, _ = layer(inputs, training=False)
@@ -170,7 +172,7 @@ class EntropyBottleneckTest(test.TestCase):
     # Test the layer with more than one channel and multiple input dimensions,
     # with the channel dimension right after the batch dimension.
     inputs = array_ops.placeholder(dtypes.float32, (None, 3, None, None))
-    layer = entropybottleneck.EntropyBottleneck(
+    layer = entropy_models.EntropyBottleneck(
         data_format="channels_first", init_scale=50)
     noisy, _ = layer(inputs, training=True)
     quantized, _ = layer(inputs, training=False)
@@ -192,7 +194,7 @@ class EntropyBottleneckTest(test.TestCase):
     # `test_decompress`. If you set the constant at the end to `True`, this test
     # will fail and the log will contain the new test data.
     inputs = array_ops.placeholder(dtypes.float32, (2, 3, 10))
-    layer = entropybottleneck.EntropyBottleneck(
+    layer = entropy_models.EntropyBottleneck(
         data_format="channels_first", filters=(), init_scale=2)
     bitstrings = layer.compress(inputs)
     decoded = layer.decompress(bitstrings, array_ops.shape(inputs)[1:])
@@ -237,7 +239,7 @@ class EntropyBottleneckTest(test.TestCase):
     bitstrings = array_ops.placeholder(dtypes.string)
     input_shape = array_ops.placeholder(dtypes.int32)
     quantized_cdf = array_ops.placeholder(dtypes.int32)
-    layer = entropybottleneck.EntropyBottleneck(
+    layer = entropy_models.EntropyBottleneck(
         data_format="channels_first", filters=(), dtype=dtypes.float32)
     layer.build(self.expected.shape)
     layer._quantized_cdf = quantized_cdf
@@ -253,13 +255,13 @@ class EntropyBottleneckTest(test.TestCase):
     # Test that layer can be built when `decompress` is the first call to it.
     bitstrings = array_ops.placeholder(dtypes.string)
     input_shape = array_ops.placeholder(dtypes.int32, shape=[3])
-    layer = entropybottleneck.EntropyBottleneck(dtype=dtypes.float32)
+    layer = entropy_models.EntropyBottleneck(dtype=dtypes.float32)
     layer.decompress(bitstrings, input_shape[1:], channels=5)
     self.assertTrue(layer.built)
 
   def test_pmf_normalization(self):
     # Test that probability mass functions are normalized correctly.
-    layer = entropybottleneck.EntropyBottleneck(dtype=dtypes.float32)
+    layer = entropy_models.EntropyBottleneck(dtype=dtypes.float32)
     layer.build((None, 10))
     with self.test_session() as sess:
       sess.run(variables.global_variables_initializer())
@@ -268,7 +270,7 @@ class EntropyBottleneckTest(test.TestCase):
 
   def test_visualize(self):
     # Test that summary op can be constructed.
-    layer = entropybottleneck.EntropyBottleneck(dtype=dtypes.float32)
+    layer = entropy_models.EntropyBottleneck(dtype=dtypes.float32)
     layer.build((None, 10))
     summary = layer.visualize()
     with self.test_session() as sess:
@@ -278,7 +280,7 @@ class EntropyBottleneckTest(test.TestCase):
   def test_normalization(self):
     # Test that densities are normalized correctly.
     inputs = array_ops.placeholder(dtypes.float32, (None, 1))
-    layer = entropybottleneck.EntropyBottleneck(filters=(2,))
+    layer = entropy_models.EntropyBottleneck(filters=(2,))
     _, likelihood = layer(inputs, training=True)
     with self.test_session() as sess:
       sess.run(variables.global_variables_initializer())
@@ -291,7 +293,7 @@ class EntropyBottleneckTest(test.TestCase):
   def test_entropy_estimates(self):
     # Test that entropy estimates match actual range coding.
     inputs = array_ops.placeholder(dtypes.float32, (1, None, 1))
-    layer = entropybottleneck.EntropyBottleneck(
+    layer = entropy_models.EntropyBottleneck(
         filters=(2, 3), data_format="channels_last")
     _, likelihood = layer(inputs, training=True)
     diff_entropy = math_ops.reduce_sum(math_ops.log(likelihood)) / -np.log(2)

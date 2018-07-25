@@ -19,9 +19,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from tensorflow.contrib.coder.python.ops import coder_ops
+# Dependency imports
 
 import numpy as np
+
+from tensorflow.contrib.coder.python.ops import coder_ops
 
 from tensorflow.python.eager import context
 from tensorflow.python.framework import constant_op
