@@ -19,13 +19,26 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-# pylint: disable=wildcard-import
-from tensorflow_compression.python.layers.entropybottleneck import *
-from tensorflow.contrib.coder.python.ops.coder_ops import *
-# pylint: enable=wildcard-import
+# Dependency imports
 
 from tensorflow.python.util.all_util import remove_undocumented
+
+# pylint: disable=wildcard-import,g-bad-import-order
+from tensorflow.contrib.coder.python.ops.coder_ops import *
+from tensorflow_compression.python.layers.entropy_models import *
+from tensorflow_compression.python.layers.gdn import *
+from tensorflow_compression.python.layers.initializers import *
+from tensorflow_compression.python.layers.parameterizers import *
+from tensorflow_compression.python.layers.signal import *
+from tensorflow_compression.python.ops.math_ops import *
+from tensorflow_compression.python.ops.padding_ops import *
+from tensorflow_compression.python.ops.spectral_ops import *
+# pylint: enable=wildcard-import,g-bad-import-order
+
 remove_undocumented(__name__, [
-    "EntropyBottleneck",
+    "EntropyBottleneck", "GDN", "IdentityInitializer", "Parameterizer",
+    "StaticParameterizer", "RDFTParameterizer", "NonnegativeParameterizer",
+    "SignalConv1D", "SignalConv2D", "SignalConv3D",
+    "upper_bound", "lower_bound", "same_padding_for_kernel", "irdft_matrix",
     "pmf_to_quantized_cdf", "range_decode", "range_encode",
 ])

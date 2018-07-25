@@ -19,19 +19,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import os
-import tensorflow as tf
+# Dependency imports
 
 from tensorflow.contrib.coder.python.ops import coder_ops
+
 pmf_to_quantized_cdf = coder_ops.pmf_to_quantized_cdf
 range_decode = coder_ops.range_decode
 range_encode = coder_ops.range_encode
-
-
-#_coder_ops = tf.load_op_library(os.path.join(
-#    tf.resource_loader.get_data_files_path(), "../../_coder_ops.so"))
-
-# TODO(nmjohn): Find a way to do the below mapping in this module automatically.
-#pmf_to_quantized_cdf = _coder_ops.pmf_to_quantized_cdf
-#range_decode = _coder_ops.range_decode
-#range_encode = _coder_ops.range_encode

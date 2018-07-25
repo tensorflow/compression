@@ -10,11 +10,11 @@ For usage questions and discussions, please head over to our
 **Please note**: You need TensorFlow 1.9 (or the master branch as of May 2018)
 or later.
 
-To make sure the library imports succeed, try running the two
-tests.
+To make sure the library imports succeed, try running the unit tests.
 ```
-python tensorflow_compression/python/ops/coder_ops_test.py
-python tensorflow_compression/python/layers/entropybottleneck_test.py
+for i in tensorflow_compression/python/*/*_test.py; do
+  python $i
+done
 ```
 
 ## Entropy bottleneck layer
