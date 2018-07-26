@@ -664,7 +664,7 @@ def _conv_class_factory(name, rank):
 
 # pylint:disable=invalid-name
 # Subclass _SignalConv for each dimensionality.
-SignalConv1D = _conv_class_factory(b"SignalConv1D", 1)
-SignalConv2D = _conv_class_factory(b"SignalConv2D", 2)
-SignalConv3D = _conv_class_factory(b"SignalConv3D", 3)
+SignalConv1D = _conv_class_factory("SignalConv1D", 1)
+SignalConv2D = _conv_class_factory("SignalConv2D", 2)
+SignalConv3D = _conv_class_factory("SignalConv3D", 3)
 # pylint:enable=invalid-name
