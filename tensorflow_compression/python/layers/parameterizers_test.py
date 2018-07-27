@@ -23,8 +23,7 @@ from __future__ import print_function
 
 import numpy as np
 import tensorflow as tf
-
-from tensorflow_compression.python.layers import parameterizers
+import tensorflow_compression as tfc
 
 
 class ParameterizersTest(tf.test.TestCase):
@@ -41,7 +40,7 @@ class ParameterizersTest(tf.test.TestCase):
   def test_static_parameterizer(self):
     shape = (1, 2, 3, 4)
     var = self._test_parameterizer(
-        parameterizers.StaticParameterizer(tf.initializers.zeros()),
+        tfc.StaticParameterizer(tf.initializers.zeros()),
         tf.initializers.random_uniform(), shape)
     self.assertEqual(var.shape, shape)
     self.assertAllClose(var, np.zeros(shape), rtol=0, atol=1e-7)
@@ -49,7 +48,7 @@ class ParameterizersTest(tf.test.TestCase):
   def test_rdft_parameterizer(self):
     shape = (3, 4, 2, 1)
     var = self._test_parameterizer(
-        parameterizers.RDFTParameterizer(),
+        tfc.RDFTParameterizer(),
         tf.initializers.ones(), shape)
     self.assertEqual(var.shape, shape)
     self.assertAllClose(var, np.ones(shape), rtol=0, atol=1e-6)
@@ -57,7 +56,7 @@ class ParameterizersTest(tf.test.TestCase):
   def test_nonnegative_parameterizer(self):
     shape = (1, 2, 3, 4)
     var = self._test_parameterizer(
-        parameterizers.NonnegativeParameterizer(),
+        tfc.NonnegativeParameterizer(),
         tf.initializers.random_uniform(), shape)
     self.assertEqual(var.shape, shape)
     self.assertTrue(np.all(var >= 0))
@@ -65,7 +64,7 @@ class ParameterizersTest(tf.test.TestCase):
   def test_positive_parameterizer(self):
     shape = (1, 2, 3, 4)
     var = self._test_parameterizer(
-        parameterizers.NonnegativeParameterizer(minimum=.1),
+        tfc.NonnegativeParameterizer(minimum=.1),
         tf.initializers.random_uniform(), shape)
     self.assertEqual(var.shape, shape)
     self.assertTrue(np.all(var >= .1))

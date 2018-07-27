@@ -23,15 +23,14 @@ from __future__ import print_function
 
 import numpy as np
 import tensorflow as tf
-
-from tensorflow_compression.python.layers import gdn
+import tensorflow_compression as tfc
 
 
 class GDNTest(tf.test.TestCase):
 
   def _run_gdn(self, x, shape, inverse, rectify, data_format):
     inputs = tf.placeholder(tf.float32, shape)
-    layer = gdn.GDN(
+    layer = tfc.GDN(
         inverse=inverse, rectify=rectify, data_format=data_format)
     outputs = layer(inputs)
     with self.test_session() as sess:
