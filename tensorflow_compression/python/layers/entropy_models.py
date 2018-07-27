@@ -57,11 +57,9 @@ class EntropyBottleneck(base_layer.Layer):
   of its input tensor, which is described in the appendix of the paper (please
   cite the paper if you use this code for scientific work):
 
-  "Variational image compression with a scale hyperprior"
-
-  Johannes Ballé, David Minnen, Saurabh Singh, Sung Jin Hwang, Nick Johnston
-
-  https://arxiv.org/abs/1802.01436
+  > "Variational image compression with a scale hyperprior"<br />
+  > J. Ballé, D. Minnen, S. Singh, S. J. Hwang, N. Johnston<br />
+  > https://arxiv.org/abs/1802.01436
 
   The layer assumes that the input tensor is at least 2D, with a batch dimension
   at the beginning and a channel dimension as specified by `data_format`. The

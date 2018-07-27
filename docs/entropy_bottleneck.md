@@ -19,8 +19,8 @@ The layer implements a flexible probability density model to estimate entropy,
 which is described in the appendix of the paper (please cite the paper if you
 use this code for scientific work):
 
-> J. Ballé, D. Minnen, S. Singh, S. J. Hwang, N. Johnston:
-> "Variational image compression with a scale hyperprior"
+> "Variational image compression with a scale hyperprior"<br />
+> J. Ballé, D. Minnen, S. Singh, S. J. Hwang, N. Johnston<br />
 > https://arxiv.org/abs/1802.01436
 
 The layer assumes that the input tensor is at least 2D, with a batch dimension
