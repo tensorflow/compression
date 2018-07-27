@@ -359,8 +359,17 @@ class EntropyBottleneck(base_layer.Layer):
 
     cdf = coder_ops.pmf_to_quantized_cdf(
         pmf, precision=self.range_coder_precision)
+
+    # We need to supply an initializer without fully defined static shape here,
+    # or the variable will return the wrong dynamic shape later. A placeholder
+    # with default gets the trick done.
+    def cdf_init(*args, **kwargs):
+      return array_ops.placeholder_with_default(
+          array_ops.zeros((channels, 1), dtype=dtypes.int32),
+          shape=(channels, None))
+
     self._quantized_cdf = self.add_variable(
-        "quantized_cdf", shape=(channels, 1), dtype=dtypes.int32,
+        "quantized_cdf", shape=None, initializer=cdf_init, dtype=dtypes.int32,
         trainable=False)
 
     update_op = state_ops.assign(
