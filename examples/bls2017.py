@@ -35,6 +35,8 @@ import tensorflow_compression as tfc
 
 
 def load_image(filename):
+  """Loads a PNG image file."""
+
   string = tf.read_file(filename)
   image = tf.image.decode_image(string, channels=3)
   image = tf.cast(image, tf.float32)
@@ -43,6 +45,8 @@ def load_image(filename):
 
 
 def save_image(filename, image):
+  """Saves an image to a PNG file."""
+
   image = tf.clip_by_value(image, 0, 1)
   image = tf.round(image * 255)
   image = tf.cast(image, tf.uint8)
@@ -51,6 +55,8 @@ def save_image(filename, image):
 
 
 def analysis_transform(tensor, num_filters):
+  """Builds the analysis transform."""
+
   with tf.variable_scope("analysis"):
     with tf.variable_scope("layer_0"):
       layer = tfc.SignalConv2D(
@@ -74,6 +80,8 @@ def analysis_transform(tensor, num_filters):
 
 
 def synthesis_transform(tensor, num_filters):
+  """Builds the synthesis transform."""
+
   with tf.variable_scope("synthesis"):
     with tf.variable_scope("layer_0"):
       layer = tfc.SignalConv2D(
@@ -96,11 +104,16 @@ def synthesis_transform(tensor, num_filters):
     return tensor
 
 
-def train(args):
+def train():
+  """Trains the model."""
+
+  if args.verbose:
+    tf.logging.set_verbosity(tf.logging.INFO)
+
   # Load all training images into a constant.
   images = tf.map_fn(
-    load_image, tf.matching_files(args.data_glob),
-    dtype=tf.float32, back_prop=False)
+      load_image, tf.matching_files(args.data_glob),
+      dtype=tf.float32, back_prop=False)
   with tf.Session() as sess:
     images = tf.constant(sess.run(images), name="images")
 
@@ -119,7 +132,9 @@ def train(args):
   train_bpp = tf.reduce_sum(tf.log(likelihoods)) / (-np.log(2) * num_pixels)
 
   # Mean squared error across pixels.
-  train_mse = tf.reduce_sum(tf.squared_difference(x, x_tilde)) / num_pixels
+  train_mse = tf.reduce_sum(tf.squared_difference(x, x_tilde))
+  # Multiply by 255^2 to correct for rescaling.
+  train_mse *= 255 ** 2 / num_pixels
 
   # The rate-distortion cost.
   train_loss = args.lmbda * train_mse + train_bpp
@@ -134,9 +149,15 @@ def train(args):
 
   train_op = tf.group(main_step, aux_step, entropy_bottleneck.updates[0])
 
+  logged_tensors = [
+      tf.identity(train_loss, name="train_loss"),
+      tf.identity(train_bpp, name="train_bpp"),
+      tf.identity(train_mse, name="train_mse"),
+  ]
   hooks = [
       tf.train.StopAtStepHook(last_step=args.last_step),
       tf.train.NanTensorHook(train_loss),
+      tf.train.LoggingTensorHook(logged_tensors, every_n_secs=60),
   ]
   with tf.train.MonitoredTrainingSession(
       hooks=hooks, checkpoint_dir=args.checkpoint_dir) as sess:
@@ -144,7 +165,9 @@ def train(args):
       sess.run(train_op)
 
 
-def compress(args):
+def compress():
+  """Compresses an image."""
+
   # Load input image and add batch dimension.
   x = load_image(args.input)
   x = tf.expand_dims(x, 0)
@@ -166,7 +189,9 @@ def compress(args):
   eval_bpp = tf.reduce_sum(tf.log(likelihoods)) / (-np.log(2) * num_pixels)
 
   # Mean squared error across pixels.
-  mse = tf.reduce_sum(tf.squared_difference(x, x_hat)) / num_pixels
+  x_hat = tf.clip_by_value(x_hat, 0, 1)
+  x_hat = tf.round(x_hat * 255)
+  mse = tf.reduce_sum(tf.squared_difference(x * 255, x_hat)) / num_pixels
 
   with tf.Session() as sess:
     # Load the latest model checkpoint, get the compressed string and the tensor
@@ -176,10 +201,10 @@ def compress(args):
     string, x_shape, y_shape = sess.run([string, tf.shape(x), tf.shape(y)])
 
     # Write a binary file with the shape information and the compressed string.
-    with open(args.output, "wb") as file:
-      file.write(np.array(x_shape[1:-1], dtype=np.uint16).tobytes())
-      file.write(np.array(y_shape[1:-1], dtype=np.uint16).tobytes())
-      file.write(string)
+    with open(args.output, "wb") as f:
+      f.write(np.array(x_shape[1:-1], dtype=np.uint16).tobytes())
+      f.write(np.array(y_shape[1:-1], dtype=np.uint16).tobytes())
+      f.write(string)
 
     # If requested, transform the quantized image back and measure performance.
     if args.verbose:
@@ -193,14 +218,15 @@ def compress(args):
       print("Actual bits per pixel for this image: {:0.4}".format(bpp))
 
 
-def decompress(args):
-  # Read the shape information and compressed string from the binary file.
-  with open(args.input, "rb") as file:
-    x_shape = np.frombuffer(file.read(4), dtype=np.uint16)
-    y_shape = np.frombuffer(file.read(4), dtype=np.uint16)
-    string = file.read()
+def decompress():
+  """Decompresses an image."""
 
-  bits = 8 * len(string)
+  # Read the shape information and compressed string from the binary file.
+  with open(args.input, "rb") as f:
+    x_shape = np.frombuffer(f.read(4), dtype=np.uint16)
+    y_shape = np.frombuffer(f.read(4), dtype=np.uint16)
+    string = f.read()
+
   y_shape = [int(s) for s in y_shape] + [args.num_filters]
 
   # Add a batch dimension, then decompress and transform the image back.
@@ -242,34 +268,42 @@ if __name__ == "__main__":
   parser.add_argument(
       "output", nargs="?",
       help="Output filename.")
-  parser.add_argument("--verbose", "-v", action="store_true",
+  parser.add_argument(
+      "--verbose", "-v", action="store_true",
       help="Report bitrate and distortion when training or compressing.")
-  parser.add_argument("--num_filters", type=int, default=128,
+  parser.add_argument(
+      "--num_filters", type=int, default=128,
       help="Number of filters per layer.")
-  parser.add_argument("--checkpoint_dir", default="train",
+  parser.add_argument(
+      "--checkpoint_dir", default="train",
       help="Directory where to save/load model checkpoints.")
-  parser.add_argument("--data_glob", default="images/*.png",
+  parser.add_argument(
+      "--data_glob", default="images/*.png",
       help="Glob pattern identifying training data. This pattern must expand "
            "to a list of RGB images in PNG format which all have the same "
            "shape.")
-  parser.add_argument("--batchsize", type=int, default=8,
+  parser.add_argument(
+      "--batchsize", type=int, default=8,
       help="Batch size for training.")
-  parser.add_argument("--patchsize", type=int, default=128,
+  parser.add_argument(
+      "--patchsize", type=int, default=128,
       help="Size of image patches for training.")
-  parser.add_argument("--lambda", type=float, default=0.1, dest="lmbda",
+  parser.add_argument(
+      "--lambda", type=float, default=0.1, dest="lmbda",
       help="Lambda for rate-distortion tradeoff.")
-  parser.add_argument("--last_step", type=int, default=1000000,
+  parser.add_argument(
+      "--last_step", type=int, default=1000000,
       help="Train up to this number of steps.")
 
   args = parser.parse_args()
 
   if args.command == "train":
-    train(args)
+    train()
   elif args.command == "compress":
     if args.input is None or args.output is None:
       raise ValueError("Need input and output filename for compression.")
-    compress(args)
+    compress()
   elif args.command == "decompress":
     if args.input is None or args.output is None:
       raise ValueError("Need input and output filename for decompression.")
-    decompress(args)
+    decompress()
