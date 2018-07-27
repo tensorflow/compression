@@ -20,8 +20,9 @@ done
 
 ## Example model
 
-The [examples directory](examples/) directory contains an implementation of the
-image compression model described in:
+The [examples directory](https://github.com/tensorflow/compression/tree/master/examples)
+directory contains an implementation of the image compression model described
+in:
 
 > J. Ballé, V. Laparra, E. P. Simoncelli:
 > "End-to-end optimized image compression"
@@ -45,12 +46,14 @@ python bls2017.py [options] decompress compressed.bin reconstruction.png
 
 ## Documentation
 
-Refer to [the API documentation](docs/api_docs/python/tfc.md) for a full
-description of the Keras layers and TensorFlow ops this package implements.
+Refer to [the API documentation](https://tensorflow.github.io/compression/docs/api_docs/python/tfc.html)
+for a full description of the Keras layers and TensorFlow ops this package
+implements.
 
 There's also an introduction to our `EntropyBottleneck` class
-[here](docs/entropy_bottleneck.md), and a description of the range coding ops
-[here](docs/range_coding.md).
+[here](https://tensorflow.github.io/compression/docs/entropy_bottleneck.html),
+and a description of the range coding ops
+[here](https://tensorflow.github.io/compression/docs/range_coding.html).
 
 ## Authors
 Johannes Ballé (github: [jonycgn](https://github.com/jonycgn)),
