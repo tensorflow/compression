@@ -10,11 +10,37 @@ For usage questions and discussions, please head over to our
 **Please note**: You need TensorFlow 1.9 (or the master branch as of May 2018)
 or later.
 
-To make sure the library imports succeed, try running the unit tests.
-```
+To make sure the library imports succeed, try running the unit tests:
+
+```bash
 for i in tensorflow_compression/python/*/*_test.py; do
   python $i
 done
+```
+
+## Example model
+
+The `examples` directory contains an implementation of the image compression
+model described in:
+
+> J. Ballé, V. Laparra, E. P. Simoncelli:
+> "End-to-end optimized image compression"
+> https://arxiv.org/abs/1611.01704
+
+To see a list of options, change to the directory and run:
+
+```bash
+python BLS2017.py -h
+```
+
+To train the model, you need to supply it with a dataset of RGB training images.
+They should be provided in PNG format and must all have the same shape.
+Following training, the python script can be used to compress and decompress
+images as follows:
+
+```bash
+python BLS2017.py [options] compress original.png compressed.bin
+python BLS2017.py [options] decompress compressed.bin reconstruction.png
 ```
 
 ## Entropy bottleneck layer
@@ -95,7 +121,7 @@ main_loss = 0.5 * tf.reduce_mean(squared_error) + tf.reduce_mean(bits)
 
 # Minimize loss and auxiliary loss, and execute update op.
 main_optimizer = tf.train.AdamOptimizer(learning_rate=1e-4)
-main_step = optimizer.minimize(main_loss)
+main_step = main_optimizer.minimize(main_loss)
 # 1e-3 is a good starting point for the learning rate of the auxiliary loss,
 # assuming Adam is used.
 aux_optimizer = tf.train.AdamOptimizer(learning_rate=1e-3)

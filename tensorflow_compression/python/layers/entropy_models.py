@@ -359,15 +359,9 @@ class EntropyBottleneck(base_layer.Layer):
 
     cdf = coder_ops.pmf_to_quantized_cdf(
         pmf, precision=self.range_coder_precision)
-    def cdf_getter(*args, **kwargs):
-      del args, kwargs  # ignored
-      return variable_scope.get_variable(
-          "quantized_cdf", dtype=dtypes.int32, initializer=cdf,
-          trainable=False, validate_shape=False, collections=())
-    # Need to provide a fake shape here since add_variable insists on it.
     self._quantized_cdf = self.add_variable(
         "quantized_cdf", shape=(channels, 1), dtype=dtypes.int32,
-        getter=cdf_getter, trainable=False)
+        trainable=False)
 
     update_op = state_ops.assign(
         self._quantized_cdf, cdf, validate_shape=False)
