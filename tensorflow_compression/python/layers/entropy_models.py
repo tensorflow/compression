@@ -38,7 +38,6 @@ from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import nn
 from tensorflow.python.ops import random_ops
 from tensorflow.python.ops import state_ops
-from tensorflow.python.ops import variable_scope
 from tensorflow.python.summary import summary
 
 
@@ -364,6 +363,7 @@ class EntropyBottleneck(base_layer.Layer):
     # or the variable will return the wrong dynamic shape later. A placeholder
     # with default gets the trick done.
     def cdf_init(*args, **kwargs):
+      del args, kwargs  # unused
       return array_ops.placeholder_with_default(
           array_ops.zeros((channels, 1), dtype=dtypes.int32),
           shape=(channels, None))

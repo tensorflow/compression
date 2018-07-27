@@ -30,7 +30,7 @@ model described in:
 To see a list of options, change to the directory and run:
 
 ```bash
-python BLS2017.py -h
+python bls2017.py -h
 ```
 
 To train the model, you need to supply it with a dataset of RGB training images.
@@ -39,8 +39,8 @@ Following training, the python script can be used to compress and decompress
 images as follows:
 
 ```bash
-python BLS2017.py [options] compress original.png compressed.bin
-python BLS2017.py [options] decompress compressed.bin reconstruction.png
+python bls2017.py [options] compress original.png compressed.bin
+python bls2017.py [options] decompress compressed.bin reconstruction.png
 ```
 
 ## Entropy bottleneck layer
