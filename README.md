@@ -1,14 +1,27 @@
-# TensorFlow data compression library
-
 This package contains data compression ops and layers for TensorFlow.
 
-For usage questions and discussions, please head over to our
-[Google group](https://groups.google.com/forum/#!forum/tensorflow-compression)!
+# Documentation
 
-## Prerequisite
+All documentation is hosted at https://tensorflow.github.io/compression.
+
+Refer to [the API documentation](https://tensorflow.github.io/compression/docs/api_docs/python/tfc.html)
+for a complete description of the Keras layers and TensorFlow ops this package
+implements.
+
+There's also an introduction to our `EntropyBottleneck` class
+[here](https://tensorflow.github.io/compression/docs/entropy_bottleneck.html),
+and a description of the range coding operators
+[here](https://tensorflow.github.io/compression/docs/range_coding.html).
+
+# Google group
+
+For usage questions and discussions, please head over to our
+[Google group](https://groups.google.com/forum/#!forum/tensorflow-compression).
+
+# Quick start
 
 **Please note**: You need TensorFlow 1.9 (or the master branch as of May 2018)
-or later.
+or later installed.
 
 To make sure the library imports succeed, try running the unit tests:
 
@@ -44,18 +57,7 @@ python bls2017.py [options] compress original.png compressed.bin
 python bls2017.py [options] decompress compressed.bin reconstruction.png
 ```
 
-## Documentation
-
-Refer to [the API documentation](https://tensorflow.github.io/compression/docs/api_docs/python/tfc.html)
-for a full description of the Keras layers and TensorFlow ops this package
-implements.
-
-There's also an introduction to our `EntropyBottleneck` class
-[here](https://tensorflow.github.io/compression/docs/entropy_bottleneck.html),
-and a description of the range coding ops
-[here](https://tensorflow.github.io/compression/docs/range_coding.html).
-
-## Authors
+# Authors
 Johannes Ballé (github: [jonycgn](https://github.com/jonycgn)),
 Sung Jin Hwang (github: [ssjhv](https://github.com/ssjhv)), and
 Nick Johnston (github: [nmjohn](https://github.com/nmjohn))
