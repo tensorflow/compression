@@ -23,8 +23,7 @@ from __future__ import print_function
 
 import numpy as np
 import tensorflow as tf
-
-from tensorflow_compression.python.ops import spectral_ops
+import tensorflow_compression as tfc
 
 
 class SpectralOpsTest(tf.test.TestCase):
@@ -32,7 +31,7 @@ class SpectralOpsTest(tf.test.TestCase):
   def test_irdft1_matrix(self):
     for shape in [(4,), (3,)]:
       size = shape[0]
-      matrix = spectral_ops.irdft_matrix(shape)
+      matrix = tfc.irdft_matrix(shape)
       # Test that the matrix is orthonormal.
       result = tf.matmul(matrix, tf.transpose(matrix))
       with self.test_session() as sess:
@@ -42,7 +41,7 @@ class SpectralOpsTest(tf.test.TestCase):
   def test_irdft2_matrix(self):
     for shape in [(7, 4), (8, 9)]:
       size = shape[0] * shape[1]
-      matrix = spectral_ops.irdft_matrix(shape)
+      matrix = tfc.irdft_matrix(shape)
       # Test that the matrix is orthonormal.
       result = tf.matmul(matrix, tf.transpose(matrix))
       with self.test_session() as sess:
@@ -52,7 +51,7 @@ class SpectralOpsTest(tf.test.TestCase):
   def test_irdft3_matrix(self):
     for shape in [(3, 4, 2), (6, 3, 1)]:
       size = shape[0] * shape[1] * shape[2]
-      matrix = spectral_ops.irdft_matrix(shape)
+      matrix = tfc.irdft_matrix(shape)
       # Test that the matrix is orthonormal.
       result = tf.matmul(matrix, tf.transpose(matrix))
       with self.test_session() as sess:
