@@ -58,18 +58,14 @@ Generalized divisive normalization layer.
 
 Based on the papers:
 
-  "Density Modeling of Images using a Generalized Normalization
-  Transformation"
+> "Density modeling of images using a generalized normalization
+> transformation"<br />
+> J. Ballé, V. Laparra, E.P. Simoncelli<br />
+> https://arxiv.org/abs/1511.06281
 
-  Johannes Ballé, Valero Laparra, Eero P. Simoncelli
-
-  https://arxiv.org/abs/1511.06281
-
-  "End-to-end Optimized Image Compression"
-
-  Johannes Ballé, Valero Laparra, Eero P. Simoncelli
-
-  https://arxiv.org/abs/1611.01704
+> "End-to-end optimized image compression"<br />
+> J. Ballé, V. Laparra, E.P. Simoncelli<br />
+> https://arxiv.org/abs/1611.01704
 
 Implements an activation function that is essentially a multivariate
 generalization of a particular sigmoid-type function:

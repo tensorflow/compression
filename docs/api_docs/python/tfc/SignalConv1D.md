@@ -88,15 +88,17 @@ In general, the outputs are equivalent to a composition of:
 5. a pointwise nonlinearity (if `activation is not None`)
 
 For more information on what the difference between convolution and cross
-correlation is, see https://en.wikipedia.org/wiki/Convolution and
-https://en.wikipedia.org/wiki/Cross-correlation. Note that the distinction
-between convolution and cross correlation is occasionally blurred (one may use
-convolution as an umbrella term for both). For a discussion of
-up-/downsampling, see https://en.wikipedia.org/wiki/Upsampling and
-https://en.wikipedia.org/wiki/Decimation_(signal_processing). A more in-depth
-treatment of all of these operations can be found in:
+correlation is, see [this](https://en.wikipedia.org/wiki/Convolution) and
+[this](https://en.wikipedia.org/wiki/Cross-correlation) Wikipedia article,
+respectively. Note that the distinction between convolution and cross
+correlation is occasionally blurred (one may use convolution as an umbrella
+term for both). For a discussion of up-/downsampling, refer to the articles
+about [upsampling](https://en.wikipedia.org/wiki/Upsampling) and
+[decimation](https://en.wikipedia.org/wiki/Decimation_(signal_processing)). A
+more in-depth treatment of all of these operations can be found in:
 
-  Oppenheim, Schafer, Buck: Discrete-Time Signal Processing (Prentice Hall)
+> "Discrete-Time Signal Processing"<br />
+> Oppenheim, Schafer, Buck (Prentice Hall)
 
 For purposes of this class, the center position of a kernel is always
 considered to be at `K // 2`, where `K` is the support length of the kernel.
