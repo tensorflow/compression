@@ -1,5 +1,18 @@
 This project contains data compression ops and layers for TensorFlow. The
-project website is at https://tensorflow.github.io/compression.
+project website is at
+[tensorflow.github.io/compression](https://tensorflow.github.io/compression).
+
+What does this library do, you ask?
+
+In a nutshell, you can use it to build your own ML models with optimized lossy
+data compression built in. It's useful to find storage-efficient representations
+of your data (features, examples, images, etc.) while only sacrificing a tiny
+fraction of model performance. It can compress any floating point tensor to a
+much smaller sequence of bits.
+
+For an introduction to lossy data compression with machine learning, take a look
+at @jonycgn's
+[talk on Learned Image Compression](https://www.youtube.com/watch?v=x_q7cZviXkY).
 
 # Quick start
 
@@ -35,7 +48,7 @@ import tensorflow_compression as tfc
 ## Example model
 
 The [examples directory](https://github.com/tensorflow/compression/tree/master/examples)
-directory contains an implementation of the image compression model described
+contains an implementation of the image compression model described
 in:
 
 > "End-to-end optimized image compression"<br />
