@@ -23,8 +23,6 @@ from __future__ import print_function
 
 import numpy as np
 
-from tensorflow.contrib.coder.python.ops import coder_ops
-
 from tensorflow.python.eager import context
 from tensorflow.python.framework import constant_op
 from tensorflow.python.framework import dtypes
@@ -39,6 +37,9 @@ from tensorflow.python.ops import nn
 from tensorflow.python.ops import random_ops
 from tensorflow.python.ops import state_ops
 from tensorflow.python.summary import summary
+
+from tensorflow_compression.python.ops import coder_ops
+from tensorflow_compression.python.ops import math_ops as tfc_math_ops
 
 
 class EntropyBottleneck(base_layer.Layer):
@@ -436,8 +437,7 @@ class EntropyBottleneck(base_layer.Layer):
     if self.likelihood_bound > 0:
       likelihood_bound = constant_op.constant(
           self.likelihood_bound, dtype=self.dtype)
-      # TODO(jonycgn): Override gradients.
-      likelihood = math_ops.maximum(likelihood, likelihood_bound)
+      likelihood = tfc_math_ops.lower_bound(likelihood, likelihood_bound)
 
     # Convert back to input tensor shape.
     order = list(range(1, ndim))

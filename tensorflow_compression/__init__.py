@@ -23,17 +23,17 @@ from __future__ import print_function
 
 from tensorflow.python.util.all_util import remove_undocumented
 
-# pylint: disable=wildcard-import,g-bad-import-order
-from tensorflow.contrib.coder.python.ops.coder_ops import *
+# pylint: disable=wildcard-import
 from tensorflow_compression.python.layers.entropy_models import *
 from tensorflow_compression.python.layers.gdn import *
 from tensorflow_compression.python.layers.initializers import *
 from tensorflow_compression.python.layers.parameterizers import *
 from tensorflow_compression.python.layers.signal import *
+from tensorflow_compression.python.ops.coder_ops import *
 from tensorflow_compression.python.ops.math_ops import *
 from tensorflow_compression.python.ops.padding_ops import *
 from tensorflow_compression.python.ops.spectral_ops import *
-# pylint: enable=wildcard-import,g-bad-import-order
+# pylint: enable=wildcard-import
 
 remove_undocumented(__name__, [
     "EntropyBottleneck", "GDN", "IdentityInitializer", "Parameterizer",
