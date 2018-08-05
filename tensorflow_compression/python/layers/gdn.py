@@ -170,7 +170,7 @@ class GDN(base.Layer):
       norm_pool += self.beta
       if self.data_format == "channels_first":
         # Return to channels_first format if necessary.
-        axes = range(ndim - 1)
+        axes = list(range(ndim - 1))
         axes.insert(1, ndim - 1)
         norm_pool = array_ops.transpose(norm_pool, axes)
 
