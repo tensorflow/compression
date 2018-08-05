@@ -28,7 +28,7 @@ from tensorflow_compression.python.layers.entropy_models import *
 from tensorflow_compression.python.layers.gdn import *
 from tensorflow_compression.python.layers.initializers import *
 from tensorflow_compression.python.layers.parameterizers import *
-from tensorflow_compression.python.layers.signal import *
+from tensorflow_compression.python.layers.signal_conv import *
 from tensorflow_compression.python.ops.coder_ops import *
 from tensorflow_compression.python.ops.math_ops import *
 from tensorflow_compression.python.ops.padding_ops import *
