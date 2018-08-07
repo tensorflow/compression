@@ -75,10 +75,10 @@ class GDN(base.Layer):
       A good default setting is somewhere between 0 and 0.5.
     data_format: Format of input tensor. Currently supports `'channels_first'`
       and `'channels_last'`.
-    beta_parameterization: Parameterizer object for beta parameter. Defaults
-      to NonnegativeParameterizer with a minimum value of 1e-6.
-    gamma_parameterization: Parameterizer object for gamma parameter.
-      Defaults to NonnegativeParameterizer with a minimum value of 0.
+    beta_parameterizer: Reparameterization for beta parameter. Defaults to
+      `NonnegativeParameterizer` with a minimum value of `1e-6`.
+    gamma_parameterizer: Reparameterization for gamma parameter. Defaults to
+      `NonnegativeParameterizer` with a minimum value of `0`.
     activity_regularizer: Regularizer function for the output.
     trainable: Boolean, if `True`, also add variables to the graph collection
       `GraphKeys.TRAINABLE_VARIABLES` (see `tf.Variable`).
@@ -100,8 +100,8 @@ class GDN(base.Layer):
                rectify=False,
                gamma_init=.1,
                data_format="channels_last",
-               beta_parameterization=_default_beta_param,
-               gamma_parameterization=_default_gamma_param,
+               beta_parameterizer=_default_beta_param,
+               gamma_parameterizer=_default_gamma_param,
                activity_regularizer=None,
                trainable=True,
                name=None,
@@ -113,8 +113,8 @@ class GDN(base.Layer):
     self.rectify = bool(rectify)
     self._gamma_init = float(gamma_init)
     self.data_format = data_format
-    self._beta_parameterization = beta_parameterization
-    self._gamma_parameterization = gamma_parameterization
+    self._beta_parameterizer = beta_parameterizer
+    self._gamma_parameterizer = gamma_parameterizer
     self._channel_axis()  # trigger ValueError early
     self.input_spec = base.InputSpec(min_ndim=2)
 
@@ -136,11 +136,11 @@ class GDN(base.Layer):
     self.input_spec = base.InputSpec(ndim=input_shape.ndims,
                                      axes={channel_axis: num_channels})
 
-    self.beta = self._beta_parameterization(
+    self.beta = self._beta_parameterizer(
         name="beta", shape=[num_channels], dtype=self.dtype,
         getter=self.add_variable, initializer=init_ops.Ones())
 
-    self.gamma = self._gamma_parameterization(
+    self.gamma = self._gamma_parameterizer(
         name="gamma", shape=[num_channels, num_channels], dtype=self.dtype,
         getter=self.add_variable,
         initializer=init_ops.Identity(gain=self._gamma_init))

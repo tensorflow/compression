@@ -4,7 +4,7 @@
 <meta itemprop="property" content="activity_regularizer"/>
 <meta itemprop="property" content="bias"/>
 <meta itemprop="property" content="bias_initializer"/>
-<meta itemprop="property" content="bias_parameterization"/>
+<meta itemprop="property" content="bias_parameterizer"/>
 <meta itemprop="property" content="bias_regularizer"/>
 <meta itemprop="property" content="channel_separable"/>
 <meta itemprop="property" content="corr"/>
@@ -19,7 +19,7 @@
 <meta itemprop="property" content="input_shape"/>
 <meta itemprop="property" content="kernel"/>
 <meta itemprop="property" content="kernel_initializer"/>
-<meta itemprop="property" content="kernel_parameterization"/>
+<meta itemprop="property" content="kernel_parameterizer"/>
 <meta itemprop="property" content="kernel_regularizer"/>
 <meta itemprop="property" content="kernel_support"/>
 <meta itemprop="property" content="losses"/>
@@ -245,11 +245,10 @@ will throw an exception.
 * <b>`kernel_regularizer`</b>: Optional regularizer for the filter kernel.
 * <b>`bias_regularizer`</b>: Optional regularizer for the bias vector.
 * <b>`activity_regularizer`</b>: Regularizer function for the output.
-* <b>`kernel_parameterization`</b>: Reparameterization applied to filter kernel. If not
-    `None`, must be a parameterization object. Defaults to RDFT
-    parameterization.
-* <b>`bias_parameterization`</b>: Reparameterization applied to bias. If not `None`,
-    must be a parameterization object.
+* <b>`kernel_parameterizer`</b>: Reparameterization applied to filter kernel. If not
+    `None`, must be a `Parameterizer` object. Defaults to `RDFTParameterizer`.
+* <b>`bias_parameterizer`</b>: Reparameterization applied to bias. If not `None`, must
+    be a `Parameterizer` object.
 * <b>`trainable`</b>: Boolean. Whether the layer should be trained.
 * <b>`name`</b>: String. The name of the layer.
 * <b>`dtype`</b>: Default dtype of the layer's parameters (default of `None` means use
@@ -272,8 +271,8 @@ Read-only properties:
 * <b>`kernel_regularizer`</b>: See above.
 * <b>`bias_regularizer`</b>: See above.
 * <b>`activity_regularizer`</b>: See above.
-* <b>`kernel_parameterization`</b>: See above.
-* <b>`bias_parameterization`</b>: See above.
+* <b>`kernel_parameterizer`</b>: See above.
+* <b>`bias_parameterizer`</b>: See above.
 * <b>`name`</b>: See above.
 * <b>`dtype`</b>: See above.
 * <b>`kernel`</b>: `Tensor`-like object. The convolution kernel as applied to the
@@ -309,7 +308,7 @@ Optional regularizer function for the output of this layer.
 
 
 
-<h3 id="bias_parameterization"><code>bias_parameterization</code></h3>
+<h3 id="bias_parameterizer"><code>bias_parameterizer</code></h3>
 
 
 
@@ -417,7 +416,7 @@ Input shape, as an integer shape tuple
 
 
 
-<h3 id="kernel_parameterization"><code>kernel_parameterization</code></h3>
+<h3 id="kernel_parameterizer"><code>kernel_parameterizer</code></h3>
 
 
 

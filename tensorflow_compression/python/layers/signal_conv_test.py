@@ -110,7 +110,7 @@ class SignalTest(tf.test.TestCase):
         strides_up=strides_up, padding="valid", extra_pad_end=extra_pad_end,
         channel_separable=channel_separable, data_format=data_format,
         activation=activation, use_bias=use_bias,
-        kernel_parameterization=tf_kernel)
+        kernel_parameterizer=tf_kernel)
     tf_outputs = layer(tf_inputs)
     with self.test_session() as sess:
       sess.run(tf.global_variables_initializer())
@@ -159,7 +159,7 @@ class SignalTest(tf.test.TestCase):
         strides_up=strides_up, padding=padding, extra_pad_end=extra_pad_end,
         channel_separable=channel_separable, data_format=data_format,
         activation=activation, use_bias=use_bias,
-        kernel_parameterization=tf_kernel)
+        kernel_parameterizer=tf_kernel)
     tf_outputs = layer(tf_inputs)
     with self.test_session() as sess:
       sess.run(tf.global_variables_initializer())
