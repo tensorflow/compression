@@ -20,7 +20,7 @@ Example code for kernel creation, assuming 2D kernels:
 
 ```
 def create_kernel(init):
-  shape = init.get_shape().as_list()
+  shape = init.shape.as_list()
   matrix = irdft_matrix(shape[:2])
   init = tf.reshape(init, (shape[0] * shape[1], shape[2] * shape[3]))
   init = tf.matmul(tf.transpose(matrix), init)

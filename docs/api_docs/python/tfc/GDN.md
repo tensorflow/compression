@@ -91,10 +91,10 @@ more flexible, as `beta` and `gamma` are trainable parameters.
     A good default setting is somewhere between 0 and 0.5.
 * <b>`data_format`</b>: Format of input tensor. Currently supports `'channels_first'`
     and `'channels_last'`.
-* <b>`beta_parameterization`</b>: Parameterizer object for beta parameter. Defaults
-    to NonnegativeParameterizer with a minimum value of 1e-6.
-* <b>`gamma_parameterization`</b>: Parameterizer object for gamma parameter.
-    Defaults to NonnegativeParameterizer with a minimum value of 0.
+* <b>`beta_parameterizer`</b>: Reparameterization for beta parameter. Defaults to
+    `NonnegativeParameterizer` with a minimum value of `1e-6`.
+* <b>`gamma_parameterizer`</b>: Reparameterization for gamma parameter. Defaults to
+    `NonnegativeParameterizer` with a minimum value of `0`.
 * <b>`activity_regularizer`</b>: Regularizer function for the output.
 * <b>`trainable`</b>: Boolean, if `True`, also add variables to the graph collection
     `GraphKeys.TRAINABLE_VARIABLES` (see `tf.Variable`).
@@ -314,8 +314,8 @@ __init__(
     rectify=False,
     gamma_init=0.1,
     data_format='channels_last',
-    beta_parameterization=_default_beta_param,
-    gamma_parameterization=_default_gamma_param,
+    beta_parameterizer=_default_beta_param,
+    gamma_parameterizer=_default_gamma_param,
     activity_regularizer=None,
     trainable=True,
     name=None,

@@ -213,11 +213,10 @@ class _SignalConv(base.Layer):
     kernel_regularizer: Optional regularizer for the filter kernel.
     bias_regularizer: Optional regularizer for the bias vector.
     activity_regularizer: Regularizer function for the output.
-    kernel_parameterization: Reparameterization applied to filter kernel. If not
-      `None`, must be a parameterization object. Defaults to RDFT
-      parameterization.
-    bias_parameterization: Reparameterization applied to bias. If not `None`,
-      must be a parameterization object.
+    kernel_parameterizer: Reparameterization applied to filter kernel. If not
+      `None`, must be a `Parameterizer` object. Defaults to `RDFTParameterizer`.
+    bias_parameterizer: Reparameterization applied to bias. If not `None`, must
+      be a `Parameterizer` object.
     trainable: Boolean. Whether the layer should be trained.
     name: String. The name of the layer.
     dtype: Default dtype of the layer's parameters (default of `None` means use
@@ -240,8 +239,8 @@ class _SignalConv(base.Layer):
     kernel_regularizer: See above.
     bias_regularizer: See above.
     activity_regularizer: See above.
-    kernel_parameterization: See above.
-    bias_parameterization: See above.
+    kernel_parameterizer: See above.
+    bias_parameterizer: See above.
     name: See above.
     dtype: See above.
     kernel: `Tensor`-like object. The convolution kernel as applied to the
@@ -268,8 +267,8 @@ class _SignalConv(base.Layer):
                kernel_initializer=init_ops.VarianceScaling(),
                bias_initializer=init_ops.Zeros(),
                kernel_regularizer=None, bias_regularizer=None,
-               kernel_parameterization=parameterizers.RDFTParameterizer(),
-               bias_parameterization=None,
+               kernel_parameterizer=parameterizers.RDFTParameterizer(),
+               bias_parameterizer=None,
                **kwargs):
     super(_SignalConv, self).__init__(**kwargs)
     self._rank = int(rank)
@@ -299,8 +298,8 @@ class _SignalConv(base.Layer):
     self._bias_initializer = bias_initializer
     self._kernel_regularizer = kernel_regularizer
     self._bias_regularizer = bias_regularizer
-    self._kernel_parameterization = kernel_parameterization
-    self._bias_parameterization = bias_parameterization
+    self._kernel_parameterizer = kernel_parameterizer
+    self._bias_parameterizer = bias_parameterizer
     self.input_spec = base.InputSpec(ndim=self._rank + 2)
 
   @property
@@ -364,12 +363,12 @@ class _SignalConv(base.Layer):
     return self._bias_regularizer
 
   @property
-  def kernel_parameterization(self):
-    return self._kernel_parameterization
+  def kernel_parameterizer(self):
+    return self._kernel_parameterizer
 
   @property
-  def bias_parameterization(self):
-    return self._bias_parameterization
+  def bias_parameterizer(self):
+    return self._bias_parameterizer
 
   @property
   def kernel(self):
@@ -401,21 +400,21 @@ class _SignalConv(base.Layer):
     else:
       output_channels = self.filters
 
-    if self.kernel_parameterization is None:
+    if self.kernel_parameterizer is None:
       getter = self.add_variable
     else:
       getter = functools.partial(
-          self.kernel_parameterization, getter=self.add_variable)
+          self.kernel_parameterizer, getter=self.add_variable)
     self._kernel = getter(
         name="kernel", shape=kernel_shape, dtype=self.dtype,
         initializer=self.kernel_initializer,
         regularizer=self.kernel_regularizer)
 
-    if self.bias_parameterization is None:
+    if self.bias_parameterizer is None:
       getter = self.add_variable
     else:
       getter = functools.partial(
-          self.bias_parameterization, getter=self.add_variable)
+          self.bias_parameterizer, getter=self.add_variable)
     self._bias = None if not self.use_bias else getter(
         name="bias", shape=(output_channels,), dtype=self.dtype,
         initializer=self.bias_initializer, regularizer=self.bias_regularizer)
