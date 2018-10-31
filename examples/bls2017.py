@@ -77,22 +77,19 @@ def analysis_transform(tensor, num_filters):
     """Build the analysis transform."""
 
     with tf.variable_scope("analysis"):
-        # Set reuse=tf.AUTO_REUSE to create variable if it doesn't exist
-        # (training graph) or reuse it as a layer in the eval graph created
-        # afterwards
-        with tf.variable_scope("layer_0", reuse=tf.AUTO_REUSE):
+        with tf.variable_scope("layer_0"):
             layer = tfc.SignalConv2D(
                 num_filters, (9, 9), corr=True, strides_down=4,
                 padding="same_zeros", use_bias=True, activation=tfc.GDN())
             tensor = layer(tensor)
 
-        with tf.variable_scope("layer_1", reuse=tf.AUTO_REUSE):
+        with tf.variable_scope("layer_1"):
             layer = tfc.SignalConv2D(
               num_filters, (5, 5), corr=True, strides_down=2,
               padding="same_zeros", use_bias=True, activation=tfc.GDN())
             tensor = layer(tensor)
 
-        with tf.variable_scope("layer_2", reuse=tf.AUTO_REUSE):
+        with tf.variable_scope("layer_2"):
             layer = tfc.SignalConv2D(
                 num_filters, (5, 5), corr=True, strides_down=2,
                 padding="same_zeros", use_bias=False, activation=None)
@@ -105,21 +102,21 @@ def synthesis_transform(tensor, num_filters):
     """Build the synthesis transform."""
 
     with tf.variable_scope("synthesis"):
-        with tf.variable_scope("layer_0", reuse=tf.AUTO_REUSE):
+        with tf.variable_scope("layer_0"):
             layer = tfc.SignalConv2D(
                 num_filters, (5, 5), corr=False, strides_up=2,
                 padding="same_zeros", use_bias=True,
                 activation=tfc.GDN(inverse=True))
             tensor = layer(tensor)
 
-        with tf.variable_scope("layer_1", reuse=tf.AUTO_REUSE):
+        with tf.variable_scope("layer_1"):
             layer = tfc.SignalConv2D(
                 num_filters, (5, 5), corr=False, strides_up=2,
                 padding="same_zeros", use_bias=True,
                 activation=tfc.GDN(inverse=True))
             tensor = layer(tensor)
 
-        with tf.variable_scope("layer_2", reuse=tf.AUTO_REUSE):
+        with tf.variable_scope("layer_2"):
             layer = tfc.SignalConv2D(
                 3, (9, 9), corr=False, strides_up=4, padding="same_zeros",
                 use_bias=True, activation=None)
