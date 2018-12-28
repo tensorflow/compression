@@ -19,6 +19,8 @@ This is a close approximation of the image compression model of
 Ballé, Laparra, Simoncelli (2017):
 End-to-end optimized image compression
 https://arxiv.org/abs/1611.01704
+
+With patches from Victor Xing <victor.t.xing@gmail.com>
 """
 
 from __future__ import absolute_import
@@ -26,6 +28,7 @@ from __future__ import division
 from __future__ import print_function
 
 import argparse
+import glob
 
 # Dependency imports
 
@@ -44,12 +47,16 @@ def load_image(filename):
   return image
 
 
-def save_image(filename, image):
-  """Saves an image to a PNG file."""
-
+def quantize_image(image):
   image = tf.clip_by_value(image, 0, 1)
   image = tf.round(image * 255)
   image = tf.cast(image, tf.uint8)
+  return image
+
+
+def save_image(filename, image):
+  """Saves an image to a PNG file."""
+  image = quantize_image(image)
   string = tf.image.encode_png(image)
   return tf.write_file(filename, string)
 
@@ -110,17 +117,22 @@ def train():
   if args.verbose:
     tf.logging.set_verbosity(tf.logging.INFO)
 
-  # Load all training images into a constant.
-  images = tf.map_fn(
-      load_image, tf.matching_files(args.data_glob),
-      dtype=tf.float32, back_prop=False)
-  with tf.Session() as sess:
-    images = tf.constant(sess.run(images), name="images")
+  # Create input data pipeline.
+  with tf.device('/cpu:0'):
+    train_files = glob.glob(args.train_glob)
+    train_dataset = tf.data.Dataset.from_tensor_slices(train_files)
+    train_dataset = train_dataset.shuffle(buffer_size=len(train_files)).repeat()
+    train_dataset = train_dataset.map(
+        load_image, num_parallel_calls=args.preprocess_threads)
+    train_dataset = train_dataset.map(
+        lambda x: tf.random_crop(x, (args.patchsize, args.patchsize, 3)))
+    train_dataset = train_dataset.batch(args.batchsize)
+    train_dataset = train_dataset.prefetch(32)
 
-  # Training inputs are random crops out of the images tensor.
-  crop_shape = (args.batchsize, args.patchsize, args.patchsize, 3)
-  x = tf.random_crop(images, crop_shape)
-  num_pixels = np.prod(crop_shape[:-1])
+  num_pixels = args.batchsize * args.patchsize ** 2
+
+  # Get training patch from dataset.
+  x = train_dataset.make_one_shot_iterator().get_next()
 
   # Build autoencoder.
   y = analysis_transform(x, args.num_filters)
@@ -132,9 +144,9 @@ def train():
   train_bpp = tf.reduce_sum(tf.log(likelihoods)) / (-np.log(2) * num_pixels)
 
   # Mean squared error across pixels.
-  train_mse = tf.reduce_sum(tf.squared_difference(x, x_tilde))
+  train_mse = tf.reduce_mean(tf.squared_difference(x, x_tilde))
   # Multiply by 255^2 to correct for rescaling.
-  train_mse *= 255 ** 2 / num_pixels
+  train_mse *= 255 ** 2
 
   # The rate-distortion cost.
   train_loss = args.lmbda * train_mse + train_bpp
@@ -149,18 +161,24 @@ def train():
 
   train_op = tf.group(main_step, aux_step, entropy_bottleneck.updates[0])
 
-  logged_tensors = [
-      tf.identity(train_loss, name="train_loss"),
-      tf.identity(train_bpp, name="train_bpp"),
-      tf.identity(train_mse, name="train_mse"),
-  ]
+  tf.summary.scalar("loss", train_loss)
+  tf.summary.scalar("bpp", train_bpp)
+  tf.summary.scalar("mse", train_mse)
+
+  tf.summary.image("original", quantize_image(x))
+  tf.summary.image("reconstruction", quantize_image(x_tilde))
+
+  # Creates summary for the probability mass function (PMF) estimated in the
+  # bottleneck.
+  entropy_bottleneck.visualize()
+
   hooks = [
       tf.train.StopAtStepHook(last_step=args.last_step),
       tf.train.NanTensorHook(train_loss),
-      tf.train.LoggingTensorHook(logged_tensors, every_n_secs=60),
   ]
   with tf.train.MonitoredTrainingSession(
-      hooks=hooks, checkpoint_dir=args.checkpoint_dir) as sess:
+      hooks=hooks, checkpoint_dir=args.checkpoint_dir,
+      save_checkpoint_secs=300, save_summaries_secs=60) as sess:
     while not sess.should_stop():
       sess.run(train_op)
 
@@ -188,10 +206,14 @@ def compress():
   # Total number of bits divided by number of pixels.
   eval_bpp = tf.reduce_sum(tf.log(likelihoods)) / (-np.log(2) * num_pixels)
 
-  # Mean squared error across pixels.
+  # Bring both images back to 0..255 range.
+  x *= 255
   x_hat = tf.clip_by_value(x_hat, 0, 1)
   x_hat = tf.round(x_hat * 255)
-  mse = tf.reduce_sum(tf.squared_difference(x * 255, x_hat)) / num_pixels
+
+  mse = tf.reduce_mean(tf.squared_difference(x, x_hat))
+  psnr = tf.squeeze(tf.image.psnr(x_hat, x, 255))
+  msssim = tf.squeeze(tf.image.ssim_multiscale(x_hat, x, 255))
 
   with tf.Session() as sess:
     # Load the latest model checkpoint, get the compressed string and the tensor
@@ -208,14 +230,18 @@ def compress():
 
     # If requested, transform the quantized image back and measure performance.
     if args.verbose:
-      eval_bpp, mse, num_pixels = sess.run([eval_bpp, mse, num_pixels])
+      eval_bpp, mse, psnr, msssim, num_pixels = sess.run(
+          [eval_bpp, mse, psnr, msssim, num_pixels])
 
       # The actual bits per pixel including overhead.
       bpp = (8 + len(string)) * 8 / num_pixels
 
-      print("Mean squared error: {:0.4}".format(mse))
-      print("Information content of this image in bpp: {:0.4}".format(eval_bpp))
-      print("Actual bits per pixel for this image: {:0.4}".format(bpp))
+      print("Mean squared error: {:0.4f}".format(mse))
+      print("PSNR (dB): {:0.2f}".format(psnr))
+      print("Multiscale SSIM: {:0.4f}".format(msssim))
+      print("Multiscale SSIM (dB): {:0.2f}".format(-10 * np.log10(1 - msssim)))
+      print("Information content in bpp: {:0.4f}".format(eval_bpp))
+      print("Actual bits per pixel: {:0.4f}".format(bpp))
 
 
 def decompress():
@@ -278,22 +304,25 @@ if __name__ == "__main__":
       "--checkpoint_dir", default="train",
       help="Directory where to save/load model checkpoints.")
   parser.add_argument(
-      "--data_glob", default="images/*.png",
+      "--train_glob", default="images/*.png",
       help="Glob pattern identifying training data. This pattern must expand "
-           "to a list of RGB images in PNG format which all have the same "
-           "shape.")
+           "to a list of RGB images in PNG format.")
   parser.add_argument(
       "--batchsize", type=int, default=8,
       help="Batch size for training.")
   parser.add_argument(
-      "--patchsize", type=int, default=128,
+      "--patchsize", type=int, default=256,
       help="Size of image patches for training.")
   parser.add_argument(
-      "--lambda", type=float, default=0.1, dest="lmbda",
+      "--lambda", type=float, default=0.01, dest="lmbda",
       help="Lambda for rate-distortion tradeoff.")
   parser.add_argument(
       "--last_step", type=int, default=1000000,
       help="Train up to this number of steps.")
+  parser.add_argument(
+      "--preprocess_threads", type=int, default=16,
+      help="Number of CPU threads to use for parallel decoding of training "
+           "images.")
 
   args = parser.parse_args()
 
