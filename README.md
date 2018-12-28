@@ -2,13 +2,19 @@ This project contains data compression ops and layers for TensorFlow. The
 project website is at
 [tensorflow.github.io/compression](https://tensorflow.github.io/compression).
 
-What does this library do, you ask?
-
-In a nutshell, you can use it to build your own ML models with optimized lossy
+You can use this library to build your own ML models with optimized lossy
 data compression built in. It's useful to find storage-efficient representations
 of your data (features, examples, images, etc.) while only sacrificing a tiny
 fraction of model performance. It can compress any floating point tensor to a
 much smaller sequence of bits.
+
+Specifically, the
+[EntropyBottleneck class](https://tensorflow.github.io/compression/docs/entropy_bottleneck.html)
+in this library simplifies the process of designing rate–distortion optimized
+codes. During training, it acts like a likelihood model. Once training is
+completed, it encodes floating point tensors into optimal bit sequences by
+automating the design of probability tables and calling a range coder
+implementation behind the scenes.
 
 For an introduction to lossy data compression with machine learning, take a look
 at @jonycgn's
@@ -58,13 +64,41 @@ in:
 To see a list of options, change to the directory and run:
 
 ```bash
+cd examples
 python bls2017.py -h
 ```
 
 To train the model, you need to supply it with a dataset of RGB training images.
-They should be provided in PNG format and must all have the same shape.
-Following training, the Python script can be used to compress and decompress
-images as follows:
+They should be provided in PNG format. Training can be as simple as the
+following command:
+
+```bash
+python bls2017.py -v --train_glob=images/*.png train
+```
+
+This will use the default settings. The most important parameter is `--lambda`,
+which controls the trade-off between bitrate and distortion that the model will
+be optimized for. The number of channels per layer is important, too: models
+tuned for higher bitrates (or, equivalently, lower distortion) tend to require
+transforms with a greater approximation capacity (i.e. more channels), so to
+optimize performance, you want to make sure that the number of channels is large
+enough (or larger). This is described in more detail in:
+
+> "Efficient nonlinear transforms for lossy image compression"<br />
+> J. Ballé<br />
+> https://arxiv.org/abs/1802.00847
+
+If you wish, you can monitor progress with Tensorboard. To do this, create a
+Tensorboard instance in the background before starting the training, then point
+your web browser to [port 6006 on your machine](http://localhost:6006):
+
+```bash
+tensorboard --logdir=. &
+```
+
+When training has finished, the Python script can be used to compress and
+decompress images as follows. The same model checkpoint must be accessible to
+both commands.
 
 ```bash
 python bls2017.py [options] compress original.png compressed.bin
