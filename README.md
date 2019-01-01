@@ -73,7 +73,7 @@ They should be provided in PNG format. Training can be as simple as the
 following command:
 
 ```bash
-python bls2017.py -v --train_glob=images/*.png train
+python bls2017.py -v --train_glob="images/*.png" train
 ```
 
 This will use the default settings. The most important parameter is `--lambda`,
