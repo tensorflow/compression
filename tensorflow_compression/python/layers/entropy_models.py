@@ -29,9 +29,10 @@ from tensorflow.python.framework import dtypes
 from tensorflow.python.framework import ops
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.keras.engine import base_layer
+from tensorflow.python.keras.engine import input_spec
 from tensorflow.python.ops import array_ops
-from tensorflow.python.ops import functional_ops
 from tensorflow.python.ops import init_ops
+from tensorflow.python.ops import functional_ops
 from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import nn
 from tensorflow.python.ops import random_ops
@@ -468,14 +469,16 @@ class EntropyBottleneck(base_layer.Layer):
       inputs = ops.convert_to_tensor(inputs)
       if not self.built:
         # Check input assumptions set before layer building, e.g. input rank.
-        self._assert_input_compatibility(inputs)
+        input_spec.assert_input_compatibility(self.input_spec, inputs,
+                                              self.name)
         if self.dtype is None:
           self._dtype = inputs.dtype.base_dtype.name
         self.build(inputs.shape)
 
       # Check input assumptions set after layer building, e.g. input shape.
       if not context.executing_eagerly():
-        self._assert_input_compatibility(inputs)
+        input_spec.assert_input_compatibility(self.input_spec, inputs,
+                                              self.name)
 
       ndim = self.input_spec.ndim
       channel_axis = self._channel_axis(ndim)
