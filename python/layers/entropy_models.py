@@ -39,8 +39,8 @@ from tensorflow.python.ops import random_ops
 from tensorflow.python.ops import state_ops
 from tensorflow.python.summary import summary
 
-from tensorflow_compression.python.ops import coder_ops
 from tensorflow_compression.python.ops import math_ops as tfc_math_ops
+from tensorflow_compression.python.ops import range_coding_ops
 
 
 class EntropyBottleneck(base_layer.Layer):
@@ -356,7 +356,7 @@ class EntropyBottleneck(base_layer.Layer):
         ], axis=-1)
     self._pmf = pmf
 
-    cdf = coder_ops.pmf_to_quantized_cdf(
+    cdf = range_coding_ops.pmf_to_quantized_cdf(
         pmf, precision=self.range_coder_precision)
 
     # We need to supply an initializer without fully defined static shape here,
@@ -507,7 +507,7 @@ class EntropyBottleneck(base_layer.Layer):
       values = math_ops.cast(values, dtypes.int16)
 
       def loop_body(tensor):
-        return coder_ops.range_encode(
+        return range_coding_ops.range_encode(
             tensor, cdf, precision=self.range_coder_precision)
       strings = functional_ops.map_fn(
           loop_body, values, dtype=dtypes.string, back_prop=False)
@@ -564,7 +564,7 @@ class EntropyBottleneck(base_layer.Layer):
       num_levels = array_ops.shape(cdf)[-1] - 1
 
       def loop_body(string):
-        return coder_ops.range_decode(
+        return range_coding_ops.range_decode(
             string, shape, cdf, precision=self.range_coder_precision)
       outputs = functional_ops.map_fn(
           loop_body, strings, dtype=dtypes.int16, back_prop=False)

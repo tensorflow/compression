@@ -2,9 +2,9 @@ This project contains data compression ops and layers for TensorFlow. The
 project website is at
 [tensorflow.github.io/compression](https://tensorflow.github.io/compression).
 
-You can use this library to build your own ML models with optimized lossy
-data compression built in. It's useful to find storage-efficient representations
-of your data (features, examples, images, etc.) while only sacrificing a tiny
+You can use this library to build your own ML models with optimized lossy data
+compression built in. It's useful to find storage-efficient representations of
+your data (features, examples, images, etc.) while only sacrificing a tiny
 fraction of model performance. It can compress any floating point tensor to a
 much smaller sequence of bits.
 
@@ -22,11 +22,14 @@ at @jonycgn's
 
 # Quick start
 
-**Please note**: You need TensorFlow 1.9 (or the master branch as of May 2018)
-or later installed.
+Install TensorFlow 1.13.
 
-Clone the repository to a filesystem location of your choice, or download the
-ZIP file and unpack it. Then include the root directory in your `PYTHONPATH`
+**Please note**: We are currently transitioning to providing pip packages. At
+this point, the master will not work. Make sure to use the released version.
+
+Download the
+[ZIP file for release v1.1](https://github.com/tensorflow/compression/releases/tag/v1.1)
+and unpack it. Then include its root directory in your `PYTHONPATH`
 environment variable:
 
 ```bash
@@ -53,9 +56,9 @@ import tensorflow_compression as tfc
 
 ## Example model
 
-The [examples directory](https://github.com/tensorflow/compression/tree/master/examples)
-contains an implementation of the image compression model described
-in:
+The
+[examples directory](https://github.com/tensorflow/compression/tree/master/examples)
+contains an implementation of the image compression model described in:
 
 > "End-to-end optimized image compression"<br />
 > J. Ballé, V. Laparra, E. P. Simoncelli<br />
@@ -110,7 +113,8 @@ python bls2017.py [options] decompress compressed.bin reconstruction.png
 For usage questions and discussions, please head over to our
 [Google group](https://groups.google.com/forum/#!forum/tensorflow-compression).
 
-Refer to [the API documentation](https://tensorflow.github.io/compression/docs/api_docs/python/tfc.html)
+Refer to
+[the API documentation](https://tensorflow.github.io/compression/docs/api_docs/python/tfc.html)
 for a complete description of the Keras layers and TensorFlow ops this package
 implements.
 
@@ -120,8 +124,9 @@ and a description of the range coding operators
 [here](https://tensorflow.github.io/compression/docs/range_coding.html).
 
 # Authors
-Johannes Ballé (github: [jonycgn](https://github.com/jonycgn)),
-Sung Jin Hwang (github: [ssjhv](https://github.com/ssjhv)), and
-Nick Johnston (github: [nmjohn](https://github.com/nmjohn))
+
+Johannes Ballé (github: [jonycgn](https://github.com/jonycgn)), Sung Jin Hwang
+(github: [ssjhv](https://github.com/ssjhv)), and Nick Johnston (github:
+[nmjohn](https://github.com/nmjohn))
 
 Note that this is not an officially supported Google product.

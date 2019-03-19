@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 Google LLC. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -29,9 +28,9 @@ from tensorflow_compression.python.layers.gdn import *
 from tensorflow_compression.python.layers.initializers import *
 from tensorflow_compression.python.layers.parameterizers import *
 from tensorflow_compression.python.layers.signal_conv import *
-from tensorflow_compression.python.ops.coder_ops import *
 from tensorflow_compression.python.ops.math_ops import *
 from tensorflow_compression.python.ops.padding_ops import *
+from tensorflow_compression.python.ops.range_coding_ops import *
 from tensorflow_compression.python.ops.spectral_ops import *
 # pylint: enable=wildcard-import
 
