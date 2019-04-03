@@ -26,6 +26,12 @@ namespace tensorflow_compression {
 using tensorflow::Status;
 using tensorflow::TensorShape;
 using tensorflow::errors::InvalidArgument;
+using tensorflow::int32;
+using tensorflow::int64;
+using tensorflow::string;
+using tensorflow::uint8;
+using tensorflow::uint32;
+using tensorflow::uint64;
 
 Status MergeAxes(const TensorShape& broadcast_shape,
                  const TensorShape& storage_shape,

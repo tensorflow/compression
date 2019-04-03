@@ -25,10 +25,11 @@ limitations under the License.
 namespace tensorflow_compression {
 
 // The shapes are simplified to reduce indexing cost.
-tensorflow::Status MergeAxes(const tensorflow::TensorShape& broadcast_shape,
-                             const tensorflow::TensorShape& storage_shape,
-                             std::vector<int64>* merged_broadcast_shape_pointer,
-                             std::vector<int64>* merged_storage_shape_pointer);
+tensorflow::Status MergeAxes(
+    const tensorflow::TensorShape& broadcast_shape,
+    const tensorflow::TensorShape& storage_shape,
+    std::vector<tensorflow::int64>* merged_broadcast_shape_pointer,
+    std::vector<tensorflow::int64>* merged_storage_shape_pointer);
 
 }  // namespace tensorflow_compression
 

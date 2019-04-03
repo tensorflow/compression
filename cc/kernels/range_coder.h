@@ -47,17 +47,19 @@ class RangeEncoder {
   // ...
   //
   // REQUIRES: 0 <= lower < upper <= 2^precision.
-  void Encode(int32 lower, int32 upper, string* sink);
+  void Encode(tensorflow::int32 lower, tensorflow::int32 upper,
+              tensorflow::string* sink);
 
   // The encode may contain some under-determined values from previous encoding.
   // After Encode() calls, Finalize() must be called. Otherwise the encoded
   // string may not be decoded.
-  void Finalize(string* sink);
+  void Finalize(tensorflow::string* sink);
 
  private:
-  uint32 base_ = 0;
-  uint32 size_minus1_ = std::numeric_limits<uint32>::max();
-  uint64 delay_ = 0;
+  tensorflow::uint32 base_ = 0;
+  tensorflow::uint32 size_minus1_ =
+      std::numeric_limits<tensorflow::uint32>::max();
+  tensorflow::uint64 delay_ = 0;
 
   const int precision_;
 };
@@ -69,7 +71,7 @@ class RangeDecoder {
   //
   // REQUIRES: `precision` must be the same as the encoder's precision.
   // REQUIRES: 0 < precision <= 16.
-  RangeDecoder(const string& source, int precision);
+  RangeDecoder(const tensorflow::string& source, int precision);
 
   // Decodes a character from `source` using CDF. The size of `cdf` should be
   // one more than the number of the character in the alphabet.
@@ -90,18 +92,19 @@ class RangeDecoder {
   // REQUIRES: cdf[cdf.size() - 1] <= 2^precision.
   //
   // In practice the last element of `cdf` should equal to 2^precision.
-  int32 Decode(tensorflow::gtl::ArraySlice<int32> cdf);
+  tensorflow::int32 Decode(tensorflow::gtl::ArraySlice<tensorflow::int32> cdf);
 
  private:
   void Read16BitValue();
 
-  uint32 base_ = 0;
-  uint32 size_minus1_ = std::numeric_limits<uint32>::max();
-  uint32 value_ = 0;
+  tensorflow::uint32 base_ = 0;
+  tensorflow::uint32 size_minus1_ =
+      std::numeric_limits<tensorflow::uint32>::max();
+  tensorflow::uint32 value_ = 0;
 
-  string::const_iterator current_;
-  const string::const_iterator begin_;
-  const string::const_iterator end_;
+  tensorflow::string::const_iterator current_;
+  const tensorflow::string::const_iterator begin_;
+  const tensorflow::string::const_iterator end_;
 
   const int precision_;
 };

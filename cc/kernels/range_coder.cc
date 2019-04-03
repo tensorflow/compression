@@ -30,6 +30,11 @@ limitations under the License.
 
 namespace tensorflow_compression {
 namespace gtl = tensorflow::gtl;
+using tensorflow::int32;
+using tensorflow::string;
+using tensorflow::uint32;
+using tensorflow::uint64;
+using tensorflow::uint8;
 
 RangeEncoder::RangeEncoder(int precision) : precision_(precision) {
   CHECK_GT(precision, 0);
