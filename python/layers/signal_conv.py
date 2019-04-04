@@ -13,12 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Signal processing convolution layers.
-
-An alternative abstraction layer for convolution operators that feels more
-signal-processingy. Mostly, it has different padding, down-/upsampling, and
-alignment handling than `tf.layers.Conv?D`.
-"""
+"""Swiss army tool for convolutions."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -28,26 +23,20 @@ import functools
 
 # Dependency imports
 
-from tensorflow.python.eager import context
-from tensorflow.python.framework import ops
-from tensorflow.python.framework import tensor_shape
-from tensorflow.python.layers import base
-from tensorflow.python.layers import utils
-from tensorflow.python.ops import array_ops
-from tensorflow.python.ops import init_ops
-from tensorflow.python.ops import nn
+import tensorflow as tf
 
 from tensorflow_compression.python.layers import parameterizers
 from tensorflow_compression.python.ops import padding_ops
 
 
-class _SignalConv(base.Layer):
+class _SignalConv(tf.keras.layers.Layer):
   """{rank}D convolution layer.
 
   This layer creates a filter kernel that is convolved or cross correlated with
   the layer input to produce an output tensor. The main difference of this class
-  to `tf.layers.Conv?D` is how padding, up- and downsampling, and alignment is
-  handled.
+  to `tf.layers.Conv{rank}D` is how padding, up- and downsampling, and alignment
+  is handled. It supports much more flexible options for structuring the linear
+  transform.
 
   In general, the outputs are equivalent to a composition of:
   1. an upsampling step (if `strides_up > 1`)
@@ -176,7 +165,23 @@ class _SignalConv(base.Layer):
 
   Note that due to limitations of the underlying operations, not all
   combinations of arguments are currently implemented. In this case, this class
-  will throw an exception.
+  will throw a `NotImplementedError` exception.
+
+  Speed tips:
+
+  - Prefer combining correlations with downsampling, and convolutions with
+    upsampling, as the underlying ops implement these combinations directly.
+  - If that isn't desirable, prefer using odd-length kernel supports, since
+    odd-length kernels can be flipped if necessary, to use the fastest
+    implementation available.
+  - Combining upsampling and downsampling (for rational resampling ratios)
+    is relatively slow, because no underlying ops exist for that use case.
+    Downsampling in this case is implemented by discarding computed output
+    values.
+  - Note that `channel_separable` is only implemented for 1D and 2D. Also,
+    upsampled channel-separable convolutions are currently only implemented for
+    `filters == 1`. When using `channel_separable`, prefer using identical
+    strides in all dimensions to maximize performance.
 
   Arguments:
     filters: Integer. If `not channel_separable`, specifies the total number of
@@ -215,12 +220,12 @@ class _SignalConv(base.Layer):
     activity_regularizer: Regularizer function for the output.
     kernel_parameterizer: Reparameterization applied to filter kernel. If not
       `None`, must be a `Parameterizer` object. Defaults to `RDFTParameterizer`.
-    bias_parameterizer: Reparameterization applied to bias. If not `None`, must
-      be a `Parameterizer` object.
+    bias_parameterizer: Reparameterization applied to bias. If not `None`,
+      must be a `Parameterizer` object. Defaults to `None`.
     trainable: Boolean. Whether the layer should be trained.
     name: String. The name of the layer.
-    dtype: Default dtype of the layer's parameters (default of `None` means use
-      the type of the first input).
+    dtype: `DType` of the layer's inputs (default of `None` means use the type
+      of the first input).
 
   Read-only properties:
     filters: See above.
@@ -244,9 +249,9 @@ class _SignalConv(base.Layer):
     name: See above.
     dtype: See above.
     kernel: `Tensor`-like object. The convolution kernel as applied to the
-      inputs, i.e. after any reparameterizations.
+      inputs, i.e. after any reparameterizers.
     bias: `Tensor`-like object. The bias vector as applied to the inputs, i.e.
-      after any reparameterizations.
+      after any reparameterizers.
     trainable_variables: List of trainable variables.
     non_trainable_variables: List of non-trainable variables.
     variables: List of all variables of this layer, trainable and non-trainable.
@@ -259,27 +264,25 @@ class _SignalConv(base.Layer):
       that can be accepted by the layer.
   """
 
-  def __init__(self, rank, filters, kernel_support,
+  def __init__(self, filters, kernel_support,
                corr=False, strides_down=1, strides_up=1, padding="valid",
                extra_pad_end=True, channel_separable=False,
                data_format="channels_last",
                activation=None, use_bias=False,
-               kernel_initializer=init_ops.VarianceScaling(),
-               bias_initializer=init_ops.Zeros(),
+               kernel_initializer=tf.initializers.variance_scaling(),
+               bias_initializer=tf.initializers.zeros(),
                kernel_regularizer=None, bias_regularizer=None,
                kernel_parameterizer=parameterizers.RDFTParameterizer(),
                bias_parameterizer=None,
                **kwargs):
     super(_SignalConv, self).__init__(**kwargs)
-    self._rank = int(rank)
+
     self._filters = int(filters)
-    self._kernel_support = utils.normalize_tuple(
-        kernel_support, self._rank, "kernel_support")
+    self._kernel_support = self._normalized_tuple(
+        kernel_support, "kernel_support")
     self._corr = bool(corr)
-    self._strides_down = utils.normalize_tuple(
-        strides_down, self._rank, "strides_down")
-    self._strides_up = utils.normalize_tuple(
-        strides_up, self._rank, "strides_up")
+    self._strides_down = self._normalized_tuple(strides_down, "strides_down")
+    self._strides_up = self._normalized_tuple(strides_up, "strides_up")
     self._padding = str(padding).lower()
     try:
       self._pad_mode = {
@@ -291,7 +294,7 @@ class _SignalConv(base.Layer):
       raise ValueError("Unsupported padding mode: '{}'".format(padding))
     self._extra_pad_end = bool(extra_pad_end)
     self._channel_separable = bool(channel_separable)
-    self._data_format = utils.normalize_data_format(data_format)
+    self._data_format = str(data_format)
     self._activation = activation
     self._use_bias = bool(use_bias)
     self._kernel_initializer = kernel_initializer
@@ -300,7 +303,11 @@ class _SignalConv(base.Layer):
     self._bias_regularizer = bias_regularizer
     self._kernel_parameterizer = kernel_parameterizer
     self._bias_parameterizer = bias_parameterizer
-    self.input_spec = base.InputSpec(ndim=self._rank + 2)
+
+    if self.data_format not in ("channels_first", "channels_last"):
+      raise ValueError("Unknown data format: '{}'.".format(self.data_format))
+
+    self.input_spec = tf.keras.layers.InputSpec(ndim=self._rank + 2)
 
   @property
   def filters(self):
@@ -379,67 +386,235 @@ class _SignalConv(base.Layer):
     return self._bias
 
   @property
-  def _channel_axis(self):
-    return {"channels_first": 1, "channels_last": -1}[self.data_format]
+  def _op_data_format(self):
+    fmt = {"channels_first": "NC{}", "channels_last": "N{}C"}[self.data_format]
+    return fmt.format({1: "W", 2: "HW", 3: "DHW"}[self._rank])
 
-  def _pad_strides(self, strides):
+  def _padded_tuple(self, iterable, fill):
     if self.data_format == "channels_first":
-      return (1, 1) + strides
+      return (fill, fill) + tuple(iterable)
     else:
-      return (1,) + strides + (1,)
+      return (fill,) + tuple(iterable) + (fill,)
+
+  def _normalized_tuple(self, value, name):
+    try:
+      return self._rank * (int(value),)
+    except (ValueError, TypeError):
+      try:
+        value = tuple(int(v) for v in value)
+        assert len(value) == self._rank
+        return value
+      except (ValueError, TypeError, AssertionError):
+        raise ValueError(
+            "`{}` must be an integer or an iterable of integers with length {}."
+            .format(name, self._rank))
+
+  def _greatest_common_factor(self, iterable):
+    for f in range(max(iterable), 1, -1):
+      if all(i % f == 0 for i in iterable):
+        return f
+    return 1
+
+  def _raise_notimplemented(self):
+    raise NotImplementedError(
+        "The provided combination of SignalConv{}D arguments is not currently "
+        "implemented (filters={}, kernel_support={}, corr={}, strides_down={}, "
+        "strides_up={}, channel_separable={}, data_format={}). Try using "
+        "odd-length kernels or turning off separability?".format(
+            self._rank, self.filters, self.kernel_support, self.corr,
+            self.strides_down, self.strides_up, self.channel_separable,
+            self.data_format))
 
   def build(self, input_shape):
-    input_shape = tensor_shape.TensorShape(input_shape)
-    channel_axis = self._channel_axis
+    input_shape = tf.TensorShape(input_shape)
+    channel_axis = {"channels_first": 1, "channels_last": -1}[self.data_format]
     input_channels = input_shape[channel_axis].value
     if input_channels is None:
       raise ValueError("The channel dimension of the inputs must be defined.")
+    self.input_spec = tf.keras.layers.InputSpec(
+        ndim=self._rank + 2, axes={channel_axis: input_channels})
+
     kernel_shape = self.kernel_support + (input_channels, self.filters)
     if self.channel_separable:
       output_channels = self.filters * input_channels
     else:
       output_channels = self.filters
 
-    if self.kernel_parameterizer is None:
+    kernel_parameterizer = self.kernel_parameterizer
+    if kernel_parameterizer is None:
       getter = self.add_variable
     else:
       getter = functools.partial(
-          self.kernel_parameterizer, getter=self.add_variable)
+          kernel_parameterizer, getter=self.add_variable)
     self._kernel = getter(
         name="kernel", shape=kernel_shape, dtype=self.dtype,
         initializer=self.kernel_initializer,
         regularizer=self.kernel_regularizer)
 
-    if self.bias_parameterizer is None:
-      getter = self.add_variable
+    if self.use_bias:
+      bias_parameterizer = self.bias_parameterizer
+      if bias_parameterizer is None:
+        getter = self.add_variable
+      else:
+        getter = functools.partial(
+            bias_parameterizer, getter=self.add_variable)
+      self._bias = getter(
+          name="bias", shape=(output_channels,), dtype=self.dtype,
+          initializer=self.bias_initializer, regularizer=self.bias_regularizer)
     else:
-      getter = functools.partial(
-          self.bias_parameterizer, getter=self.add_variable)
-    self._bias = None if not self.use_bias else getter(
-        name="bias", shape=(output_channels,), dtype=self.dtype,
-        initializer=self.bias_initializer, regularizer=self.bias_regularizer)
-
-    self.input_spec = base.InputSpec(
-        ndim=self._rank + 2, axes={channel_axis: input_channels})
+      self._bias = None
 
     super(_SignalConv, self).build(input_shape)
 
+  def _correlate_down_valid(self, inputs, kernel):
+    # Computes valid correlation followed by downsampling.
+
+    data_format = self._op_data_format
+    strides = self._padded_tuple(self.strides_down, 1)
+
+    if 1 <= self._rank <= 3 and not self.channel_separable:
+      # `tf.nn.convolution` computes correlation followed by optional
+      # downsampling.
+      outputs = tf.nn.convolution(
+          inputs, kernel,
+          strides=self.strides_down, padding="VALID", data_format=data_format)
+    elif self._rank == 1 and self.channel_separable:
+      # There is no 1D depthwise correlation op, so if that is requested we
+      # insert an extra dimension and use the 2D op.
+      extradim = {"channels_first": 2, "channels_last": 1}[self.data_format]
+      strides = strides[:extradim] + (strides[extradim],) + strides[extradim:]
+      data_format = data_format.replace("W", "HW")
+      inputs = tf.expand_dims(inputs, extradim)
+      kernel = tf.expand_dims(kernel, 0)
+      outputs = tf.nn.depthwise_conv2d_native(
+          inputs, kernel,
+          strides=strides, padding="VALID", data_format=data_format)
+      outputs = tf.squeeze(outputs, [extradim])
+    elif self._rank == 2 and self.channel_separable:
+      # `tf.nn.depthwise_conv2d_native` performs channel-separable correlations
+      # followed by optional downsampling. All strides must be identical. If
+      # not, we downsample by the greatest common factor and then downsample
+      # the result further.
+      gcf = self._greatest_common_factor(self.strides_down)
+      strides = self._padded_tuple(self._rank * (gcf,), 1)
+      outputs = tf.nn.depthwise_conv2d_native(
+          inputs, kernel,
+          strides=strides, padding="VALID", data_format=data_format)
+      # Perform remaining downsampling.
+      slices = tuple(slice(None, None, s // gcf) for s in self.strides_down)
+      if any(s.step != 1 for s in slices):
+        outputs = outputs[self._padded_tuple(slices, slice(None))]
+    else:
+      self._raise_notimplemented()
+
+    return outputs
+
+  def _up_convolve_transpose_valid(self, inputs, kernel, prepadding):
+    # Computes upsampling followed by convolution, via transpose convolution ops
+    # in VALID mode. This is a relatively inefficient implementation of
+    # upsampled convolutions, where we need to crop away a lot of the values
+    # computed in the boundaries.
+
+    # Transpose convolutions expect the output and input channels in reversed
+    # order. We implement this by swapping those dimensions of the kernel.
+    # For channel separable convolutions, we can't currently perform anything
+    # other than one filter per channel, so the last dimension needs to be of
+    # length one. Since this happens to be the format that the op expects it,
+    # we can skip the transpose in that case.
+    if not self.channel_separable:
+      kernel = tf.transpose(
+          kernel, list(range(self._rank)) + [self._rank + 1, self._rank])
+
+    # Compute shape of temporary.
+    input_shape = tf.shape(inputs)
+    temp_shape = [input_shape[0]] + (self._rank + 1) * [None]
+    if self.data_format == "channels_last":
+      spatial_axes = range(1, self._rank + 1)
+      temp_shape[-1] = (
+          input_shape[-1] if self.channel_separable else self.filters)
+    else:
+      spatial_axes = range(2, self._rank + 2)
+      temp_shape[1] = input_shape[1] if self.channel_separable else self.filters
+    if self.extra_pad_end:
+      get_length = lambda l, s, k: l * s + (k - 1)
+    else:
+      get_length = lambda l, s, k: l * s + ((k - 1) - (s - 1))
+    for i, a in enumerate(spatial_axes):
+      temp_shape[a] = get_length(
+          input_shape[a], self.strides_up[i], self.kernel_support[i])
+
+    data_format = self._op_data_format
+    strides = self._padded_tuple(self.strides_up, 1)
+
+    # Compute convolution.
+    if self._rank == 1 and not self.channel_separable:
+      # There's no 1D equivalent to conv2d_backprop_input, so we insert an
+      # extra dimension and use the 2D op.
+      extradim = {"channels_first": 2, "channels_last": 1}[self.data_format]
+      data_format = data_format.replace("W", "HW")
+      strides = strides[:extradim] + (strides[extradim],) + strides[extradim:]
+      temp_shape = temp_shape[:extradim] + [1] + temp_shape[extradim:]
+      kernel = tf.expand_dims(kernel, 0)
+      inputs = tf.expand_dims(inputs, extradim)
+      outputs = tf.nn.conv2d_backprop_input(
+          temp_shape, kernel, inputs,
+          strides=strides, padding="VALID", data_format=data_format)
+      outputs = tf.squeeze(outputs, [extradim])
+    elif self._rank == 1 and self.channel_separable and self.filters == 1:
+      # There's no 1D equivalent to depthwise_conv2d_native_backprop_input, so
+      # we insert an extra dimension and use the 2D op.
+      extradim = {"channels_first": 2, "channels_last": 1}[self.data_format]
+      data_format = data_format.replace("W", "HW")
+      strides = strides[:extradim] + (strides[extradim],) + strides[extradim:]
+      temp_shape = temp_shape[:extradim] + [1] + temp_shape[extradim:]
+      kernel = tf.expand_dims(kernel, 0)
+      inputs = tf.expand_dims(inputs, extradim)
+      outputs = tf.nn.depthwise_conv2d_native_backprop_input(
+          temp_shape, kernel, inputs,
+          strides=strides, padding="VALID", data_format=data_format)
+      outputs = tf.squeeze(outputs, [extradim])
+    elif self._rank == 2 and not self.channel_separable:
+      outputs = tf.nn.conv2d_backprop_input(
+          temp_shape, kernel, inputs,
+          strides=strides, padding="VALID", data_format=data_format)
+    elif (self._rank == 2 and self.channel_separable and
+          self.filters == 1 and self.strides_up[0] == self.strides_up[1]):
+      outputs = tf.nn.depthwise_conv2d_native_backprop_input(
+          temp_shape, kernel, inputs,
+          strides=strides, padding="VALID", data_format=data_format)
+    elif self._rank == 3 and not self.channel_separable:
+      outputs = tf.nn.conv3d_transpose(
+          inputs, kernel, temp_shape,
+          strides=strides, padding="VALID", data_format=data_format)
+    else:
+      self._raise_notimplemented()
+
+    # Perform crop, taking into account any pre-padding that was applied.
+    slices = (self._rank + 2) * [slice(None)]
+    for i, a in enumerate(spatial_axes):
+      if self.padding == "valid":
+        # Take `kernel_support - 1` samples away from both sides. This leaves
+        # just samples computed without any padding.
+        start = stop = self.kernel_support[i] - 1
+      else:  # same
+        # Take half of kernel sizes plus the pre-padding away from each side.
+        start = prepadding[i][0] * self.strides_up[i]
+        start += self.kernel_support[i] // 2
+        stop = prepadding[i][1] * self.strides_up[i]
+        stop += (self.kernel_support[i] - 1) // 2
+      step = self.strides_down[i]
+      start = start if start > 0 else None
+      stop = -stop if stop > 0 else None
+      step = step if step > 1 else None
+      slices[a] = slice(start, stop, step)
+    if not all(s.start is s.stop is s.step is None for s in slices):
+      outputs = outputs[tuple(slices)]
+
+    return outputs
+
   def call(self, inputs):
-    inputs = ops.convert_to_tensor(inputs, dtype=self.dtype)
-    input_shape = array_ops.shape(inputs)
+    inputs = tf.convert_to_tensor(inputs)
     outputs = inputs
-
-    # First, perform any requested padding.
-    if self.padding in ("same_zeros", "same_reflect"):
-      padding = padding_ops.same_padding_for_kernel(
-          self.kernel_support, self.corr, self.strides_up)
-      if self.data_format == "channels_last":
-        padding = [[0, 0]] + list(padding) + [[0, 0]]
-      else:
-        padding = [[0, 0], [0, 0]] + list(padding)
-      outputs = array_ops.pad(outputs, padding, self._pad_mode)
-
-    # Now, perform valid convolutions/correlations.
 
     # Not for all possible combinations of (`kernel_support`, `corr`,
     # `strides_up`, `strides_down`) TF ops exist. We implement some additional
@@ -450,7 +625,7 @@ class _SignalConv(base.Layer):
     # If a convolution with no upsampling is desired, we flip the kernels and
     # use cross correlation to implement it, provided the kernels are odd-length
     # in every dimension (with even-length kernels, the boundary handling
-    # would have to change, so we'll throw an error instead).
+    # would have to change).
     if (not corr and
         all(s == 1 for s in self.strides_up) and
         all(s % 2 == 1 for s in self.kernel_support)):
@@ -458,172 +633,71 @@ class _SignalConv(base.Layer):
       slices = self._rank * (slice(None, None, -1),) + 2 * (slice(None),)
       kernel = kernel[slices]
 
-    # Similarly, we can implement a cross correlation with no downsampling using
-    # convolutions. However, we do this only if upsampling is requested, as we
-    # are wasting computation in the boundaries whenever we call the transpose
-    # convolution ops.
-    if (corr and
-        all(s == 1 for s in self.strides_down) and
-        any(s != 1 for s in self.strides_up) and
-        all(s % 2 == 1 for s in self.kernel_support)):
+    # Similarly, we can implement a cross correlation using convolutions.
+    # However, we do this only if upsampling is requested, as we are potentially
+    # wasting computation in the boundaries whenever we call the transpose ops.
+    elif (corr and
+          any(s != 1 for s in self.strides_up) and
+          all(s % 2 == 1 for s in self.kernel_support)):
       corr = False
       slices = self._rank * (slice(None, None, -1),) + 2 * (slice(None),)
       kernel = kernel[slices]
 
-    data_format = utils.convert_data_format(
-        self.data_format, self._rank + 2)
-    if (corr and
-        self.channel_separable and
-        self._rank == 2 and
-        all(s == 1 for s in self.strides_up) and
-        all(s == self.strides_down[0] for s in self.strides_down)):
-      # `nn.depthwise_conv2d_native` performs channel-separable correlations
-      # followed by optional downsampling.
-      outputs = nn.depthwise_conv2d_native(
-          outputs, kernel, strides=self._pad_strides(self.strides_down),
-          padding="VALID", data_format=data_format)
-    elif (corr and
-          all(s == 1 for s in self.strides_up) and
-          not self.channel_separable):
-      # `nn.convolution` performs correlations followed by optional
-      # downsampling.
-      outputs = nn.convolution(
-          outputs, kernel, strides=self.strides_down, padding="VALID",
-          data_format=data_format)
-    elif (not corr and
-          all(s == 1 for s in self.strides_down) and
-          ((not self.channel_separable and 1 <= self._rank <= 3) or
-           (self.channel_separable and self.filters == 1 and self._rank == 2 and
-            all(s == self.strides_up[0] for s in self.strides_up)))):
-      # `nn.conv?d_transpose` perform convolutions, preceded by optional
-      # upsampling. Generally, they increase the spatial support of their
-      # inputs, so in order to implement 'valid', we need to crop their outputs.
+    # Compute amount of necessary padding, and determine whether to use built-in
+    # padding or to pre-pad with a separate op.
+    if self.padding == "valid" or all(s == 1 for s in self.kernel_support):
+      prepadding = self._rank * [[0, 0]]
+    else:  # same_*
+      padding = padding_ops.same_padding_for_kernel(
+          self.kernel_support, corr, self.strides_up)
+      # Pre-pad and then use built-in valid padding mode.
+      outputs = tf.pad(
+          outputs, self._padded_tuple(padding, (0, 0)), self._pad_mode)
+      prepadding = padding
 
-      # Transpose convolutions expect the output and input channels in reversed
-      # order. We implement this by swapping those dimensions of the kernel.
-      # For channel separable convolutions, we can't currently perform anything
-      # other than one filter per channel, so the last dimension needs to be of
-      # length one. Since this happens to be the format that the op expects it,
-      # we can skip the transpose in that case.
-      if not self.channel_separable:
-        kernel = array_ops.transpose(
-            kernel, list(range(self._rank)) + [self._rank + 1, self._rank])
-
-      # Compute shape of temporary.
-      pad_shape = array_ops.shape(outputs)
-      temp_shape = [pad_shape[0]] + (self._rank + 1) * [None]
-      if self.data_format == "channels_last":
-        spatial_axes = range(1, self._rank + 1)
-        if self.channel_separable:
-          temp_shape[-1] = input_shape[-1]
-        else:
-          temp_shape[-1] = self.filters
-      else:
-        spatial_axes = range(2, self._rank + 2)
-        if self.channel_separable:
-          temp_shape[1] = input_shape[1]
-        else:
-          temp_shape[1] = self.filters
-      if self.extra_pad_end:
-        get_length = lambda l, s, k: l * s + (k - 1)
-      else:
-        get_length = lambda l, s, k: l * s + (k - s)
-      for i, a in enumerate(spatial_axes):
-        temp_shape[a] = get_length(
-            pad_shape[a], self.strides_up[i], self.kernel_support[i])
-
-      # Compute convolution.
-      if self._rank == 1 and not self.channel_separable:
-        # There's no 1D transpose convolution op, so we insert an extra
-        # dimension and use 2D.
-        extradim = {"channels_first": 2, "channels_last": 1}[self.data_format]
-        strides = self._pad_strides(self.strides_up)
-        temp = array_ops.squeeze(
-            nn.conv2d_transpose(
-                array_ops.expand_dims(outputs, extradim),
-                array_ops.expand_dims(kernel, 0),
-                temp_shape[:extradim] + [1] + temp_shape[extradim:],
-                strides=strides[:extradim] + (1,) + strides[extradim:],
-                padding="VALID", data_format=data_format.replace("W", "HW")),
-            [extradim])
-      elif self._rank == 2 and self.channel_separable:
-        temp = nn.depthwise_conv2d_native_backprop_input(
-            temp_shape, kernel, outputs,
-            strides=self._pad_strides(self.strides_up), padding="VALID",
-            data_format=data_format)
-      elif self._rank == 2 and not self.channel_separable:
-        temp = nn.conv2d_transpose(
-            outputs, kernel, temp_shape,
-            strides=self._pad_strides(self.strides_up), padding="VALID",
-            data_format=data_format)
-      elif self._rank == 3 and not self.channel_separable:
-        temp = nn.conv3d_transpose(
-            outputs, kernel, temp_shape,
-            strides=self._pad_strides(self.strides_up), padding="VALID",
-            data_format=data_format)
-      else:
-        assert False  # Should never reach this.
-
-      # Perform crop.
-      slices = [slice(None)] * (self._rank + 2)
-      if self.padding == "valid":
-        # Take `kernel_support - 1` samples away from both sides. This leaves
-        # just samples computed without padding.
-        for i, a in enumerate(spatial_axes):
-          slices[a] = slice(
-              self.kernel_support[i] - 1,
-              None if self.kernel_support[i] == 1 else
-              1 - self.kernel_support[i])
-      else:
-        # Take `kernel_support // 2` plus the padding away from beginning, and
-        # crop end to input length multiplied by upsampling factor.
-        for i, a in enumerate(spatial_axes):
-          offset = padding[a][0] * self.strides_up[i]
-          offset += self.kernel_support[i] // 2
-          length = get_length(input_shape[a], self.strides_up[i], offset + 1)
-          slices[a] = slice(offset, length)
-      outputs = temp[slices]
+    # Compute the convolution/correlation.
+    if corr and all(s == 1 for s in self.strides_up):
+      outputs = self._correlate_down_valid(outputs, kernel)
+    elif not corr:
+      outputs = self._up_convolve_transpose_valid(
+          outputs, kernel, prepadding)
     else:
-      raise NotImplementedError(
-          "The provided combination of SignalConv arguments is not currently "
-          "implemented (kernel_support={}, corr={}, strides_down={}, "
-          "strides_up={}, channel_separable={}, filters={}). "
-          "Try using odd-length kernels or turning off separability?".format(
-              self.kernel_support, self.corr, self.strides_down,
-              self.strides_up, self.channel_separable, self.filters))
+      self._raise_notimplemented()
 
     # Now, add bias if requested.
     if self.bias is not None:
+      bias = self.bias
       if self.data_format == "channels_first":
         # As of Mar 2017, direct addition is significantly slower than
         # bias_add when computing gradients.
         if self._rank == 1:
-          # nn.bias_add does not accept a 1D input tensor.
-          outputs = array_ops.expand_dims(outputs, 2)
-          outputs = nn.bias_add(outputs, self.bias, data_format="NCHW")
-          outputs = array_ops.squeeze(outputs, [2])
+          # tf.nn.bias_add does not accept a 1D input tensor.
+          outputs = tf.expand_dims(outputs, 2)
+          outputs = tf.nn.bias_add(outputs, bias, data_format="NCHW")
+          outputs = tf.squeeze(outputs, [2])
         elif self._rank == 2:
-          outputs = nn.bias_add(outputs, self.bias, data_format="NCHW")
+          outputs = tf.nn.bias_add(outputs, bias, data_format="NCHW")
         elif self._rank >= 3:
-          shape = array_ops.shape(outputs)
-          outputs = array_ops.reshape(outputs, shape[:3] + [-1])
-          outputs = nn.bias_add(outputs, self.bias, data_format="NCHW")
-          outputs = array_ops.reshape(outputs, shape)
+          shape = tf.shape(outputs)
+          outputs = tf.reshape(
+              outputs, tf.concat([shape[:3], [-1]], axis=0))
+          outputs = tf.nn.bias_add(outputs, bias, data_format="NCHW")
+          outputs = tf.reshape(outputs, shape)
       else:
-        outputs = nn.bias_add(outputs, self.bias)
+        outputs = tf.nn.bias_add(outputs, bias)
 
     # Finally, pass through activation function if requested.
     if self.activation is not None:
       outputs = self.activation(outputs)  # pylint:disable=not-callable
 
     # Aid shape inference, for some reason shape info is not always available.
-    if not context.executing_eagerly():
+    if not tf.executing_eagerly():
       outputs.set_shape(self.compute_output_shape(inputs.shape))
 
     return outputs
 
   def compute_output_shape(self, input_shape):
-    input_shape = tensor_shape.TensorShape(input_shape)
+    input_shape = tf.TensorShape(input_shape)
     input_shape = input_shape.with_rank(self._rank + 2)
     batch = input_shape[0]
     if self.data_format == "channels_first":
@@ -649,16 +723,14 @@ class _SignalConv(base.Layer):
       channels = self.filters
 
     if self.data_format == "channels_first":
-      return tensor_shape.TensorShape([batch, channels] + spatial)
+      return tf.TensorShape([batch, channels] + spatial)
     else:
-      return tensor_shape.TensorShape([batch] + spatial + [channels])
+      return tf.TensorShape([batch] + spatial + [channels])
 
 
 def _conv_class_factory(name, rank):
   """Subclass from _SignalConv, fixing convolution rank."""
-  def init(self, *args, **kwargs):
-    return _SignalConv.__init__(self, rank, *args, **kwargs)
-  clsdict = {"__init__": init,
+  clsdict = {"_rank": rank,
              "__doc__": _SignalConv.__doc__.format(rank=rank)}
   return type(name, (_SignalConv,), clsdict)
 

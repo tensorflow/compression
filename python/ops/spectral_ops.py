@@ -23,16 +23,13 @@ from __future__ import print_function
 
 import numpy as np
 from scipy import fftpack
-
-from tensorflow.python.framework import dtypes
-from tensorflow.python.framework import ops
-from tensorflow.python.ops import array_ops
+import tensorflow as tf
 
 
 _matrix_cache = {}
 
 
-def irdft_matrix(shape, dtype=dtypes.float32):
+def irdft_matrix(shape, dtype=tf.float32):
   """Matrix for implementing kernel reparameterization with `tf.matmul`.
 
   This can be used to represent a kernel with the provided shape in the RDFT
@@ -60,8 +57,8 @@ def irdft_matrix(shape, dtype=dtypes.float32):
     `Tensor` of shape `(prod(shape), prod(shape))` and dtype `dtype`.
   """
   shape = tuple(int(s) for s in shape)
-  dtype = dtypes.as_dtype(dtype)
-  key = (ops.get_default_graph(), "irdft", shape, dtype.as_datatype_enum)
+  dtype = tf.as_dtype(dtype)
+  key = (tf.get_default_graph(), "irdft", shape, dtype.as_datatype_enum)
   matrix = _matrix_cache.get(key)
   if matrix is None:
     size = np.prod(shape)
@@ -77,7 +74,7 @@ def irdft_matrix(shape, dtype=dtypes.float32):
       matrix[tuple(slices)] *= np.sqrt(2)
     matrix /= np.sqrt(size)
     matrix = np.reshape(matrix, (size, size))
-    matrix = array_ops.constant(
+    matrix = tf.constant(
         matrix, dtype=dtype, name="irdft_" + "x".join([str(s) for s in shape]))
     _matrix_cache[key] = matrix
   return matrix

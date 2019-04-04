@@ -24,9 +24,6 @@ from __future__ import print_function
 import numpy as np
 import scipy.signal
 import tensorflow as tf
-
-from tensorflow.python.platform import test
-
 import tensorflow_compression as tfc
 
 
@@ -128,7 +125,7 @@ class SignalTest(tf.test.TestCase):
     expected = self.scipy_convolve_valid(
         corr, inputs, kernel, strides_down, strides_up, extra_pad_end,
         channel_separable)
-    self.assertAllClose(expected, outputs, rtol=0, atol=1e-6)
+    self.assertAllClose(expected, outputs, rtol=0, atol=1e-3)
 
   def run_same(self, batch, input_support, channels, filters, kernel_support,
                corr, strides_down, strides_up, padding, extra_pad_end,
@@ -181,7 +178,7 @@ class SignalTest(tf.test.TestCase):
     slices += tuple(slice(None, None, s) for s in strides_down)
     expected = expected[slices]
 
-    self.assertAllClose(expected, outputs, rtol=0, atol=1e-6)
+    self.assertAllClose(expected, outputs, rtol=0, atol=1e-3)
 
   def is_implemented(self, batch, input_support, channels, filters,
                      kernel_support, corr, strides_down, strides_up, padding,
@@ -189,38 +186,32 @@ class SignalTest(tf.test.TestCase):
                      use_bias):
     """Determine if SignalConv* implements the given arguments."""
 
-    # Simultaneous up- and downsampling is not implemented.
-    if (any(s != 1 for s in strides_down) and
-        any(s != 1 for s in strides_up)):
+    # If convolution is requested, or kernels can be flipped, we can use the
+    # transpose ops.
+    can_use_transpose = (
+        not corr or all(s % 2 == 1 for s in kernel_support))
+
+    # If upsampling is requested, or convolution and kernels can't be flipped,
+    # we must use the transpose ops.
+    must_use_transpose = (
+        any(s != 1 for s in strides_up) or
+        (not corr and any(s % 2 != 1 for s in kernel_support)))
+
+    # If we must use transpose ops but can't, we fail.
+    if must_use_transpose and not can_use_transpose:
       return False
 
-    # Upsampled correlations are not implemented unless kernels are odd-length.
-    if (corr and
-        any(s != 1 for s in strides_up) and
-        any(s % 2 != 1 for s in kernel_support)):
+    # Channel-separable is only implemented for 1D and 2D.
+    if channel_separable and len(input_support) > 2:
       return False
 
-    # Downsampled convolutions are not implemented unless kernels are
-    # odd-length.
-    if (not corr and
-        any(s != 1 for s in strides_down) and
-        any(s % 2 != 1 for s in kernel_support)):
+    # Channel-separable with upsampling is only implemented for homogeneous
+    # strides.
+    if channel_separable and any(s != strides_up[0] for s in strides_up):
       return False
 
-    # Channel-separable is only implemented for 2D and for homogeneous strides.
-    if (channel_separable and
-        (len(input_support) != 2 or
-         any(s != strides_up[0] for s in strides_up) or
-         any(s != strides_down[0] for s in strides_down))):
-      return False
-
-    # If any upsampling, or convolution with non-odd-length kernels is
-    # requested, we have to use the depthwise backprop op. However, we can't
-    # implement filters > 1 with it.
-    if (channel_separable and
-        (any(s != 1 for s in strides_up) or
-         (not corr and any(s % 2 != 1 for s in kernel_support))) and
-        filters != 1):
+    # If we have to use the depthwise backprop op, we can't use filters > 1.
+    if channel_separable and must_use_transpose and filters != 1:
       return False
 
     return True
@@ -229,10 +220,40 @@ class SignalTest(tf.test.TestCase):
   def data_formats(self):
     # On CPU, many ops don't support the channels first data format. Hence, if
     # no GPU is available, we skip these tests.
-    if test.is_gpu_available(cuda_only=True):
+    if tf.test.is_gpu_available(cuda_only=True):
       return ("channels_first", "channels_last")
     else:
       return ("channels_last",)
+
+  def run_or_fail(self, method,
+                  batch, input_support, channels, filters, kernel_support,
+                  corr, strides_down, strides_up, padding, extra_pad_end,
+                  channel_separable, data_format, activation, use_bias):
+    args = dict(
+        batch=batch, input_support=input_support, channels=channels,
+        filters=filters, kernel_support=kernel_support, corr=corr,
+        strides_down=strides_down, strides_up=strides_up, padding=padding,
+        extra_pad_end=extra_pad_end, channel_separable=channel_separable,
+        data_format=data_format, activation=activation, use_bias=use_bias)
+    if self.is_implemented(**args):
+      try:
+        method(**args)
+      except:
+        msg = []
+        for k in sorted(args.iterkeys()):
+          msg.append("{}={}".format(k, args[k]))
+        print("Failed when it shouldn't have: " + ", ".join(msg))
+        raise
+    else:
+      try:
+        with self.assertRaisesRegexp(NotImplementedError, "SignalConv"):
+          method(**args)
+      except:
+        msg = []
+        for k in sorted(args.iterkeys()):
+          msg.append("{}={}".format(k, args[k]))
+        print("Did not fail when it should have: " + ", ".join(msg))
+        raise
 
   def test_1d_valid_spatial(self):
     """Test 1D valid convolutions with different supports/strides."""
@@ -240,32 +261,23 @@ class SignalTest(tf.test.TestCase):
     padding = "valid"
     channels = 1
     filters = 1
-    channel_separable = False
     activation = None
     use_bias = False
-    for input_support in [(12,), (7,)]:
-      for kernel_support in [(1,), (2,), (7,)]:
-        for corr in [False, True]:
-          for strides_down, strides_up, extra_pad_end in zip(
-              [(1,), (1,), (1,), (1,), (1,), (2,), (5,), (2,)],
-              [(1,), (2,), (2,), (3,), (3,), (1,), (1,), (3,)],
-              [True, False, True, False, True, True, True, True]):
-            for data_format in self.data_formats:
-              args = (
-                  batch, input_support, channels, filters,
-                  kernel_support, corr, strides_down, strides_up,
-                  padding, extra_pad_end, channel_separable,
-                  data_format, activation, use_bias)
-              if self.is_implemented(*args):
-                try:
-                  self.run_valid(*args)
-                except:
-                  print(*args)
-                  raise
-              else:
-                with self.assertRaisesRegexp(
-                    NotImplementedError, "SignalConv"):
-                  self.run_valid(*args)
+    for channel_separable in [False, True]:
+      for input_support in [(12,), (7,)]:
+        for kernel_support in [(1,), (2,), (7,)]:
+          for corr in [False, True]:
+            for strides_down, strides_up, extra_pad_end in zip(
+                [(1,), (1,), (1,), (1,), (1,), (2,), (5,), (2,)],
+                [(1,), (2,), (2,), (3,), (3,), (1,), (1,), (3,)],
+                [True, False, True, False, True, True, True, True]):
+              for data_format in self.data_formats:
+                self.run_or_fail(
+                    self.run_valid,
+                    batch, input_support, channels, filters,
+                    kernel_support, corr, strides_down, strides_up,
+                    padding, extra_pad_end, channel_separable,
+                    data_format, activation, use_bias)
 
   def test_1d_valid_channels(self):
     """Test 1D valid convolutions with multiple channels/filters."""
@@ -276,27 +288,18 @@ class SignalTest(tf.test.TestCase):
     corr = True
     strides_down = (1,)
     extra_pad_end = True
-    channel_separable = False
     activation = None
     use_bias = False
-    for channels, filters in zip([1, 2], [2, 1]):
-      for strides_up in [(1,), (2,)]:
-        for data_format in self.data_formats:
-          args = (
-              batch, input_support, channels, filters,
-              kernel_support, corr, strides_down, strides_up,
-              padding, extra_pad_end, channel_separable,
-              data_format, activation, use_bias)
-          if self.is_implemented(*args):
-            try:
-              self.run_valid(*args)
-            except:
-              print(*args)
-              raise
-          else:
-            with self.assertRaisesRegexp(
-                NotImplementedError, "SignalConv"):
-              self.run_valid(*args)
+    for channel_separable in [False, True]:
+      for channels, filters in zip([1, 2], [2, 1]):
+        for strides_up in [(1,), (2,)]:
+          for data_format in self.data_formats:
+            self.run_or_fail(
+                self.run_valid,
+                batch, input_support, channels, filters,
+                kernel_support, corr, strides_down, strides_up,
+                padding, extra_pad_end, channel_separable,
+                data_format, activation, use_bias)
 
   def test_1d_same_zeros_spatial(self):
     """Test 1D same_zeros convolutions with different supports/strides."""
@@ -315,21 +318,12 @@ class SignalTest(tf.test.TestCase):
               [(1,), (2,), (3,), (1,), (1,), (3,)],
               [True, False, True, True, True, True]):
             for data_format in self.data_formats:
-              args = (
+              self.run_or_fail(
+                  self.run_same,
                   batch, input_support, channels, filters,
                   kernel_support, corr, strides_down, strides_up,
                   padding, extra_pad_end, channel_separable,
                   data_format, activation, use_bias)
-              if self.is_implemented(*args):
-                try:
-                  self.run_same(*args)
-                except:
-                  print(*args)
-                  raise
-              else:
-                with self.assertRaisesRegexp(
-                    NotImplementedError, "SignalConv"):
-                  self.run_same(*args)
 
   def test_1d_same_padding(self):
     """Test 1D same convolutions with different padding modes."""
@@ -347,21 +341,12 @@ class SignalTest(tf.test.TestCase):
     use_bias = False
     for padding in ["same_reflect"]:
       for data_format in self.data_formats:
-        args = (
+        self.run_or_fail(
+            self.run_same,
             batch, input_support, channels, filters,
             kernel_support, corr, strides_down, strides_up,
             padding, extra_pad_end, channel_separable,
             data_format, activation, use_bias)
-        if self.is_implemented(*args):
-          try:
-            self.run_same(*args)
-          except:
-            print(*args)
-            raise
-        else:
-          with self.assertRaisesRegexp(
-              NotImplementedError, "SignalConv"):
-            self.run_same(*args)
 
   def test_1d_bias_activation(self):
     """Test 1D convolutions with bias and activation."""
@@ -379,16 +364,12 @@ class SignalTest(tf.test.TestCase):
     use_bias = True
     padding = "valid"
     for data_format in self.data_formats:
-      args = (
+      self.run_or_fail(
+          self.run_valid,
           batch, input_support, channels, filters,
           kernel_support, corr, strides_down, strides_up,
           padding, extra_pad_end, channel_separable,
           data_format, activation, use_bias)
-      try:
-        self.run_valid(*args)
-      except:
-        print(*args)
-        raise
 
   def test_2d_valid_spatial(self):
     """Test 2D valid convolutions with different supports/strides."""
@@ -407,21 +388,12 @@ class SignalTest(tf.test.TestCase):
                 [(1, 1), (1, 1), (2, 2), (4, 3), (1, 1)],
                 [True, True, False, True, True]):
               for data_format in self.data_formats:
-                args = (
+                self.run_or_fail(
+                    self.run_valid,
                     batch, input_support, channels, filters,
                     kernel_support, corr, strides_down, strides_up,
                     padding, extra_pad_end, channel_separable,
                     data_format, activation, use_bias)
-                if self.is_implemented(*args):
-                  try:
-                    self.run_valid(*args)
-                  except:
-                    print(*args)
-                    raise
-                else:
-                  with self.assertRaisesRegexp(
-                      NotImplementedError, "SignalConv"):
-                    self.run_valid(*args)
 
   def test_2d_valid_channels(self):
     """Test 2D valid convolutions with multiple channels/filters."""
@@ -438,21 +410,12 @@ class SignalTest(tf.test.TestCase):
       for channels, filters in zip([1, 2], [2, 1]):
         for strides_up in [(1, 1), (2, 2)]:
           for data_format in self.data_formats:
-            args = (
+            self.run_or_fail(
+                self.run_valid,
                 batch, input_support, channels, filters,
                 kernel_support, corr, strides_down, strides_up,
                 padding, extra_pad_end, channel_separable,
                 data_format, activation, use_bias)
-            if self.is_implemented(*args):
-              try:
-                self.run_valid(*args)
-              except:
-                print(*args)
-                raise
-            else:
-              with self.assertRaisesRegexp(
-                  NotImplementedError, "SignalConv"):
-                self.run_valid(*args)
 
   def test_2d_same_zeros_spatial(self):
     """Test 2D same_zeros convolutions with different supports/strides."""
@@ -467,25 +430,16 @@ class SignalTest(tf.test.TestCase):
       for kernel_support in [(3, 2), (2, 6), (3, 3)]:
         for corr in [False, True]:
           for strides_down, strides_up, extra_pad_end in zip(
-              [(1, 1), (1, 1), (1, 1), (3, 5), (3, 5)],
-              [(1, 1), (2, 3), (3, 2), (1, 1), (5, 3)],
-              [True, False, True, True, True]):
+              [(1, 1), (1, 1), (1, 1), (3, 5), (2, 3)],
+              [(1, 1), (2, 3), (5, 2), (1, 1), (3, 2)],
+              [True, False, True, True, False]):
             for data_format in self.data_formats:
-              args = (
+              self.run_or_fail(
+                  self.run_same,
                   batch, input_support, channels, filters,
                   kernel_support, corr, strides_down, strides_up,
                   padding, extra_pad_end, channel_separable,
                   data_format, activation, use_bias)
-              if self.is_implemented(*args):
-                try:
-                  self.run_same(*args)
-                except:
-                  print(*args)
-                  raise
-              else:
-                with self.assertRaisesRegexp(
-                    NotImplementedError, "SignalConv"):
-                  self.run_same(*args)
 
   def test_2d_same_padding(self):
     """Test 2D same convolutions with different padding modes."""
@@ -498,26 +452,17 @@ class SignalTest(tf.test.TestCase):
     strides_up = (1, 1)
     strides_down = (1, 1)
     extra_pad_end = True
-    channel_separable = True
+    channel_separable = False
     activation = None
     use_bias = False
     for padding in ["same_reflect"]:
       for data_format in self.data_formats:
-        args = (
+        self.run_or_fail(
+            self.run_same,
             batch, input_support, channels, filters,
             kernel_support, corr, strides_down, strides_up,
             padding, extra_pad_end, channel_separable,
             data_format, activation, use_bias)
-        if self.is_implemented(*args):
-          try:
-            self.run_same(*args)
-          except:
-            print(*args)
-            raise
-        else:
-          with self.assertRaisesRegexp(
-              NotImplementedError, "SignalConv"):
-            self.run_same(*args)
 
   def test_2d_bias_activation(self):
     """Test 2D convolutions with bias and activation."""
@@ -530,21 +475,17 @@ class SignalTest(tf.test.TestCase):
     strides_up = (1, 1)
     strides_down = (1, 1)
     extra_pad_end = True
-    channel_separable = True
+    channel_separable = False
     activation = tf.identity
     use_bias = True
     padding = "valid"
     for data_format in self.data_formats:
-      args = (
+      self.run_or_fail(
+          self.run_valid,
           batch, input_support, channels, filters,
           kernel_support, corr, strides_down, strides_up,
           padding, extra_pad_end, channel_separable,
           data_format, activation, use_bias)
-      try:
-        self.run_valid(*args)
-      except:
-        print(*args)
-        raise
 
   def test_3d_valid_spatial(self):
     """Test 3D valid convolutions with different supports/strides."""
@@ -563,21 +504,12 @@ class SignalTest(tf.test.TestCase):
               [(1, 1, 1), (1, 3, 2), (2, 4, 1), (1, 1, 1), (1, 1, 2)],
               [True, False, True, True]):
             for data_format in self.data_formats:
-              args = (
+              self.run_or_fail(
+                  self.run_valid,
                   batch, input_support, channels, filters,
                   kernel_support, corr, strides_down, strides_up,
                   padding, extra_pad_end, channel_separable,
                   data_format, activation, use_bias)
-              if self.is_implemented(*args):
-                try:
-                  self.run_valid(*args)
-                except:
-                  print(*args)
-                  raise
-              else:
-                with self.assertRaisesRegexp(
-                    NotImplementedError, "SignalConv"):
-                  self.run_valid(*args)
 
   def test_3d_valid_channels(self):
     """Test 3D valid convolutions with multiple channels/filters."""
@@ -594,21 +526,12 @@ class SignalTest(tf.test.TestCase):
     for channels, filters in zip([1, 2], [2, 1]):
       for strides_up in [(1, 1, 1), (1, 2, 2)]:
         for data_format in self.data_formats:
-          args = (
+          self.run_or_fail(
+              self.run_valid,
               batch, input_support, channels, filters,
               kernel_support, corr, strides_down, strides_up,
               padding, extra_pad_end, channel_separable,
               data_format, activation, use_bias)
-          if self.is_implemented(*args):
-            try:
-              self.run_valid(*args)
-            except:
-              print(*args)
-              raise
-          else:
-            with self.assertRaisesRegexp(
-                NotImplementedError, "SignalConv"):
-              self.run_valid(*args)
 
   def test_3d_same_zeros_spatial(self):
     """Test 3D same_zeros convolutions with different supports/strides."""
@@ -627,21 +550,12 @@ class SignalTest(tf.test.TestCase):
               [(1, 1, 1), (4, 3, 2), (2, 1, 3), (1, 1, 1)],
               [True, False, True, True]):
             for data_format in self.data_formats:
-              args = (
+              self.run_or_fail(
+                  self.run_same,
                   batch, input_support, channels, filters,
                   kernel_support, corr, strides_down, strides_up,
                   padding, extra_pad_end, channel_separable,
                   data_format, activation, use_bias)
-              if self.is_implemented(*args):
-                try:
-                  self.run_same(*args)
-                except:
-                  print(*args)
-                  raise
-              else:
-                with self.assertRaisesRegexp(
-                    NotImplementedError, "SignalConv"):
-                  self.run_same(*args)
 
   def test_3d_same_padding(self):
     """Test 3D same convolutions with different padding modes."""
@@ -659,21 +573,12 @@ class SignalTest(tf.test.TestCase):
     use_bias = False
     for padding in ["same_reflect"]:
       for data_format in self.data_formats:
-        args = (
+        self.run_or_fail(
+            self.run_same,
             batch, input_support, channels, filters,
             kernel_support, corr, strides_down, strides_up,
             padding, extra_pad_end, channel_separable,
             data_format, activation, use_bias)
-        if self.is_implemented(*args):
-          try:
-            self.run_same(*args)
-          except:
-            print(*args)
-            raise
-        else:
-          with self.assertRaisesRegexp(
-              NotImplementedError, "SignalConv"):
-            self.run_same(*args)
 
   def test_3d_bias_activation(self):
     """Test 3D convolutions with bias and activation."""
@@ -691,16 +596,12 @@ class SignalTest(tf.test.TestCase):
     use_bias = True
     padding = "valid"
     for data_format in self.data_formats:
-      args = (
+      self.run_or_fail(
+          self.run_valid,
           batch, input_support, channels, filters,
           kernel_support, corr, strides_down, strides_up,
           padding, extra_pad_end, channel_separable,
           data_format, activation, use_bias)
-      try:
-        self.run_valid(*args)
-      except:
-        print(*args)
-        raise
 
 
 if __name__ == "__main__":

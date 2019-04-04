@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Parameterizations for layer classes."""
+"""Parameterizers for layer classes."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -21,31 +21,30 @@ from __future__ import print_function
 
 # Dependency imports
 
-from tensorflow.python.ops import array_ops
-from tensorflow.python.ops import math_ops
+import tensorflow as tf
 
-from tensorflow_compression.python.ops import math_ops as cmath_ops
-from tensorflow_compression.python.ops import spectral_ops as spectral_ops
+from tensorflow_compression.python.ops import math_ops
+from tensorflow_compression.python.ops import spectral_ops
 
 
 class Parameterizer(object):
-  """Parameterizer object (abstract base class).
+  """Parameterization object (abstract base class).
 
-  Parameterizer objects are immutable objects designed to facilitate
+  `Parameterizer`s are immutable objects designed to facilitate
   reparameterization of model parameters (tensor variables). They are called
   just like `tf.get_variable` with an additional argument `getter` specifying
   the actual function call to generate a variable (in many cases, `getter` would
   be `tf.get_variable`).
 
-  To achieve reparameterization, a parameterizer object wraps the provided
-  initializer, regularizer, and the returned variable in its own Tensorflow
+  To achieve reparameterization, a `Parameterizer` wraps the provided
+  initializer, regularizer, and the returned variable in its own TensorFlow
   code.
   """
   pass
 
 
 class StaticParameterizer(Parameterizer):
-  """A parameterization object that always returns a constant tensor.
+  """A parameterizer that always returns a constant tensor.
 
   No variables are created, hence the parameter never changes.
 
@@ -102,13 +101,13 @@ class RDFTParameterizer(Parameterizer):
       assert dtype == rdft_dtype, dtype
       init = initializer(
           var_shape, dtype=var_dtype, partition_info=partition_info)
-      init = array_ops.reshape(init, (-1, rdft_shape[-1]))
-      init = math_ops.matmul(irdft_matrix, init, transpose_a=True)
+      init = tf.reshape(init, (-1, rdft_shape[-1]))
+      init = tf.linalg.matmul(irdft_matrix, init, transpose_a=True)
       return init
 
     def reparam(rdft):
-      var = math_ops.matmul(irdft_matrix, rdft)
-      var = array_ops.reshape(var, var_shape)
+      var = tf.linalg.matmul(irdft_matrix, rdft)
+      var = tf.reshape(var, var_shape)
       return var
 
     if regularizer is not None:
@@ -129,7 +128,7 @@ class NonnegativeParameterizer(Parameterizer):
   Args:
     minimum: Float. Lower bound for parameters (defaults to zero).
     reparam_offset: Float. Offset added to the reparameterization of beta and
-      gamma. The reparameterization of beta and gamma as their square roots lets
+      gamma. The parameterization of beta and gamma as their square roots lets
       the training slow down when their values are close to zero, which is
       desirable as small values in the denominator can lead to a situation where
       gradient noise on beta/gamma leads to extreme amounts of noise in the GDN
@@ -146,23 +145,23 @@ class NonnegativeParameterizer(Parameterizer):
     self.reparam_offset = float(reparam_offset)
 
   def __call__(self, getter, name, shape, dtype, initializer, regularizer=None):
-    pedestal = array_ops.constant(self.reparam_offset ** 2, dtype=dtype)
-    bound = array_ops.constant(
+    pedestal = tf.constant(self.reparam_offset ** 2, dtype=dtype)
+    bound = tf.constant(
         (self.minimum + self.reparam_offset ** 2) ** .5, dtype=dtype)
     reparam_name = "reparam_" + name
 
     def reparam_initializer(shape, dtype=None, partition_info=None):
       init = initializer(shape, dtype=dtype, partition_info=partition_info)
-      init = math_ops.sqrt(init + pedestal)
+      init = tf.math.sqrt(tf.math.maximum(init + pedestal, pedestal))
       return init
 
     def reparam(var):
-      var = cmath_ops.lower_bound(var, bound)
-      var = math_ops.square(var) - pedestal
+      var = math_ops.lower_bound(var, bound)
+      var = tf.math.square(var) - pedestal
       return var
 
     if regularizer is not None:
-      regularizer = lambda rdft: regularizer(reparam(rdft))
+      regularizer = lambda var: regularizer(reparam(var))
 
     var = getter(
         name=reparam_name, shape=shape, dtype=dtype,

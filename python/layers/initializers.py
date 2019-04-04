@@ -21,8 +21,7 @@ from __future__ import print_function
 
 # Dependency imports
 
-from tensorflow.python.ops import array_ops
-from tensorflow.python.ops import linalg_ops
+import tensorflow as tf
 
 
 class IdentityInitializer(object):
@@ -45,11 +44,11 @@ class IdentityInitializer(object):
 
     support = tuple(shape[:-2]) + (1, 1)
     indices = [[s // 2 for s in support]]
-    updates = array_ops.constant([self.gain], dtype=dtype)
-    kernel = array_ops.scatter_nd(indices, updates, support)
+    updates = tf.constant([self.gain], dtype=dtype)
+    kernel = tf.scatter_nd(indices, updates, support)
 
     assert shape[-2] == shape[-1], shape
     if shape[-1] != 1:
-      kernel *= linalg_ops.eye(shape[-1], dtype=dtype)
+      kernel *= tf.eye(shape[-1], dtype=dtype)
 
     return kernel

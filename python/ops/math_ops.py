@@ -21,11 +21,10 @@ from __future__ import print_function
 
 # Dependency imports
 
-from tensorflow.python.framework import ops
-from tensorflow.python.ops import math_ops
+import tensorflow as tf
 
 
-@ops.RegisterGradient("IdentityFirstOfTwoInputs")
+@tf.RegisterGradient("IdentityFirstOfTwoInputs")
 def _identity_first_of_two_inputs_grad(op, grad):
   """Gradient for `lower_bound` or `upper_bound` if `gradient == 'identity'`.
 
@@ -40,7 +39,7 @@ def _identity_first_of_two_inputs_grad(op, grad):
   return [grad, None]
 
 
-@ops.RegisterGradient("UpperBound")
+@tf.RegisterGradient("UpperBound")
 def _upper_bound_grad(op, grad):
   """Gradient for `upper_bound` if `gradient == 'identity_if_towards'`.
 
@@ -52,11 +51,11 @@ def _upper_bound_grad(op, grad):
     Gradient with respect to the inputs of the op.
   """
   inputs, bound = op.inputs
-  pass_through_if = math_ops.logical_or(inputs <= bound, grad > 0)
-  return [math_ops.cast(pass_through_if, grad.dtype) * grad, None]
+  pass_through_if = tf.logical_or(inputs <= bound, grad > 0)
+  return [tf.cast(pass_through_if, grad.dtype) * grad, None]
 
 
-@ops.RegisterGradient("LowerBound")
+@tf.RegisterGradient("LowerBound")
 def _lower_bound_grad(op, grad):
   """Gradient for `lower_bound` if `gradient == 'identity_if_towards'`.
 
@@ -68,8 +67,8 @@ def _lower_bound_grad(op, grad):
     Gradient with respect to the inputs of the op.
   """
   inputs, bound = op.inputs
-  pass_through_if = math_ops.logical_or(inputs >= bound, grad < 0)
-  return [math_ops.cast(pass_through_if, grad.dtype) * grad, None]
+  pass_through_if = tf.logical_or(inputs >= bound, grad < 0)
+  return [tf.cast(pass_through_if, grad.dtype) * grad, None]
 
 
 def upper_bound(inputs, bound, gradient="identity_if_towards", name=None):
@@ -116,15 +115,15 @@ def upper_bound(inputs, bound, gradient="identity_if_towards", name=None):
   except KeyError:
     raise ValueError("Invalid value for `gradient`: '{}'.".format(gradient))
 
-  with ops.name_scope(name, "UpperBound", [inputs, bound]) as scope:
-    inputs = ops.convert_to_tensor(inputs, name="inputs")
-    bound = ops.convert_to_tensor(
+  with tf.name_scope(name, "UpperBound", [inputs, bound]) as scope:
+    inputs = tf.convert_to_tensor(inputs, name="inputs")
+    bound = tf.convert_to_tensor(
         bound, name="bound", dtype=inputs.dtype)
     if gradient:
-      with ops.get_default_graph().gradient_override_map({"Minimum": gradient}):
-        return math_ops.minimum(inputs, bound, name=scope)
+      with tf.get_default_graph().gradient_override_map({"Minimum": gradient}):
+        return tf.minimum(inputs, bound, name=scope)
     else:
-      return math_ops.minimum(inputs, bound, name=scope)
+      return tf.minimum(inputs, bound, name=scope)
 
 
 def lower_bound(inputs, bound, gradient="identity_if_towards", name=None):
@@ -171,12 +170,12 @@ def lower_bound(inputs, bound, gradient="identity_if_towards", name=None):
   except KeyError:
     raise ValueError("Invalid value for `gradient`: '{}'.".format(gradient))
 
-  with ops.name_scope(name, "LowerBound", [inputs, bound]) as scope:
-    inputs = ops.convert_to_tensor(inputs, name="inputs")
-    bound = ops.convert_to_tensor(
+  with tf.name_scope(name, "LowerBound", [inputs, bound]) as scope:
+    inputs = tf.convert_to_tensor(inputs, name="inputs")
+    bound = tf.convert_to_tensor(
         bound, name="bound", dtype=inputs.dtype)
     if gradient:
-      with ops.get_default_graph().gradient_override_map({"Maximum": gradient}):
-        return math_ops.maximum(inputs, bound, name=scope)
+      with tf.get_default_graph().gradient_override_map({"Maximum": gradient}):
+        return tf.maximum(inputs, bound, name=scope)
     else:
-      return math_ops.maximum(inputs, bound, name=scope)
+      return tf.maximum(inputs, bound, name=scope)

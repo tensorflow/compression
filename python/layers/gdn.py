@@ -21,14 +21,7 @@ from __future__ import print_function
 
 # Dependency imports
 
-from tensorflow.python.eager import context
-from tensorflow.python.framework import ops
-from tensorflow.python.framework import tensor_shape
-from tensorflow.python.layers import base
-from tensorflow.python.ops import array_ops
-from tensorflow.python.ops import init_ops
-from tensorflow.python.ops import math_ops
-from tensorflow.python.ops import nn
+import tensorflow as tf
 
 from tensorflow_compression.python.layers import parameterizers
 
@@ -38,7 +31,7 @@ _default_beta_param = parameterizers.NonnegativeParameterizer(
 _default_gamma_param = parameterizers.NonnegativeParameterizer()
 
 
-class GDN(base.Layer):
+class GDN(tf.keras.layers.Layer):
   """Generalized divisive normalization layer.
 
   Based on the papers:
@@ -69,30 +62,44 @@ class GDN(base.Layer):
       the division is replaced by multiplication).
     rectify: Boolean. If `True`, apply a `relu` nonlinearity to the inputs
       before calculating GDN response.
-    gamma_init: The gamma matrix will be initialized as the identity matrix
-      multiplied with this value. If set to zero, the layer is effectively
-      initialized to the identity operation, since beta is initialized as one.
-      A good default setting is somewhere between 0 and 0.5.
+    gamma_init: Float. The gamma matrix will be initialized as the identity
+      matrix multiplied with this value. If set to zero, the layer is
+      effectively initialized to the identity operation, since beta is
+      initialized as one. A good default setting is somewhere between 0 and 0.5.
     data_format: Format of input tensor. Currently supports `'channels_first'`
       and `'channels_last'`.
-    beta_parameterizer: Reparameterization for beta parameter. Defaults to
-      `NonnegativeParameterizer` with a minimum value of `1e-6`.
-    gamma_parameterizer: Reparameterization for gamma parameter. Defaults to
-      `NonnegativeParameterizer` with a minimum value of `0`.
+    beta_parameterizer: `Parameterizer` object for beta parameter. Defaults
+      to `NonnegativeParameterizer` with a minimum value of 1e-6.
+    gamma_parameterizer: `Parameterizer` object for gamma parameter.
+      Defaults to `NonnegativeParameterizer` with a minimum value of 0.
     activity_regularizer: Regularizer function for the output.
-    trainable: Boolean, if `True`, also add variables to the graph collection
-      `GraphKeys.TRAINABLE_VARIABLES` (see `tf.Variable`).
-    name: String, the name of the layer. Layers with the same name will
-      share weights, but to avoid mistakes we require `reuse=True` in such
-      cases.
+    trainable: Boolean. Whether the layer should be trained.
+    name: String. The name of the layer.
+    dtype: `DType` of the layer's inputs (default of `None` means use the type
+      of the first input).
 
-  Properties:
+  Read-only properties:
     inverse: Boolean, whether GDN is computed (`True`) or IGDN (`False`).
     rectify: Boolean, whether to apply `relu` before normalization or not.
-    data_format: Format of input tensor. Currently supports `'channels_first'`
-      and `'channels_last'`.
+    gamma_init: See above.
+    data_format: See above.
+    activity_regularizer: See above.
+    name: See above.
+    dtype: See above.
     beta: The beta parameter as defined above (1D `Tensor`).
     gamma: The gamma parameter as defined above (2D `Tensor`).
+    trainable_variables: List of trainable variables.
+    non_trainable_variables: List of non-trainable variables.
+    variables: List of all variables of this layer, trainable and non-trainable.
+    updates: List of update ops of this layer.
+    losses: List of losses added by this layer.
+
+  Mutable properties:
+    beta_parameterizer: See above.
+    gamma_parameterizer: See above.
+    trainable: Boolean. Whether the layer should be trained.
+    input_spec: Optional `InputSpec` object specifying the constraints on inputs
+      that can be accepted by the layer.
   """
 
   def __init__(self,
@@ -102,87 +109,122 @@ class GDN(base.Layer):
                data_format="channels_last",
                beta_parameterizer=_default_beta_param,
                gamma_parameterizer=_default_gamma_param,
-               activity_regularizer=None,
-               trainable=True,
-               name=None,
                **kwargs):
-    super(GDN, self).__init__(trainable=trainable, name=name,
-                              activity_regularizer=activity_regularizer,
-                              **kwargs)
-    self.inverse = bool(inverse)
-    self.rectify = bool(rectify)
+    super(GDN, self).__init__(**kwargs)
+    self._inverse = bool(inverse)
+    self._rectify = bool(rectify)
     self._gamma_init = float(gamma_init)
-    self.data_format = data_format
+    self._data_format = str(data_format)
     self._beta_parameterizer = beta_parameterizer
     self._gamma_parameterizer = gamma_parameterizer
-    self._channel_axis()  # trigger ValueError early
-    self.input_spec = base.InputSpec(min_ndim=2)
+
+    if self.data_format not in ("channels_first", "channels_last"):
+      raise ValueError("Unknown data format: '{}'.".format(self.data_format))
+
+    self.input_spec = tf.keras.layers.InputSpec(min_ndim=2)
+
+  @property
+  def inverse(self):
+    return self._inverse
+
+  @property
+  def rectify(self):
+    return self._rectify
+
+  @property
+  def gamma_init(self):
+    return self._gamma_init
+
+  @property
+  def data_format(self):
+    return self._data_format
+
+  @property
+  def beta_parameterizer(self):
+    return self._beta_parameterizer
+
+  @beta_parameterizer.setter
+  def beta_parameterizer(self, val):
+    if self.built:
+      raise RuntimeError(
+          "Can't set `beta_parameterizer` once layer has been built.")
+    self._beta_parameterizer = val
+
+  @property
+  def gamma_parameterizer(self):
+    return self._gamma_parameterizer
+
+  @gamma_parameterizer.setter
+  def gamma_parameterizer(self, val):
+    if self.built:
+      raise RuntimeError(
+          "Can't set `gamma_parameterizer` once layer has been built.")
+    self._gamma_parameterizer = val
 
   def _channel_axis(self):
-    try:
-      return {"channels_first": 1, "channels_last": -1}[self.data_format]
-    except KeyError:
-      raise ValueError("Unsupported `data_format` for GDN layer: {}.".format(
-          self.data_format))
+    return {"channels_first": 1, "channels_last": -1}[self.data_format]
 
   def build(self, input_shape):
     channel_axis = self._channel_axis()
-    input_shape = tensor_shape.TensorShape(input_shape)
+    input_shape = tf.TensorShape(input_shape)
     num_channels = input_shape[channel_axis].value
     if num_channels is None:
       raise ValueError("The channel dimension of the inputs to `GDN` "
                        "must be defined.")
     self._input_rank = input_shape.ndims
-    self.input_spec = base.InputSpec(ndim=input_shape.ndims,
-                                     axes={channel_axis: num_channels})
+    self.input_spec = tf.keras.layers.InputSpec(
+        ndim=input_shape.ndims, axes={channel_axis: num_channels})
 
-    self.beta = self._beta_parameterizer(
+    # Sorry, lint, but these objects really are callable ...
+    # pylint:disable=not-callable
+    self.beta = self.beta_parameterizer(
         name="beta", shape=[num_channels], dtype=self.dtype,
-        getter=self.add_variable, initializer=init_ops.Ones())
+        getter=self.add_variable, initializer=tf.initializers.ones())
 
-    self.gamma = self._gamma_parameterizer(
+    self.gamma = self.gamma_parameterizer(
         name="gamma", shape=[num_channels, num_channels], dtype=self.dtype,
         getter=self.add_variable,
-        initializer=init_ops.Identity(gain=self._gamma_init))
+        initializer=tf.initializers.identity(gain=self._gamma_init))
+    # pylint:enable=not-callable
 
     self.built = True
 
   def call(self, inputs):
-    inputs = ops.convert_to_tensor(inputs, dtype=self.dtype)
+    inputs = tf.convert_to_tensor(inputs, dtype=self.dtype)
     ndim = self._input_rank
 
     if self.rectify:
-      inputs = nn.relu(inputs)
+      inputs = tf.nn.relu(inputs)
 
     # Compute normalization pool.
     if ndim == 2:
-      norm_pool = math_ops.matmul(math_ops.square(inputs), self.gamma)
-      norm_pool = nn.bias_add(norm_pool, self.beta)
+      norm_pool = tf.linalg.matmul(tf.math.square(inputs), self.gamma)
+      norm_pool = tf.nn.bias_add(norm_pool, self.beta)
     elif self.data_format == "channels_last" and ndim <= 5:
       shape = self.gamma.shape.as_list()
-      gamma = array_ops.reshape(self.gamma, (ndim - 2) * [1] + shape)
-      norm_pool = nn.convolution(math_ops.square(inputs), gamma, "VALID")
-      norm_pool = nn.bias_add(norm_pool, self.beta)
+      gamma = tf.reshape(self.gamma, (ndim - 2) * [1] + shape)
+      norm_pool = tf.nn.convolution(tf.math.square(inputs), gamma, "VALID")
+      norm_pool = tf.nn.bias_add(norm_pool, self.beta)
     else:  # generic implementation
       # This puts channels in the last dimension regardless of input.
-      norm_pool = math_ops.tensordot(
-          math_ops.square(inputs), self.gamma, [[self._channel_axis()], [0]])
+      norm_pool = tf.linalg.tensordot(
+          tf.math.square(inputs), self.gamma, [[self._channel_axis()], [0]])
       norm_pool += self.beta
       if self.data_format == "channels_first":
         # Return to channels_first format if necessary.
         axes = list(range(ndim - 1))
         axes.insert(1, ndim - 1)
-        norm_pool = array_ops.transpose(norm_pool, axes)
+        norm_pool = tf.transpose(norm_pool, axes)
 
     if self.inverse:
-      norm_pool = math_ops.sqrt(norm_pool)
+      norm_pool = tf.math.sqrt(norm_pool)
     else:
-      norm_pool = math_ops.rsqrt(norm_pool)
+      norm_pool = tf.math.rsqrt(norm_pool)
     outputs = inputs * norm_pool
 
-    if not context.executing_eagerly():
+    if not tf.executing_eagerly():
       outputs.set_shape(self.compute_output_shape(inputs.shape))
     return outputs
 
   def compute_output_shape(self, input_shape):
-    return tensor_shape.TensorShape(input_shape)
+    return tf.TensorShape(input_shape)
