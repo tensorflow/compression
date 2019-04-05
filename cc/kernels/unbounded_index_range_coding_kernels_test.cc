@@ -62,6 +62,13 @@ using tensorflow::Status;
 using tensorflow::Tensor;
 using tensorflow::TensorShape;
 using tensorflow::TTypes;
+using tensorflow::int16;
+using tensorflow::int32;
+using tensorflow::int64;
+using tensorflow::string;
+using tensorflow::uint8;
+using tensorflow::uint32;
+using tensorflow::uint64;
 
 int LogUniform(random::SimplePhilox* gen, uint32 n) {
   CHECK_GT(n, 0);

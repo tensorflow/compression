@@ -47,6 +47,13 @@ using tensorflow::Tensor;
 using tensorflow::TensorShape;
 using tensorflow::TensorShapeUtils;
 using tensorflow::TTypes;
+using tensorflow::int16;
+using tensorflow::int32;
+using tensorflow::int64;
+using tensorflow::string;
+using tensorflow::uint8;
+using tensorflow::uint32;
+using tensorflow::uint64;
 
 // Non-incremental encoder op -------------------------------------------------
 class UnboundedIndexRangeEncodeOp : public OpKernel {

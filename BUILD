@@ -11,6 +11,7 @@ cc_binary(
         "cc/kernels/range_coding_kernels_util.cc",
         "cc/kernels/range_coding_kernels_util.h",
         "cc/kernels/range_coding_kernels.cc",
+        "cc/kernels/unbounded_index_range_coding_kernels.cc",
         "cc/ops/range_coding_ops.cc",
     ],
     linkshared = 1,
@@ -20,7 +21,7 @@ cc_binary(
     ],
     copts = [
         "-pthread", "-std=c++11", "-D_GLIBCXX_USE_CXX11_ABI=0",
-        "-Wno-sign-compare",
+        "-Wno-sign-compare", "-Wno-maybe-uninitialized",
     ],
 )
 
@@ -44,7 +45,6 @@ py_library(
     data = [
         ":_range_coding_ops.so"
     ],
-    srcs_version = "PY2AND3",
 )
 
 py_test(
@@ -52,21 +52,18 @@ py_test(
     timeout = "long",
     srcs = ["python/layers/entropy_models_test.py"],
     deps = [":tensorflow_compression"],
-    srcs_version = "PY2AND3",
 )
 
 py_test(
     name = "gdn_test",
     srcs = ["python/layers/gdn_test.py"],
     deps = [":tensorflow_compression"],
-    srcs_version = "PY2AND3",
 )
 
 py_test(
     name = "parameterizers_test",
     srcs = ["python/layers/parameterizers_test.py"],
     deps = [":tensorflow_compression"],
-    srcs_version = "PY2AND3",
 )
 
 py_test(
@@ -74,33 +71,28 @@ py_test(
     timeout = "long",
     srcs = ["python/layers/signal_conv_test.py"],
     deps = [":tensorflow_compression"],
-    srcs_version = "PY2AND3",
 )
 
 py_test(
     name = "math_ops_test",
     srcs = ["python/ops/math_ops_test.py"],
     deps = [":tensorflow_compression"],
-    srcs_version = "PY2AND3",
 )
 
 py_test(
     name = "padding_ops_test",
     srcs = ["python/ops/padding_ops_test.py"],
     deps = [":tensorflow_compression"],
-    srcs_version = "PY2AND3",
 )
 
 py_test(
     name = "spectral_ops_test",
     srcs = ["python/ops/spectral_ops_test.py"],
     deps = [":tensorflow_compression"],
-    srcs_version = "PY2AND3",
 )
 
 py_test(
     name = "range_coding_ops_test",
     srcs = ["python/ops/range_coding_ops_test.py"],
     deps = [":tensorflow_compression"],
-    srcs_version = "PY2AND3",
 )
