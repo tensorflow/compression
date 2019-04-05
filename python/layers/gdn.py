@@ -49,7 +49,7 @@ class GDN(tf.keras.layers.Layer):
   generalization of a particular sigmoid-type function:
 
   ```
-  y[i] = x[i] / sqrt(beta[i] + sum_j(gamma[j, i] * x[j]))
+  y[i] = x[i] / sqrt(beta[i] + sum_j(gamma[j, i] * x[j]^2))
   ```
 
   where `i` and `j` run over channels. This implementation never sums across
