@@ -29,6 +29,13 @@ from tensorflow_compression.python.layers import parameterizers
 from tensorflow_compression.python.ops import padding_ops
 
 
+__all__ = [
+    "SignalConv1D",
+    "SignalConv2D",
+    "SignalConv3D",
+]
+
+
 class _SignalConv(tf.keras.layers.Layer):
   """{rank}D convolution layer.
 

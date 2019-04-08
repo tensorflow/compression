@@ -24,6 +24,12 @@ from __future__ import print_function
 import tensorflow as tf
 
 
+__all__ = [
+    "upper_bound",
+    "lower_bound",
+]
+
+
 @tf.RegisterGradient("IdentityFirstOfTwoInputs")
 def _identity_first_of_two_inputs_grad(op, grad):
   """Gradient for `lower_bound` or `upper_bound` if `gradient == 'identity'`.

@@ -29,6 +29,11 @@ import tensorflow as tf
 _matrix_cache = {}
 
 
+__all__ = [
+    "irdft_matrix",
+]
+
+
 def irdft_matrix(shape, dtype=tf.float32):
   """Matrix for implementing kernel reparameterization with `tf.matmul`.
 

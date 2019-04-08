@@ -24,6 +24,11 @@ from __future__ import print_function
 import tensorflow as tf
 
 
+__all__ = [
+    "IdentityInitializer",
+]
+
+
 class IdentityInitializer(object):
   """Initialize to the identity kernel with the given shape.
 

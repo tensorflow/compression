@@ -22,6 +22,11 @@ from __future__ import print_function
 # Dependency imports
 
 
+__all__ = [
+    "same_padding_for_kernel",
+]
+
+
 def same_padding_for_kernel(shape, corr, strides_up=None):
   """Determine correct amount of padding for `same` convolution.
 

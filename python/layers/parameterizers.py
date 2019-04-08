@@ -27,6 +27,14 @@ from tensorflow_compression.python.ops import math_ops
 from tensorflow_compression.python.ops import spectral_ops
 
 
+__all__ = [
+    "Parameterizer",
+    "StaticParameterizer",
+    "RDFTParameterizer",
+    "NonnegativeParameterizer",
+]
+
+
 class Parameterizer(object):
   """Parameterization object (abstract base class).
 

@@ -20,8 +20,6 @@ from __future__ import print_function
 
 # Dependency imports
 
-from tensorflow.python.util.all_util import remove_undocumented
-
 # pylint: disable=wildcard-import
 from tensorflow_compression.python.layers.entropy_models import *
 from tensorflow_compression.python.layers.gdn import *
@@ -33,11 +31,3 @@ from tensorflow_compression.python.ops.padding_ops import *
 from tensorflow_compression.python.ops.range_coding_ops import *
 from tensorflow_compression.python.ops.spectral_ops import *
 # pylint: enable=wildcard-import
-
-remove_undocumented(__name__, [
-    "EntropyBottleneck", "GDN", "IdentityInitializer", "Parameterizer",
-    "StaticParameterizer", "RDFTParameterizer", "NonnegativeParameterizer",
-    "SignalConv1D", "SignalConv2D", "SignalConv3D",
-    "upper_bound", "lower_bound", "same_padding_for_kernel", "irdft_matrix",
-    "pmf_to_quantized_cdf", "range_decode", "range_encode",
-])

@@ -31,6 +31,11 @@ _default_beta_param = parameterizers.NonnegativeParameterizer(
 _default_gamma_param = parameterizers.NonnegativeParameterizer()
 
 
+__all__ = [
+    "GDN",
+]
+
+
 class GDN(tf.keras.layers.Layer):
   """Generalized divisive normalization layer.
 
