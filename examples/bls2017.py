@@ -168,10 +168,6 @@ def train():
   tf.summary.image("original", quantize_image(x))
   tf.summary.image("reconstruction", quantize_image(x_tilde))
 
-  # Creates summary for the probability mass function (PMF) estimated in the
-  # bottleneck.
-  entropy_bottleneck.visualize()
-
   hooks = [
       tf.train.StopAtStepHook(last_step=args.last_step),
       tf.train.NanTensorHook(train_loss),
