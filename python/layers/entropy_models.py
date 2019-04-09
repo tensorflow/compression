@@ -30,6 +30,16 @@ from tensorflow_compression.python.ops import math_ops
 from tensorflow_compression.python.ops import range_coding_ops
 
 
+__all__ = [
+    "EntropyModel",
+    "EntropyBottleneck",
+    "SymmetricConditional",
+    "GaussianConditional",
+    "LogisticConditional",
+    "LaplacianConditional",
+]
+
+
 class EntropyModel(tf.keras.layers.Layer):
   """Entropy model (base class).
 

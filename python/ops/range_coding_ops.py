@@ -24,9 +24,16 @@ from __future__ import print_function
 from tensorflow.python.framework import load_library
 from tensorflow.python.platform import resource_loader
 
+
+__all__ = list()
+_ops = dict()
 _range_coding_ops = load_library.load_op_library(
     resource_loader.get_path_to_datafile("../../_range_coding_ops.so"))
-
-pmf_to_quantized_cdf = _range_coding_ops.pmf_to_quantized_cdf
-range_decode = _range_coding_ops.range_decode
-range_encode = _range_coding_ops.range_encode
+for name in dir(_range_coding_ops):
+  if name.startswith("_"):
+    continue
+  if name in ("LIB_HANDLE", "OP_LIST", "deprecated_endpoints", "tf_export"):
+    continue
+  __all__.append(name)
+  _ops[name] = getattr(_range_coding_ops, name)
+globals().update(_ops)
