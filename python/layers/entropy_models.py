@@ -660,7 +660,7 @@ class EntropyBottleneck(EntropyModel):
     _, _, _, input_slices = self._get_input_dims()
 
     if mode == "noise":
-      noise = tf.random_uniform(tf.shape(inputs), -half, half)
+      noise = tf.random.uniform(tf.shape(inputs), -half, half)
       return tf.math.add_n([inputs, noise])
 
     medians = self._medians[input_slices]
@@ -987,7 +987,7 @@ class SymmetricConditional(EntropyModel):
     half = tf.constant(.5, dtype=self.dtype)
 
     if mode == "noise":
-      noise = tf.random_uniform(tf.shape(inputs), -half, half)
+      noise = tf.random.uniform(tf.shape(inputs), -half, half)
       return tf.math.add_n([inputs, noise])
 
     outputs = inputs

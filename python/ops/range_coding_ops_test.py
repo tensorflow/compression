@@ -32,7 +32,7 @@ class RangeCodingOpsTest(tf.test.TestCase):
   """
 
   def test_readme_example(self):
-    data = tf.random_uniform((128, 128), 0, 10, dtype=tf.int32)
+    data = tf.random.uniform((128, 128), 0, 10, dtype=tf.int32)
     histogram = tf.bincount(data, minlength=10, maxlength=10)
     cdf = tf.cumsum(histogram, exclusive=False)
     cdf = tf.pad(cdf, [[1, 0]])
