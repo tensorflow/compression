@@ -40,6 +40,7 @@ using tensorflow::NodeDefBuilder;
 using tensorflow::OpsTestBase;
 using tensorflow::ShapeInferenceTestOp;
 using tensorflow::Tensor;
+using tensorflow::TensorShape;
 using tensorflow::TTypes;
 
 class PmfToQuantizedCdfOpTest : public OpsTestBase {
@@ -149,6 +150,87 @@ TEST_F(PmfToQuantizedCdfOpTest, ShapeFn) {
   INFER_OK(op, "[3]", "[4]");
   INFER_OK(op, "[3,4]", "[d0_0,5]");
   INFER_OK(op, "[3,4,5]", "[d0_0,d0_1,6]");
+}
+
+class FingerprintOpTest : public tensorflow::OpsTestBase {
+ protected:
+  void MakeFingerprintOp(Tensor* tensor) {
+    TF_ASSERT_OK(tensorflow::NodeDefBuilder("fingerprint", "ArrayFingerprint")
+                     .Input(tensorflow::FakeInput(tensor->dtype()))
+                     .Finalize(node_def()));
+    TF_ASSERT_OK(InitOp());
+
+    inputs_.clear();
+    inputs_.emplace_back(tensor);
+  }
+
+  void MakeCheckFingerprintOp(Tensor* tensor, Tensor* fingerprint) {
+    TF_ASSERT_OK(
+        tensorflow::NodeDefBuilder("check_fingerprint", "CheckArrayFingerprint")
+            .Input(tensorflow::FakeInput(tensor->dtype()))
+            .Input(tensorflow::FakeInput(fingerprint->dtype()))
+            .Finalize(node_def()));
+    TF_ASSERT_OK(InitOp());
+
+    inputs_.clear();
+    inputs_.emplace_back(tensor);
+    inputs_.emplace_back(fingerprint);
+  }
+};
+
+TEST_F(FingerprintOpTest, Verify) {
+  std::random_device rd;
+  random::PhiloxRandom gen(rd(), rd());
+  random::SimplePhilox rand(&gen);
+  for (tensorflow::DataType dtype : tensorflow::kRealNumberTypes) {
+    const int rank = rand.Uniform(4);
+
+    TensorShape shape;
+    for (int i = 0; i < rank; ++i) {
+      shape.AddDim(rand.Uniform(9) + 1);
+    }
+
+    Tensor tensor(dtype, shape);
+
+    const int64 length = shape.num_elements() * tensorflow::DataTypeSize(dtype);
+    auto buffer = tensor.bit_casted_shaped<char, 1>({length});
+    buffer.setRandom();
+
+    MakeFingerprintOp(&tensor);
+    TF_ASSERT_OK(RunOpKernel());
+
+    Tensor fingerprint = *GetOutput(0);
+
+    MakeCheckFingerprintOp(&tensor, &fingerprint);
+    TF_ASSERT_OK(RunOpKernel());
+
+    // Change one byte in the buffer.
+    const int64 pos = rand.Uniform(length);
+    buffer(pos) = ~buffer(pos);
+
+    MakeCheckFingerprintOp(&tensor, &fingerprint);
+    ASSERT_FALSE(RunOpKernel().ok());
+  }
+}
+
+TEST_F(FingerprintOpTest, FingerprintShapeFn) {
+  tensorflow::ShapeInferenceTestOp op("ArrayFingerprint");
+
+  INFER_OK(op, "?", "[]");
+  INFER_OK(op, "[]", "[]");
+  INFER_OK(op, "[1]", "[]");
+  INFER_OK(op, "[1,2]", "[]");
+  INFER_OK(op, "[1,2,3]", "[]");
+}
+
+TEST_F(FingerprintOpTest, CheckFingerprintShapeFn) {
+  tensorflow::ShapeInferenceTestOp op("CheckArrayFingerprint");
+
+  INFER_OK(op, "?;?", "in0");
+  INFER_OK(op, "[];?", "in0");
+  INFER_OK(op, "[1,2];?", "in0");
+  INFER_OK(op, "[1,2,3];?", "in0");
+  INFER_ERROR("rank 0", op, "?;[1]");
 }
 
 }  // namespace

@@ -28,6 +28,7 @@ limitations under the License.
 #include "tensorflow/core/lib/core/errors.h"
 #include "tensorflow/core/lib/core/threadpool.h"
 #include "tensorflow/core/lib/gtl/array_slice.h"
+#include "tensorflow/core/platform/fingerprint.h"
 #include "tensorflow/core/platform/logging.h"
 #include "tensorflow/core/platform/macros.h"
 #include "tensorflow/core/platform/types.h"
@@ -37,19 +38,20 @@ namespace {
 namespace gtl = tensorflow::gtl;
 namespace thread = tensorflow::thread;
 using tensorflow::DEVICE_CPU;
+using tensorflow::Fingerprint64;
+using tensorflow::int32;
+using tensorflow::int64;
 using tensorflow::OpKernel;
 using tensorflow::OpKernelConstruction;
 using tensorflow::OpKernelContext;
+using tensorflow::string;
 using tensorflow::Tensor;
 using tensorflow::TensorShape;
 using tensorflow::TensorShapeUtils;
-using tensorflow::errors::InvalidArgument;
-using tensorflow::int32;
-using tensorflow::int64;
-using tensorflow::string;
-using tensorflow::uint8;
 using tensorflow::uint32;
 using tensorflow::uint64;
+using tensorflow::uint8;
+using tensorflow::errors::InvalidArgument;
 
 class PmfToCdfOp : public OpKernel {
  public:
@@ -207,6 +209,63 @@ class PmfToCdfOp : public OpKernel {
 
 REGISTER_KERNEL_BUILDER(Name("PmfToQuantizedCdf").Device(DEVICE_CPU),
                         PmfToCdfOp);
+
+class ArrayFingerprintOp : public tensorflow::OpKernel {
+ public:
+  using OpKernel::OpKernel;
+
+  void Compute(tensorflow::OpKernelContext* context) override {
+    const Tensor& input = context->input(0);
+    OP_REQUIRES(context, tensorflow::DataTypeCanUseMemcpy(input.dtype()),
+                InvalidArgument("Data type not supported: ",
+                                tensorflow::DataTypeString(input.dtype())));
+
+    const int64 size =
+        input.shape().num_elements() * tensorflow::DataTypeSize(input.dtype());
+    auto data = input.bit_casted_shaped<char, 1>({size});
+
+    Tensor* output;
+    OP_REQUIRES_OK(context,
+                   context->allocate_output(0, TensorShape{}, &output));
+
+    output->scalar<int64>()() =
+        Fingerprint64({data.data(), static_cast<size_t>(data.size())});
+  }
+};
+
+REGISTER_KERNEL_BUILDER(Name("ArrayFingerprint").Device(tensorflow::DEVICE_CPU),
+                        ArrayFingerprintOp);
+
+class CheckArrayFingerprintOp : public tensorflow::OpKernel {
+ public:
+  using OpKernel::OpKernel;
+
+  void Compute(tensorflow::OpKernelContext* context) override {
+    const Tensor& input = context->input(0);
+    const Tensor& fingerprint = context->input(1);
+    OP_REQUIRES(context, tensorflow::DataTypeCanUseMemcpy(input.dtype()),
+                InvalidArgument("Data type not supported: ",
+                                tensorflow::DataTypeString(input.dtype())));
+    OP_REQUIRES(context, TensorShapeUtils::IsScalar(fingerprint.shape()),
+                InvalidArgument("`fingerprint` should be a scalar"));
+
+    const int64 size =
+        input.shape().num_elements() * tensorflow::DataTypeSize(input.dtype());
+    auto data = input.bit_casted_shaped<char, 1>({size});
+
+    OP_REQUIRES(
+        context,
+        fingerprint.scalar<int64>()() ==
+            Fingerprint64({data.data(), static_cast<size_t>(data.size())}),
+        tensorflow::errors::DataLoss("Fingerprint mismatch"));
+
+    context->set_output(0, input);
+  }
+};
+
+REGISTER_KERNEL_BUILDER(
+    Name("CheckArrayFingerprint").Device(tensorflow::DEVICE_CPU),
+    CheckArrayFingerprintOp);
 
 }  // namespace
 }  // namespace tensorflow_compression

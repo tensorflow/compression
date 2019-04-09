@@ -87,7 +87,6 @@ encoded: A range-coded scalar string.
 precision: The number of bits for probability quantization. Must be <= 16.
 )doc");
 
-
 REGISTER_OP("RangeDecode")
     .Input("encoded: string")
     .Input("shape: int32")
@@ -119,7 +118,6 @@ decoded: An int16 tensor with shape equal to `shape`.
 precision: The number of bits for probability quantization. Must be <= 16, and
   must match the precision used by RangeEncode that produced `encoded`.
 )doc");
-
 
 REGISTER_OP("UnboundedIndexRangeEncode")
     .Input("data: int32")
@@ -198,7 +196,6 @@ overflow_width: The bit width of the variable-length overflow code. Must be <=
   precision.
 )doc");
 
-
 REGISTER_OP("UnboundedIndexRangeDecode")
     .Input("encoded: string")
     .Input("index: int32")
@@ -239,7 +236,6 @@ overflow_width: The bit width of the variable-length overflow code. Must be <=
   produced `encoded`.
 )doc");
 
-
 REGISTER_OP("PmfToQuantizedCdf")
     .Input("pmf: float")
     .Output("cdf: int32")
@@ -267,6 +263,38 @@ are increased or decreased to adjust the sum to equal to 2^precision.
 Note that the input PMF is pre-quantization. The input PMF is not normalized
 by this op prior to quantization. Therefore the user is responsible for
 normalizing PMF if necessary.
+)doc");
+
+REGISTER_OP("ArrayFingerprint")
+    .Input("input: T")
+    .Output("fingerprint: int64")
+    .Attr("T: realnumbertype")
+    .SetShapeFn(tensorflow::shape_inference::ScalarShape)
+    .Doc(R"doc(
+Produces fingerprint of the input data.
+
+input: Tensor to be fingerprinted.
+fingerprint: Fingerprint value of input.
+)doc");
+
+REGISTER_OP("CheckArrayFingerprint")
+    .Input("input: T")
+    .Input("fingerprint: int64")
+    .Output("output: T")
+    .Attr("T: realnumbertype")
+    .SetShapeFn([](InferenceContext* c) {
+      ShapeHandle unused;
+      TF_RETURN_IF_ERROR(c->WithRank(c->input(1), 0, &unused));
+      c->set_output(0, c->input(0));
+      return tensorflow::Status::OK();
+    })
+    .Doc(R"doc(
+Computes the fingerprint of `input` and checks the computed value against
+`fingerprint`. If the check fails, then this op returns an error status.
+
+input: Tensor to be fingerprinted and checked.
+fingerprint: Fingerprint value to be checked against.
+output: The same as input.
 )doc");
 // clang-format on
 
