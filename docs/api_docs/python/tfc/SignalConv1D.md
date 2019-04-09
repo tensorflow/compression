@@ -1,71 +1,3 @@
-<div itemscope itemtype="http://developers.google.com/ReferenceObject">
-<meta itemprop="name" content="tfc.SignalConv1D" />
-<meta itemprop="property" content="activation"/>
-<meta itemprop="property" content="activity_regularizer"/>
-<meta itemprop="property" content="bias"/>
-<meta itemprop="property" content="bias_initializer"/>
-<meta itemprop="property" content="bias_parameterizer"/>
-<meta itemprop="property" content="bias_regularizer"/>
-<meta itemprop="property" content="channel_separable"/>
-<meta itemprop="property" content="corr"/>
-<meta itemprop="property" content="data_format"/>
-<meta itemprop="property" content="dtype"/>
-<meta itemprop="property" content="extra_pad_end"/>
-<meta itemprop="property" content="filters"/>
-<meta itemprop="property" content="graph"/>
-<meta itemprop="property" content="inbound_nodes"/>
-<meta itemprop="property" content="input"/>
-<meta itemprop="property" content="input_mask"/>
-<meta itemprop="property" content="input_shape"/>
-<meta itemprop="property" content="kernel"/>
-<meta itemprop="property" content="kernel_initializer"/>
-<meta itemprop="property" content="kernel_parameterizer"/>
-<meta itemprop="property" content="kernel_regularizer"/>
-<meta itemprop="property" content="kernel_support"/>
-<meta itemprop="property" content="losses"/>
-<meta itemprop="property" content="name"/>
-<meta itemprop="property" content="non_trainable_variables"/>
-<meta itemprop="property" content="non_trainable_weights"/>
-<meta itemprop="property" content="outbound_nodes"/>
-<meta itemprop="property" content="output"/>
-<meta itemprop="property" content="output_mask"/>
-<meta itemprop="property" content="output_shape"/>
-<meta itemprop="property" content="padding"/>
-<meta itemprop="property" content="scope_name"/>
-<meta itemprop="property" content="strides_down"/>
-<meta itemprop="property" content="strides_up"/>
-<meta itemprop="property" content="trainable_variables"/>
-<meta itemprop="property" content="trainable_weights"/>
-<meta itemprop="property" content="updates"/>
-<meta itemprop="property" content="use_bias"/>
-<meta itemprop="property" content="variables"/>
-<meta itemprop="property" content="weights"/>
-<meta itemprop="property" content="__call__"/>
-<meta itemprop="property" content="__deepcopy__"/>
-<meta itemprop="property" content="__init__"/>
-<meta itemprop="property" content="add_loss"/>
-<meta itemprop="property" content="add_update"/>
-<meta itemprop="property" content="add_variable"/>
-<meta itemprop="property" content="add_weight"/>
-<meta itemprop="property" content="apply"/>
-<meta itemprop="property" content="build"/>
-<meta itemprop="property" content="call"/>
-<meta itemprop="property" content="compute_mask"/>
-<meta itemprop="property" content="compute_output_shape"/>
-<meta itemprop="property" content="count_params"/>
-<meta itemprop="property" content="from_config"/>
-<meta itemprop="property" content="get_config"/>
-<meta itemprop="property" content="get_input_at"/>
-<meta itemprop="property" content="get_input_mask_at"/>
-<meta itemprop="property" content="get_input_shape_at"/>
-<meta itemprop="property" content="get_losses_for"/>
-<meta itemprop="property" content="get_output_at"/>
-<meta itemprop="property" content="get_output_mask_at"/>
-<meta itemprop="property" content="get_output_shape_at"/>
-<meta itemprop="property" content="get_updates_for"/>
-<meta itemprop="property" content="get_weights"/>
-<meta itemprop="property" content="set_weights"/>
-</div>
 
 # tfc.SignalConv1D
 
@@ -73,12 +5,24 @@
 
 
 
+### Aliases:
+
+* Class `tfc.SignalConv1D`
+* Class `tfc.python.layers.signal_conv.SignalConv1D`
+
+
+
+Defined in [`python/layers/signal_conv.py`](https://github.com/tensorflow/compression/tree/master/python/layers/signal_conv.py).
+
+<!-- Placeholder for "Used in" -->
+
 1D convolution layer.
 
 This layer creates a filter kernel that is convolved or cross correlated with
 the layer input to produce an output tensor. The main difference of this class
-to `tf.layers.Conv?D` is how padding, up- and downsampling, and alignment is
-handled.
+to `tf.layers.Conv1D` is how padding, up- and downsampling, and alignment
+is handled. It supports much more flexible options for structuring the linear
+transform.
 
 In general, the outputs are equivalent to a composition of:
 1. an upsampling step (if `strides_up > 1`)
@@ -207,7 +151,23 @@ Available padding (boundary handling) modes:
 
 Note that due to limitations of the underlying operations, not all
 combinations of arguments are currently implemented. In this case, this class
-will throw an exception.
+will throw a `NotImplementedError` exception.
+
+Speed tips:
+
+- Prefer combining correlations with downsampling, and convolutions with
+  upsampling, as the underlying ops implement these combinations directly.
+- If that isn't desirable, prefer using odd-length kernel supports, since
+  odd-length kernels can be flipped if necessary, to use the fastest
+  implementation available.
+- Combining upsampling and downsampling (for rational resampling ratios)
+  is relatively slow, because no underlying ops exist for that use case.
+  Downsampling in this case is implemented by discarding computed output
+  values.
+- Note that `channel_separable` is only implemented for 1D and 2D. Also,
+  upsampled channel-separable convolutions are currently only implemented for
+  `filters == 1`. When using `channel_separable`, prefer using identical
+  strides in all dimensions to maximize performance.
 
 #### Arguments:
 
@@ -247,12 +207,12 @@ will throw an exception.
 * <b>`activity_regularizer`</b>: Regularizer function for the output.
 * <b>`kernel_parameterizer`</b>: Reparameterization applied to filter kernel. If not
     `None`, must be a `Parameterizer` object. Defaults to `RDFTParameterizer`.
-* <b>`bias_parameterizer`</b>: Reparameterization applied to bias. If not `None`, must
-    be a `Parameterizer` object.
+* <b>`bias_parameterizer`</b>: Reparameterization applied to bias. If not `None`,
+    must be a `Parameterizer` object. Defaults to `None`.
 * <b>`trainable`</b>: Boolean. Whether the layer should be trained.
 * <b>`name`</b>: String. The name of the layer.
-* <b>`dtype`</b>: Default dtype of the layer's parameters (default of `None` means use
-    the type of the first input).
+* <b>`dtype`</b>: `DType` of the layer's inputs (default of `None` means use the type
+    of the first input).
 
 Read-only properties:
 * <b>`filters`</b>: See above.
@@ -276,9 +236,9 @@ Read-only properties:
 * <b>`name`</b>: See above.
 * <b>`dtype`</b>: See above.
 * <b>`kernel`</b>: `Tensor`-like object. The convolution kernel as applied to the
-    inputs, i.e. after any reparameterizations.
+    inputs, i.e. after any reparameterizers.
 * <b>`bias`</b>: `Tensor`-like object. The bias vector as applied to the inputs, i.e.
-    after any reparameterizations.
+    after any reparameterizers.
 * <b>`trainable_variables`</b>: List of trainable variables.
 * <b>`non_trainable_variables`</b>: List of non-trainable variables.
 * <b>`variables`</b>: List of all variables of this layer, trainable and non-trainable.
@@ -289,6 +249,35 @@ Mutable properties:
 * <b>`trainable`</b>: Boolean. Whether the layer should be trained.
 * <b>`input_spec`</b>: Optional `InputSpec` object specifying the constraints on inputs
     that can be accepted by the layer.
+
+<h2 id="__init__"><code>__init__</code></h2>
+
+``` python
+__init__(
+    filters,
+    kernel_support,
+    corr=False,
+    strides_down=1,
+    strides_up=1,
+    padding='valid',
+    extra_pad_end=True,
+    channel_separable=False,
+    data_format='channels_last',
+    activation=None,
+    use_bias=False,
+    kernel_initializer=tf.initializers.variance_scaling(),
+    bias_initializer=tf.initializers.zeros(),
+    kernel_regularizer=None,
+    bias_regularizer=None,
+    kernel_parameterizer=parameterizers.RDFTParameterizer(),
+    bias_parameterizer=None,
+    **kwargs
+)
+```
+
+
+
+
 
 ## Properties
 
@@ -332,6 +321,10 @@ Optional regularizer function for the output of this layer.
 
 
 
+<h3 id="dynamic"><code>dynamic</code></h3>
+
+
+
 <h3 id="extra_pad_end"><code>extra_pad_end</code></h3>
 
 
@@ -339,14 +332,6 @@ Optional regularizer function for the output of this layer.
 <h3 id="filters"><code>filters</code></h3>
 
 
-
-<h3 id="graph"><code>graph</code></h3>
-
-
-
-<h3 id="inbound_nodes"><code>inbound_nodes</code></h3>
-
-Deprecated, do NOT use! Only for compatibility with external Keras.
 
 <h3 id="input"><code>input</code></h3>
 
@@ -432,13 +417,17 @@ Input shape, as an integer shape tuple
 
 Losses which are associated with this `Layer`.
 
-Note that when executing eagerly, getting this property evaluates
-regularizers. When using graph execution, variable regularization ops have
-already been created and are simply returned here.
+Variable regularization tensors are created when this property is accessed,
+so it is eager safe: accessing `losses` under a `tf.GradientTape` will
+propagate gradients back to the corresponding variables.
 
 #### Returns:
 
 A list of tensors.
+
+<h3 id="metrics"><code>metrics</code></h3>
+
+
 
 <h3 id="name"><code>name</code></h3>
 
@@ -451,10 +440,6 @@ A list of tensors.
 <h3 id="non_trainable_weights"><code>non_trainable_weights</code></h3>
 
 
-
-<h3 id="outbound_nodes"><code>outbound_nodes</code></h3>
-
-Deprecated, do NOT use! Only for compatibility with external Keras.
 
 <h3 id="output"><code>output</code></h3>
 
@@ -514,10 +499,6 @@ Output shape, as an integer shape tuple
 
 
 
-<h3 id="scope_name"><code>scope_name</code></h3>
-
-
-
 <h3 id="strides_down"><code>strides_down</code></h3>
 
 
@@ -546,6 +527,8 @@ Output shape, as an integer shape tuple
 
 Returns the list of all layer variables/weights.
 
+Alias of `self.weights`.
+
 #### Returns:
 
 A list of variables.
@@ -561,17 +544,6 @@ A list of variables.
 
 
 ## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
-
-``` python
-__init__(
-    *args,
-    **kwargs
-)
-```
-
-
 
 <h3 id="__call__"><code>__call__</code></h3>
 
@@ -590,7 +562,6 @@ Wraps `call`, applying pre- and post-processing steps.
 * <b>`inputs`</b>: input tensor(s).
 * <b>`*args`</b>: additional positional arguments to be passed to `self.call`.
 * <b>`**kwargs`</b>: additional keyword arguments to be passed to `self.call`.
-    **Note**: kwarg `scope` is reserved for use by the layer.
 
 
 #### Returns:
@@ -598,8 +569,10 @@ Wraps `call`, applying pre- and post-processing steps.
   Output tensor(s).
 
 Note:
-  - If the layer's `call` method takes a `scope` keyword argument,
-    this argument will be automatically set to the current variable scope.
+  - The following optional keyword arguments are reserved for specific uses:
+    * `training`: Boolean scalar tensor of Python boolean indicating
+      whether the `call` is meant for training or inference.
+    * `mask`: Boolean input mask.
   - If the layer's `call` method takes a `mask` argument (as some Keras
     layers do), its default value will be set to the mask generated
     for `inputs` by the previous layer (if `input` did come from
@@ -611,141 +584,24 @@ Note:
 
 * <b>`ValueError`</b>: if the layer's `call` method returns None (an invalid value).
 
-<h3 id="__deepcopy__"><code>__deepcopy__</code></h3>
+<h3 id="__delattr__"><code>__delattr__</code></h3>
 
 ``` python
-__deepcopy__(memo)
+__delattr__(name)
 ```
 
 
 
-<h3 id="add_loss"><code>add_loss</code></h3>
+<h3 id="__setattr__"><code>__setattr__</code></h3>
 
 ``` python
-add_loss(
-    losses,
-    inputs=None
-)
-```
-
-
-
-<h3 id="add_update"><code>add_update</code></h3>
-
-``` python
-add_update(
-    updates,
-    inputs=None
-)
-```
-
-Add update op(s), potentially dependent on layer inputs.
-
-Weight updates (for instance, the updates of the moving mean and variance
-in a BatchNormalization layer) may be dependent on the inputs passed
-when calling a layer. Hence, when reusing the same layer on
-different inputs `a` and `b`, some entries in `layer.updates` may be
-dependent on `a` and some on `b`. This method automatically keeps track
-of dependencies.
-
-The `get_updates_for` method allows to retrieve the updates relevant to a
-specific set of inputs.
-
-This call is ignored when eager execution is enabled (in that case, variable
-updates are run on the fly and thus do not need to be tracked for later
-execution).
-
-#### Arguments:
-
-* <b>`updates`</b>: Update op, or list/tuple of update ops.
-* <b>`inputs`</b>: If anything other than None is passed, it signals the updates
-    are conditional on some of the layer's inputs,
-    and thus they should only be run where these inputs are available.
-    This is the case for BatchNormalization updates, for instance.
-    If None, the updates will be taken into account unconditionally,
-    and you are responsible for making sure that any dependency they might
-    have is available at runtime.
-    A step counter might fall into this category.
-
-<h3 id="add_variable"><code>add_variable</code></h3>
-
-``` python
-add_variable(
-    *args,
-    **kwargs
-)
-```
-
-Alias for `add_weight`.
-
-<h3 id="add_weight"><code>add_weight</code></h3>
-
-``` python
-add_weight(
+__setattr__(
     name,
-    shape,
-    dtype=None,
-    initializer=None,
-    regularizer=None,
-    trainable=None,
-    constraint=None,
-    use_resource=None,
-    synchronization=vs.VariableSynchronization.AUTO,
-    aggregation=vs.VariableAggregation.NONE,
-    partitioner=None
+    value
 )
 ```
 
-Adds a new variable to the layer, or gets an existing one; returns it.
 
-#### Arguments:
-
-* <b>`name`</b>: variable name.
-* <b>`shape`</b>: variable shape.
-* <b>`dtype`</b>: The type of the variable. Defaults to `self.dtype` or `float32`.
-* <b>`initializer`</b>: initializer instance (callable).
-* <b>`regularizer`</b>: regularizer instance (callable).
-* <b>`trainable`</b>: whether the variable should be part of the layer's
-    "trainable_variables" (e.g. variables, biases)
-    or "non_trainable_variables" (e.g. BatchNorm mean, stddev).
-    Note, if the current variable scope is marked as non-trainable
-    then this parameter is ignored and any added variables are also
-    marked as non-trainable. `trainable` defaults to `True` unless
-    `synchronization` is set to `ON_READ`.
-* <b>`constraint`</b>: constraint instance (callable).
-* <b>`use_resource`</b>: Whether to use `ResourceVariable`.
-* <b>`synchronization`</b>: Indicates when a distributed a variable will be
-    aggregated. Accepted values are constants defined in the class
-    BAD_LINK. By default the synchronization is set to
-    `AUTO` and the current `DistributionStrategy` chooses
-    when to synchronize. If `synchronization` is set to `ON_READ`,
-    `trainable` must not be set to `True`.
-* <b>`aggregation`</b>: Indicates how a distributed variable will be aggregated.
-    Accepted values are constants defined in the class
-    BAD_LINK.
-* <b>`partitioner`</b>: (optional) partitioner instance (callable).  If
-    provided, when the requested variable is created it will be split
-    into multiple partitions according to `partitioner`.  In this case,
-    an instance of `PartitionedVariable` is returned.  Available
-    partitioners include `tf.fixed_size_partitioner` and
-    `tf.variable_axis_size_partitioner`.  For more details, see the
-    documentation of `tf.get_variable` and the  "Variable Partitioners
-    and Sharding" section of the API guide.
-
-
-#### Returns:
-
-The created variable.  Usually either a `Variable` or `ResourceVariable`
-instance.  If `partitioner` is not `None`, a `PartitionedVariable`
-instance is returned.
-
-
-#### Raises:
-
-* <b>`RuntimeError`</b>: If called with partioned variable regularization and
-    eager execution is enabled.
-* <b>`ValueError`</b>: When trainable has been set to True with synchronization
-    set as `ON_READ`.
 
 <h3 id="apply"><code>apply</code></h3>
 
@@ -759,7 +615,7 @@ apply(
 
 Apply the layer on a input.
 
-This simply wraps `self.__call__`.
+This is an alias of `self.__call__`.
 
 #### Arguments:
 
@@ -776,14 +632,6 @@ Output tensor(s).
 
 ``` python
 build(input_shape)
-```
-
-
-
-<h3 id="call"><code>call</code></h3>
-
-``` python
-call(inputs)
 ```
 
 

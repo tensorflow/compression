@@ -1,14 +1,20 @@
-<div itemscope itemtype="http://developers.google.com/ReferenceObject">
-<meta itemprop="name" content="tfc.NonnegativeParameterizer" />
-<meta itemprop="property" content="__call__"/>
-<meta itemprop="property" content="__init__"/>
-</div>
 
 # tfc.NonnegativeParameterizer
 
 ## Class `NonnegativeParameterizer`
 
 Inherits From: [`Parameterizer`](../tfc/Parameterizer.md)
+
+### Aliases:
+
+* Class `tfc.NonnegativeParameterizer`
+* Class `tfc.python.layers.parameterizers.NonnegativeParameterizer`
+
+
+
+Defined in [`python/layers/parameterizers.py`](https://github.com/tensorflow/compression/tree/master/python/layers/parameterizers.py).
+
+<!-- Placeholder for "Used in" -->
 
 Object encapsulating nonnegative parameterization as needed for GDN.
 
@@ -19,7 +25,7 @@ learning rate for small values.
 
 * <b>`minimum`</b>: Float. Lower bound for parameters (defaults to zero).
 * <b>`reparam_offset`</b>: Float. Offset added to the reparameterization of beta and
-    gamma. The reparameterization of beta and gamma as their square roots lets
+    gamma. The parameterization of beta and gamma as their square roots lets
     the training slow down when their values are close to zero, which is
     desirable as small values in the denominator can lead to a situation where
     gradient noise on beta/gamma leads to extreme amounts of noise in the GDN
@@ -30,9 +36,7 @@ learning rate for small values.
     bigger potentially leads to more gradient noise on the activations, making
     it too small may lead to numerical precision issues.
 
-## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
+<h2 id="__init__"><code>__init__</code></h2>
 
 ``` python
 __init__(
@@ -42,6 +46,10 @@ __init__(
 ```
 
 
+
+
+
+## Methods
 
 <h3 id="__call__"><code>__call__</code></h3>
 

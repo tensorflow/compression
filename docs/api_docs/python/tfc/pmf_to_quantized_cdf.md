@@ -1,8 +1,10 @@
-<div itemscope itemtype="http://developers.google.com/ReferenceObject">
-<meta itemprop="name" content="tfc.pmf_to_quantized_cdf" />
-</div>
 
 # tfc.pmf_to_quantized_cdf
+
+### Aliases:
+
+* `tfc.pmf_to_quantized_cdf`
+* `tfc.python.ops.range_coding_ops.pmf_to_quantized_cdf`
 
 ``` python
 tfc.pmf_to_quantized_cdf(
@@ -11,6 +13,12 @@ tfc.pmf_to_quantized_cdf(
     name=None
 )
 ```
+
+
+
+Defined in [`python/ops/range_coding_ops.py`](https://github.com/tensorflow/compression/tree/master/python/ops/range_coding_ops.py).
+
+<!-- Placeholder for "Used in" -->
 
 Converts PMF to quantized CDF. This op uses floating-point operations
 

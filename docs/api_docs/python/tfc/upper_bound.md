@@ -1,8 +1,10 @@
-<div itemscope itemtype="http://developers.google.com/ReferenceObject">
-<meta itemprop="name" content="tfc.upper_bound" />
-</div>
 
 # tfc.upper_bound
+
+### Aliases:
+
+* `tfc.python.ops.math_ops.upper_bound`
+* `tfc.upper_bound`
 
 ``` python
 tfc.upper_bound(
@@ -12,6 +14,12 @@ tfc.upper_bound(
     name=None
 )
 ```
+
+
+
+Defined in [`python/ops/math_ops.py`](https://github.com/tensorflow/compression/tree/master/python/ops/math_ops.py).
+
+<!-- Placeholder for "Used in" -->
 
 Same as `tf.minimum`, but with helpful gradient for `inputs > bound`.
 

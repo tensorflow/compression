@@ -1,8 +1,10 @@
-<div itemscope itemtype="http://developers.google.com/ReferenceObject">
-<meta itemprop="name" content="tfc.same_padding_for_kernel" />
-</div>
 
 # tfc.same_padding_for_kernel
+
+### Aliases:
+
+* `tfc.python.ops.padding_ops.same_padding_for_kernel`
+* `tfc.same_padding_for_kernel`
 
 ``` python
 tfc.same_padding_for_kernel(
@@ -11,6 +13,12 @@ tfc.same_padding_for_kernel(
     strides_up=None
 )
 ```
+
+
+
+Defined in [`python/ops/padding_ops.py`](https://github.com/tensorflow/compression/tree/master/python/ops/padding_ops.py).
+
+<!-- Placeholder for "Used in" -->
 
 Determine correct amount of padding for `same` convolution.
 

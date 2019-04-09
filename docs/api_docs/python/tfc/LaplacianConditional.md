@@ -1,14 +1,14 @@
 
-# tfc.EntropyBottleneck
+# tfc.LaplacianConditional
 
-## Class `EntropyBottleneck`
+## Class `LaplacianConditional`
 
-Inherits From: [`EntropyModel`](../tfc/EntropyModel.md)
+Inherits From: [`SymmetricConditional`](../tfc/SymmetricConditional.md)
 
 ### Aliases:
 
-* Class `tfc.EntropyBottleneck`
-* Class `tfc.python.layers.entropy_models.EntropyBottleneck`
+* Class `tfc.LaplacianConditional`
+* Class `tfc.python.layers.entropy_models.LaplacianConditional`
 
 
 
@@ -16,109 +16,17 @@ Defined in [`python/layers/entropy_models.py`](https://github.com/tensorflow/com
 
 <!-- Placeholder for "Used in" -->
 
-Entropy bottleneck layer.
-
-This layer models the entropy of the tensor passing through it. During
-training, this can be used to impose a (soft) entropy constraint on its
-activations, limiting the amount of information flowing through the layer.
-After training, the layer can be used to compress any input tensor to a
-string, which may be written to a file, and to decompress a file which it
-previously generated back to a reconstructed tensor. The entropies estimated
-during training or evaluation are approximately equal to the average length of
-the strings in bits.
-
-The layer implements a flexible probability density model to estimate entropy
-of its input tensor, which is described in the appendix of the paper (please
-cite the paper if you use this code for scientific work):
-
-> "Variational image compression with a scale hyperprior"<br />
-> J. Ballé, D. Minnen, S. Singh, S. J. Hwang, N. Johnston<br />
-> https://arxiv.org/abs/1802.01436
-
-The layer assumes that the input tensor is at least 2D, with a batch dimension
-at the beginning and a channel dimension as specified by `data_format`. The
-layer trains an independent probability density model for each channel, but
-assumes that across all other dimensions, the inputs are i.i.d. (independent
-and identically distributed).
-
-Because data compression always involves discretization, the outputs of the
-layer are generally only approximations of its inputs. During training,
-discretization is modeled using additive uniform noise to ensure
-differentiability. The entropies computed during training are differential
-entropies. During evaluation, the data is actually quantized, and the
-entropies are discrete (Shannon entropies). To make sure the approximated
-tensor values are good enough for practical purposes, the training phase must
-be used to balance the quality of the approximation with the entropy, by
-adding an entropy term to the training loss. See the example in the package
-documentation to get started.
-
-Note: the layer always produces exactly one auxiliary loss and one update op,
-which are only significant for compression and decompression. To use the
-compression feature, the auxiliary loss must be minimized during or after
-training. After that, the update op must be executed at least once.
-
-#### Arguments:
-
-* <b>`init_scale`</b>: Float. A scaling factor determining the initial width of the
-    probability densities. This should be chosen big enough so that the
-    range of values of the layer inputs roughly falls within the interval
-    [`-init_scale`, `init_scale`] at the beginning of training.
-* <b>`filters`</b>: An iterable of ints, giving the number of filters at each layer of
-    the density model. Generally, the more filters and layers, the more
-    expressive is the density model in terms of modeling more complicated
-    distributions of the layer inputs. For details, refer to the paper
-    referenced above. The default is `[3, 3, 3]`, which should be sufficient
-    for most practical purposes.
-* <b>`tail_mass`</b>: Float, between 0 and 1. The bottleneck layer automatically
-    determines the range of input values based on their frequency of
-    occurrence. Values occurring in the tails of the distributions will not be
-    encoded with range coding, but using a Golomb-like code. `tail_mass`
-    determines the amount of probability mass in the tails which will be
-    Golomb-coded. For example, the default value of `2 ** -8` means that on
-    average, one 256th of all values will use the Golomb code.
-* <b>`likelihood_bound`</b>: Float. If positive, the returned likelihood values are
-    ensured to be greater than or equal to this value. This prevents very
-    large gradients with a typical entropy loss (defaults to 1e-9).
-* <b>`range_coder_precision`</b>: Integer, between 1 and 16. The precision of the range
-    coder used for compression and decompression. This trades off computation
-    speed with compression efficiency, where 16 is the slowest but most
-    efficient setting. Choosing lower values may increase the average
-    codelength slightly compared to the estimated entropies.
-* <b>`data_format`</b>: Either `'channels_first'` or `'channels_last'` (default).
-* <b>`trainable`</b>: Boolean. Whether the layer should be trained.
-* <b>`name`</b>: String. The name of the layer.
-* <b>`dtype`</b>: `DType` of the layer's inputs, parameters, returned likelihoods, and
-    outputs during training. Default of `None` means to use the type of the
-    first input.
-
-Read-only properties:
-* <b>`init_scale`</b>: See above.
-* <b>`filters`</b>: See above.
-* <b>`tail_mass`</b>: See above.
-* <b>`likelihood_bound`</b>: See above.
-* <b>`range_coder_precision`</b>: See above.
-* <b>`data_format`</b>: See above.
-* <b>`name`</b>: String. See above.
-* <b>`dtype`</b>: See above.
-* <b>`trainable_variables`</b>: List of trainable variables.
-* <b>`non_trainable_variables`</b>: List of non-trainable variables.
-* <b>`variables`</b>: List of all variables of this layer, trainable and non-trainable.
-* <b>`updates`</b>: List of update ops of this layer.
-* <b>`losses`</b>: List of losses added by this layer. Always contains exactly one
-    auxiliary loss, which must be added to the training loss.
-
-Mutable properties:
-* <b>`trainable`</b>: Boolean. Whether the layer should be trained.
-* <b>`input_spec`</b>: Optional `InputSpec` object specifying the constraints on inputs
-    that can be accepted by the layer.
+Conditional Laplacian entropy model.
 
 <h2 id="__init__"><code>__init__</code></h2>
 
 ``` python
 __init__(
-    init_scale=10,
-    filters=(3, 3, 3),
-    data_format='channels_last',
+    scale,
+    scale_table,
+    scale_bound=None,
+    mean=None,
+    indexes=None,
     **kwargs
 )
 ```
@@ -133,10 +41,6 @@ __init__(
 
 Optional regularizer function for the output of this layer.
 
-<h3 id="data_format"><code>data_format</code></h3>
-
-
-
 <h3 id="dtype"><code>dtype</code></h3>
 
 
@@ -145,11 +49,7 @@ Optional regularizer function for the output of this layer.
 
 
 
-<h3 id="filters"><code>filters</code></h3>
-
-
-
-<h3 id="init_scale"><code>init_scale</code></h3>
+<h3 id="indexes"><code>indexes</code></h3>
 
 
 
@@ -229,6 +129,10 @@ propagate gradients back to the corresponding variables.
 
 A list of tensors.
 
+<h3 id="mean"><code>mean</code></h3>
+
+
+
 <h3 id="metrics"><code>metrics</code></h3>
 
 
@@ -300,6 +204,18 @@ Output shape, as an integer shape tuple
 * <b>`RuntimeError`</b>: if called in Eager mode.
 
 <h3 id="range_coder_precision"><code>range_coder_precision</code></h3>
+
+
+
+<h3 id="scale"><code>scale</code></h3>
+
+
+
+<h3 id="scale_bound"><code>scale_bound</code></h3>
+
+
+
+<h3 id="scale_table"><code>scale_table</code></h3>
 
 
 
@@ -432,21 +348,20 @@ build(input_shape)
 
 Builds the entropy model.
 
-Creates the variables for the network modeling the densities, creates the
-auxiliary loss estimating the median and tail quantiles of the densities,
-and then uses that to create the probability mass functions and the discrete
-cumulative density functions used by the range coder.
+This function precomputes the quantized CDF table based on the scale table.
+This can be done at graph construction time. Then, it creates the graph for
+computing the indexes into that table based on the scale tensor, and then
+uses this index tensor to determine the starting positions of the PMFs for
+each scale.
 
 #### Arguments:
 
-* <b>`input_shape`</b>: Shape of the input tensor, used to get the number of
-    channels.
+* <b>`input_shape`</b>: Shape of the input tensor.
 
 
 #### Raises:
 
-* <b>`ValueError`</b>: if `input_shape` doesn't specify the length of the channel
-    dimension.
+* <b>`ValueError`</b>: If `input_shape` doesn't specify number of input dimensions.
 
 <h3 id="compress"><code>compress</code></h3>
 
@@ -523,11 +438,7 @@ An integer count.
 <h3 id="decompress"><code>decompress</code></h3>
 
 ``` python
-decompress(
-    strings,
-    shape,
-    channels=None
-)
+decompress(strings)
 ```
 
 Decompress values from their compressed string representations.
@@ -535,23 +446,11 @@ Decompress values from their compressed string representations.
 #### Arguments:
 
 * <b>`strings`</b>: A string `Tensor` vector containing the compressed data.
-* <b>`shape`</b>: A `Tensor` vector of int32 type. Contains the shape of the tensor
-    to be decompressed, excluding the batch dimension.
-* <b>`channels`</b>: Integer. Specifies the number of channels statically. Needs only
-    be set if the layer hasn't been built yet (i.e., this is the first input
-    it receives).
 
 
 #### Returns:
 
-The decompressed `Tensor`. Its shape will be equal to `shape` prepended
-with the batch dimension from `strings`.
-
-
-#### Raises:
-
-* <b>`ValueError`</b>: If the length of `shape` isn't available at graph construction
-    time.
+The decompressed `Tensor`.
 
 <h3 id="from_config"><code>from_config</code></h3>
 

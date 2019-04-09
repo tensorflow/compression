@@ -1,58 +1,20 @@
-<div itemscope itemtype="http://developers.google.com/ReferenceObject">
-<meta itemprop="name" content="tfc.GDN" />
-<meta itemprop="property" content="activity_regularizer"/>
-<meta itemprop="property" content="dtype"/>
-<meta itemprop="property" content="graph"/>
-<meta itemprop="property" content="inbound_nodes"/>
-<meta itemprop="property" content="input"/>
-<meta itemprop="property" content="input_mask"/>
-<meta itemprop="property" content="input_shape"/>
-<meta itemprop="property" content="losses"/>
-<meta itemprop="property" content="name"/>
-<meta itemprop="property" content="non_trainable_variables"/>
-<meta itemprop="property" content="non_trainable_weights"/>
-<meta itemprop="property" content="outbound_nodes"/>
-<meta itemprop="property" content="output"/>
-<meta itemprop="property" content="output_mask"/>
-<meta itemprop="property" content="output_shape"/>
-<meta itemprop="property" content="scope_name"/>
-<meta itemprop="property" content="trainable_variables"/>
-<meta itemprop="property" content="trainable_weights"/>
-<meta itemprop="property" content="updates"/>
-<meta itemprop="property" content="variables"/>
-<meta itemprop="property" content="weights"/>
-<meta itemprop="property" content="__call__"/>
-<meta itemprop="property" content="__deepcopy__"/>
-<meta itemprop="property" content="__init__"/>
-<meta itemprop="property" content="add_loss"/>
-<meta itemprop="property" content="add_update"/>
-<meta itemprop="property" content="add_variable"/>
-<meta itemprop="property" content="add_weight"/>
-<meta itemprop="property" content="apply"/>
-<meta itemprop="property" content="build"/>
-<meta itemprop="property" content="call"/>
-<meta itemprop="property" content="compute_mask"/>
-<meta itemprop="property" content="compute_output_shape"/>
-<meta itemprop="property" content="count_params"/>
-<meta itemprop="property" content="from_config"/>
-<meta itemprop="property" content="get_config"/>
-<meta itemprop="property" content="get_input_at"/>
-<meta itemprop="property" content="get_input_mask_at"/>
-<meta itemprop="property" content="get_input_shape_at"/>
-<meta itemprop="property" content="get_losses_for"/>
-<meta itemprop="property" content="get_output_at"/>
-<meta itemprop="property" content="get_output_mask_at"/>
-<meta itemprop="property" content="get_output_shape_at"/>
-<meta itemprop="property" content="get_updates_for"/>
-<meta itemprop="property" content="get_weights"/>
-<meta itemprop="property" content="set_weights"/>
-</div>
 
 # tfc.GDN
 
 ## Class `GDN`
 
 
+
+### Aliases:
+
+* Class `tfc.GDN`
+* Class `tfc.python.layers.gdn.GDN`
+
+
+
+Defined in [`python/layers/gdn.py`](https://github.com/tensorflow/compression/tree/master/python/layers/gdn.py).
+
+<!-- Placeholder for "Used in" -->
 
 Generalized divisive normalization layer.
 
@@ -71,7 +33,7 @@ Implements an activation function that is essentially a multivariate
 generalization of a particular sigmoid-type function:
 
 ```
-y[i] = x[i] / sqrt(beta[i] + sum_j(gamma[j, i] * x[j]))
+y[i] = x[i] / sqrt(beta[i] + sum_j(gamma[j, i] * x[j]^2))
 ```
 
 where `i` and `j` run over channels. This implementation never sums across
@@ -85,30 +47,62 @@ more flexible, as `beta` and `gamma` are trainable parameters.
     the division is replaced by multiplication).
 * <b>`rectify`</b>: Boolean. If `True`, apply a `relu` nonlinearity to the inputs
     before calculating GDN response.
-* <b>`gamma_init`</b>: The gamma matrix will be initialized as the identity matrix
-    multiplied with this value. If set to zero, the layer is effectively
-    initialized to the identity operation, since beta is initialized as one.
-    A good default setting is somewhere between 0 and 0.5.
+* <b>`gamma_init`</b>: Float. The gamma matrix will be initialized as the identity
+    matrix multiplied with this value. If set to zero, the layer is
+    effectively initialized to the identity operation, since beta is
+    initialized as one. A good default setting is somewhere between 0 and 0.5.
 * <b>`data_format`</b>: Format of input tensor. Currently supports `'channels_first'`
     and `'channels_last'`.
-* <b>`beta_parameterizer`</b>: Reparameterization for beta parameter. Defaults to
-    `NonnegativeParameterizer` with a minimum value of `1e-6`.
-* <b>`gamma_parameterizer`</b>: Reparameterization for gamma parameter. Defaults to
-    `NonnegativeParameterizer` with a minimum value of `0`.
+* <b>`beta_parameterizer`</b>: `Parameterizer` object for beta parameter. Defaults
+    to `NonnegativeParameterizer` with a minimum value of 1e-6.
+* <b>`gamma_parameterizer`</b>: `Parameterizer` object for gamma parameter.
+    Defaults to `NonnegativeParameterizer` with a minimum value of 0.
 * <b>`activity_regularizer`</b>: Regularizer function for the output.
-* <b>`trainable`</b>: Boolean, if `True`, also add variables to the graph collection
-    `GraphKeys.TRAINABLE_VARIABLES` (see `tf.Variable`).
-* <b>`name`</b>: String, the name of the layer. Layers with the same name will
-    share weights, but to avoid mistakes we require `reuse=True` in such
-    cases.
+* <b>`trainable`</b>: Boolean. Whether the layer should be trained.
+* <b>`name`</b>: String. The name of the layer.
+* <b>`dtype`</b>: `DType` of the layer's inputs (default of `None` means use the type
+    of the first input).
 
-Properties:
+Read-only properties:
 * <b>`inverse`</b>: Boolean, whether GDN is computed (`True`) or IGDN (`False`).
 * <b>`rectify`</b>: Boolean, whether to apply `relu` before normalization or not.
-* <b>`data_format`</b>: Format of input tensor. Currently supports `'channels_first'`
-    and `'channels_last'`.
+* <b>`gamma_init`</b>: See above.
+* <b>`data_format`</b>: See above.
+* <b>`activity_regularizer`</b>: See above.
+* <b>`name`</b>: See above.
+* <b>`dtype`</b>: See above.
 * <b>`beta`</b>: The beta parameter as defined above (1D `Tensor`).
 * <b>`gamma`</b>: The gamma parameter as defined above (2D `Tensor`).
+* <b>`trainable_variables`</b>: List of trainable variables.
+* <b>`non_trainable_variables`</b>: List of non-trainable variables.
+* <b>`variables`</b>: List of all variables of this layer, trainable and non-trainable.
+* <b>`updates`</b>: List of update ops of this layer.
+* <b>`losses`</b>: List of losses added by this layer.
+
+Mutable properties:
+* <b>`beta_parameterizer`</b>: See above.
+* <b>`gamma_parameterizer`</b>: See above.
+* <b>`trainable`</b>: Boolean. Whether the layer should be trained.
+* <b>`input_spec`</b>: Optional `InputSpec` object specifying the constraints on inputs
+    that can be accepted by the layer.
+
+<h2 id="__init__"><code>__init__</code></h2>
+
+``` python
+__init__(
+    inverse=False,
+    rectify=False,
+    gamma_init=0.1,
+    data_format='channels_last',
+    beta_parameterizer=_default_beta_param,
+    gamma_parameterizer=_default_gamma_param,
+    **kwargs
+)
+```
+
+
+
+
 
 ## Properties
 
@@ -116,17 +110,29 @@ Properties:
 
 Optional regularizer function for the output of this layer.
 
+<h3 id="beta_parameterizer"><code>beta_parameterizer</code></h3>
+
+
+
+<h3 id="data_format"><code>data_format</code></h3>
+
+
+
 <h3 id="dtype"><code>dtype</code></h3>
 
 
 
-<h3 id="graph"><code>graph</code></h3>
+<h3 id="dynamic"><code>dynamic</code></h3>
 
 
 
-<h3 id="inbound_nodes"><code>inbound_nodes</code></h3>
+<h3 id="gamma_init"><code>gamma_init</code></h3>
 
-Deprecated, do NOT use! Only for compatibility with external Keras.
+
+
+<h3 id="gamma_parameterizer"><code>gamma_parameterizer</code></h3>
+
+
 
 <h3 id="input"><code>input</code></h3>
 
@@ -188,17 +194,25 @@ Input shape, as an integer shape tuple
 * <b>`AttributeError`</b>: if the layer has no defined input_shape.
 * <b>`RuntimeError`</b>: if called in Eager mode.
 
+<h3 id="inverse"><code>inverse</code></h3>
+
+
+
 <h3 id="losses"><code>losses</code></h3>
 
 Losses which are associated with this `Layer`.
 
-Note that when executing eagerly, getting this property evaluates
-regularizers. When using graph execution, variable regularization ops have
-already been created and are simply returned here.
+Variable regularization tensors are created when this property is accessed,
+so it is eager safe: accessing `losses` under a `tf.GradientTape` will
+propagate gradients back to the corresponding variables.
 
 #### Returns:
 
 A list of tensors.
+
+<h3 id="metrics"><code>metrics</code></h3>
+
+
 
 <h3 id="name"><code>name</code></h3>
 
@@ -211,10 +225,6 @@ A list of tensors.
 <h3 id="non_trainable_weights"><code>non_trainable_weights</code></h3>
 
 
-
-<h3 id="outbound_nodes"><code>outbound_nodes</code></h3>
-
-Deprecated, do NOT use! Only for compatibility with external Keras.
 
 <h3 id="output"><code>output</code></h3>
 
@@ -270,7 +280,7 @@ Output shape, as an integer shape tuple
 * <b>`AttributeError`</b>: if the layer has no defined output shape.
 * <b>`RuntimeError`</b>: if called in Eager mode.
 
-<h3 id="scope_name"><code>scope_name</code></h3>
+<h3 id="rectify"><code>rectify</code></h3>
 
 
 
@@ -290,6 +300,8 @@ Output shape, as an integer shape tuple
 
 Returns the list of all layer variables/weights.
 
+Alias of `self.weights`.
+
 #### Returns:
 
 A list of variables.
@@ -305,25 +317,6 @@ A list of variables.
 
 
 ## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
-
-``` python
-__init__(
-    inverse=False,
-    rectify=False,
-    gamma_init=0.1,
-    data_format='channels_last',
-    beta_parameterizer=_default_beta_param,
-    gamma_parameterizer=_default_gamma_param,
-    activity_regularizer=None,
-    trainable=True,
-    name=None,
-    **kwargs
-)
-```
-
-
 
 <h3 id="__call__"><code>__call__</code></h3>
 
@@ -342,7 +335,6 @@ Wraps `call`, applying pre- and post-processing steps.
 * <b>`inputs`</b>: input tensor(s).
 * <b>`*args`</b>: additional positional arguments to be passed to `self.call`.
 * <b>`**kwargs`</b>: additional keyword arguments to be passed to `self.call`.
-    **Note**: kwarg `scope` is reserved for use by the layer.
 
 
 #### Returns:
@@ -350,8 +342,10 @@ Wraps `call`, applying pre- and post-processing steps.
   Output tensor(s).
 
 Note:
-  - If the layer's `call` method takes a `scope` keyword argument,
-    this argument will be automatically set to the current variable scope.
+  - The following optional keyword arguments are reserved for specific uses:
+    * `training`: Boolean scalar tensor of Python boolean indicating
+      whether the `call` is meant for training or inference.
+    * `mask`: Boolean input mask.
   - If the layer's `call` method takes a `mask` argument (as some Keras
     layers do), its default value will be set to the mask generated
     for `inputs` by the previous layer (if `input` did come from
@@ -363,141 +357,24 @@ Note:
 
 * <b>`ValueError`</b>: if the layer's `call` method returns None (an invalid value).
 
-<h3 id="__deepcopy__"><code>__deepcopy__</code></h3>
+<h3 id="__delattr__"><code>__delattr__</code></h3>
 
 ``` python
-__deepcopy__(memo)
+__delattr__(name)
 ```
 
 
 
-<h3 id="add_loss"><code>add_loss</code></h3>
+<h3 id="__setattr__"><code>__setattr__</code></h3>
 
 ``` python
-add_loss(
-    losses,
-    inputs=None
-)
-```
-
-
-
-<h3 id="add_update"><code>add_update</code></h3>
-
-``` python
-add_update(
-    updates,
-    inputs=None
-)
-```
-
-Add update op(s), potentially dependent on layer inputs.
-
-Weight updates (for instance, the updates of the moving mean and variance
-in a BatchNormalization layer) may be dependent on the inputs passed
-when calling a layer. Hence, when reusing the same layer on
-different inputs `a` and `b`, some entries in `layer.updates` may be
-dependent on `a` and some on `b`. This method automatically keeps track
-of dependencies.
-
-The `get_updates_for` method allows to retrieve the updates relevant to a
-specific set of inputs.
-
-This call is ignored when eager execution is enabled (in that case, variable
-updates are run on the fly and thus do not need to be tracked for later
-execution).
-
-#### Arguments:
-
-* <b>`updates`</b>: Update op, or list/tuple of update ops.
-* <b>`inputs`</b>: If anything other than None is passed, it signals the updates
-    are conditional on some of the layer's inputs,
-    and thus they should only be run where these inputs are available.
-    This is the case for BatchNormalization updates, for instance.
-    If None, the updates will be taken into account unconditionally,
-    and you are responsible for making sure that any dependency they might
-    have is available at runtime.
-    A step counter might fall into this category.
-
-<h3 id="add_variable"><code>add_variable</code></h3>
-
-``` python
-add_variable(
-    *args,
-    **kwargs
-)
-```
-
-Alias for `add_weight`.
-
-<h3 id="add_weight"><code>add_weight</code></h3>
-
-``` python
-add_weight(
+__setattr__(
     name,
-    shape,
-    dtype=None,
-    initializer=None,
-    regularizer=None,
-    trainable=None,
-    constraint=None,
-    use_resource=None,
-    synchronization=vs.VariableSynchronization.AUTO,
-    aggregation=vs.VariableAggregation.NONE,
-    partitioner=None
+    value
 )
 ```
 
-Adds a new variable to the layer, or gets an existing one; returns it.
 
-#### Arguments:
-
-* <b>`name`</b>: variable name.
-* <b>`shape`</b>: variable shape.
-* <b>`dtype`</b>: The type of the variable. Defaults to `self.dtype` or `float32`.
-* <b>`initializer`</b>: initializer instance (callable).
-* <b>`regularizer`</b>: regularizer instance (callable).
-* <b>`trainable`</b>: whether the variable should be part of the layer's
-    "trainable_variables" (e.g. variables, biases)
-    or "non_trainable_variables" (e.g. BatchNorm mean, stddev).
-    Note, if the current variable scope is marked as non-trainable
-    then this parameter is ignored and any added variables are also
-    marked as non-trainable. `trainable` defaults to `True` unless
-    `synchronization` is set to `ON_READ`.
-* <b>`constraint`</b>: constraint instance (callable).
-* <b>`use_resource`</b>: Whether to use `ResourceVariable`.
-* <b>`synchronization`</b>: Indicates when a distributed a variable will be
-    aggregated. Accepted values are constants defined in the class
-    BAD_LINK. By default the synchronization is set to
-    `AUTO` and the current `DistributionStrategy` chooses
-    when to synchronize. If `synchronization` is set to `ON_READ`,
-    `trainable` must not be set to `True`.
-* <b>`aggregation`</b>: Indicates how a distributed variable will be aggregated.
-    Accepted values are constants defined in the class
-    BAD_LINK.
-* <b>`partitioner`</b>: (optional) partitioner instance (callable).  If
-    provided, when the requested variable is created it will be split
-    into multiple partitions according to `partitioner`.  In this case,
-    an instance of `PartitionedVariable` is returned.  Available
-    partitioners include `tf.fixed_size_partitioner` and
-    `tf.variable_axis_size_partitioner`.  For more details, see the
-    documentation of `tf.get_variable` and the  "Variable Partitioners
-    and Sharding" section of the API guide.
-
-
-#### Returns:
-
-The created variable.  Usually either a `Variable` or `ResourceVariable`
-instance.  If `partitioner` is not `None`, a `PartitionedVariable`
-instance is returned.
-
-
-#### Raises:
-
-* <b>`RuntimeError`</b>: If called with partioned variable regularization and
-    eager execution is enabled.
-* <b>`ValueError`</b>: When trainable has been set to True with synchronization
-    set as `ON_READ`.
 
 <h3 id="apply"><code>apply</code></h3>
 
@@ -511,7 +388,7 @@ apply(
 
 Apply the layer on a input.
 
-This simply wraps `self.__call__`.
+This is an alias of `self.__call__`.
 
 #### Arguments:
 
@@ -528,14 +405,6 @@ Output tensor(s).
 
 ``` python
 build(input_shape)
-```
-
-
-
-<h3 id="call"><code>call</code></h3>
-
-``` python
-call(inputs)
 ```
 
 

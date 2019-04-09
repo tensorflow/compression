@@ -1,14 +1,20 @@
-<div itemscope itemtype="http://developers.google.com/ReferenceObject">
-<meta itemprop="name" content="tfc.RDFTParameterizer" />
-<meta itemprop="property" content="__call__"/>
-<meta itemprop="property" content="__init__"/>
-</div>
 
 # tfc.RDFTParameterizer
 
 ## Class `RDFTParameterizer`
 
 Inherits From: [`Parameterizer`](../tfc/Parameterizer.md)
+
+### Aliases:
+
+* Class `tfc.RDFTParameterizer`
+* Class `tfc.python.layers.parameterizers.RDFTParameterizer`
+
+
+
+Defined in [`python/layers/parameterizers.py`](https://github.com/tensorflow/compression/tree/master/python/layers/parameterizers.py).
+
+<!-- Placeholder for "Used in" -->
 
 Object encapsulating RDFT reparameterization.
 
@@ -23,15 +29,17 @@ the parameter.
 * <b>`dc`</b>: Boolean. If `False`, the DC component of the kernel RDFTs is not
     represented, forcing the filters to be highpass. Defaults to `True`.
 
-## Methods
-
-<h3 id="__init__"><code>__init__</code></h3>
+<h2 id="__init__"><code>__init__</code></h2>
 
 ``` python
 __init__(dc=True)
 ```
 
 
+
+
+
+## Methods
 
 <h3 id="__call__"><code>__call__</code></h3>
 

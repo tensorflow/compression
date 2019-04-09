@@ -25,7 +25,7 @@ import numpy as np
 import scipy.stats
 import tensorflow as tf
 
-from tensorflow.python.keras.engine import input_spec  # pylint:disable=g-direct-tensorflow-import
+from tensorflow.python.keras.engine import input_spec
 from tensorflow_compression.python.ops import math_ops
 from tensorflow_compression.python.ops import range_coding_ops
 

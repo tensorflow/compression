@@ -1,244 +1,74 @@
 
-# tfc.SignalConv3D
+# tfc.SymmetricConditional
 
-## Class `SignalConv3D`
+## Class `SymmetricConditional`
 
-
+Inherits From: [`EntropyModel`](../tfc/EntropyModel.md)
 
 ### Aliases:
 
-* Class `tfc.SignalConv3D`
-* Class `tfc.python.layers.signal_conv.SignalConv3D`
+* Class `tfc.SymmetricConditional`
+* Class `tfc.python.layers.entropy_models.SymmetricConditional`
 
 
 
-Defined in [`python/layers/signal_conv.py`](https://github.com/tensorflow/compression/tree/master/python/layers/signal_conv.py).
+Defined in [`python/layers/entropy_models.py`](https://github.com/tensorflow/compression/tree/master/python/layers/entropy_models.py).
 
 <!-- Placeholder for "Used in" -->
 
-3D convolution layer.
-
-This layer creates a filter kernel that is convolved or cross correlated with
-the layer input to produce an output tensor. The main difference of this class
-to `tf.layers.Conv3D` is how padding, up- and downsampling, and alignment
-is handled. It supports much more flexible options for structuring the linear
-transform.
-
-In general, the outputs are equivalent to a composition of:
-1. an upsampling step (if `strides_up > 1`)
-2. a convolution or cross correlation
-3. a downsampling step (if `strides_down > 1`)
-4. addition of a bias vector (if `use_bias == True`)
-5. a pointwise nonlinearity (if `activation is not None`)
-
-For more information on what the difference between convolution and cross
-correlation is, see [this](https://en.wikipedia.org/wiki/Convolution) and
-[this](https://en.wikipedia.org/wiki/Cross-correlation) Wikipedia article,
-respectively. Note that the distinction between convolution and cross
-correlation is occasionally blurred (one may use convolution as an umbrella
-term for both). For a discussion of up-/downsampling, refer to the articles
-about [upsampling](https://en.wikipedia.org/wiki/Upsampling) and
-[decimation](https://en.wikipedia.org/wiki/Decimation_(signal_processing)). A
-more in-depth treatment of all of these operations can be found in:
-
-> "Discrete-Time Signal Processing"<br />
-> Oppenheim, Schafer, Buck (Prentice Hall)
-
-For purposes of this class, the center position of a kernel is always
-considered to be at `K // 2`, where `K` is the support length of the kernel.
-This implies that in the `'same_*'` padding modes, all of the following
-operations will produce the same result if applied to the same inputs, which
-is not generally true for convolution operations as implemented by
-`tf.nn.convolution` or `tf.layers.Conv?D` (numbers represent kernel
-coefficient values):
-
-- convolve with `[1, 2, 3]`
-- convolve with `[0, 1, 2, 3, 0]`
-- convolve with `[0, 1, 2, 3]`
-- correlate with `[3, 2, 1]`
-- correlate with `[0, 3, 2, 1, 0]`
-- correlate with `[0, 3, 2, 1]`
-
-Available padding (boundary handling) modes:
-
-- `'valid'`: This always yields the maximum number of output samples that can
-  be computed without making any assumptions about the values outside of the
-  support of the input tensor. The padding semantics are always applied to the
-  inputs. In contrast, even though `tf.nn.conv2d_transpose` implements
-  upsampling, in `'VALID'` mode it will produce an output tensor with *larger*
-  support than the input tensor (because it is the transpose of a `'VALID'`
-  downsampled convolution).
-
-  Examples (numbers represent indexes into the respective tensors, periods
-  represent skipped spatial positions):
-
-  `kernel_support = 5` and `strides_down = 2`:
-  ```
-  inputs:  |0 1 2 3 4 5 6 7 8|
-  outputs: |    0 . 1 . 2    |
-  ```
-  ```
-  inputs:  |0 1 2 3 4 5 6 7|
-  outputs: |    0 . 1 .    |
-  ```
-
-  `kernel_support = 3`, `strides_up = 2`, and `extra_pad_end = True`:
-  ```
-  inputs:   |0 . 1 . 2 . 3 . 4 .|
-  outputs:  |  0 1 2 3 4 5 6 7  |
-  ```
-
-  `kernel_support = 3`, `strides_up = 2`, and `extra_pad_end = False`:
-  ```
-  inputs:   |0 . 1 . 2 . 3 . 4|
-  outputs:  |  0 1 2 3 4 5 6  |
-  ```
-
-- `'same_zeros'`: Values outside of the input tensor support are assumed to be
-  zero. Similar to `'SAME'` in `tf.nn.convolution`, but with different
-  padding. In `'SAME'`, the spatial alignment of the output depends on the
-  input shape. Here, the output alignment depends only on the kernel support
-  and the strides, making alignment more predictable. The first sample in the
-  output is always spatially aligned with the first sample in the input.
-
-  Examples (numbers represent indexes into the respective tensors, periods
-  represent skipped spatial positions):
-
-  `kernel_support = 5` and `strides_down = 2`:
-  ```
-  inputs:  |0 1 2 3 4 5 6 7 8|
-  outputs: |0 . 1 . 2 . 3 . 4|
-  ```
-  ```
-  inputs:  |0 1 2 3 4 5 6 7|
-  outputs: |0 . 1 . 2 . 3 .|
-  ```
-
-  `kernel_support = 3`, `strides_up = 2`, and `extra_pad_end = True`:
-  ```
-  inputs:   |0 . 1 . 2 . 3 . 4 .|
-  outputs:  |0 1 2 3 4 5 6 7 8 9|
-  ```
-
-  `kernel_support = 3`, `strides_up = 2`, and `extra_pad_end = False`:
-  ```
-  inputs:   |0 . 1 . 2 . 3 . 4|
-  outputs:  |0 1 2 3 4 5 6 7 8|
-  ```
-
-- `'same_reflect'`: Values outside of the input tensor support are assumed to
-  be reflections of the samples inside. Note that this is the same padding as
-  implemented by `tf.pad` in the `'REFLECT'` mode (i.e. with the symmetry axis
-  on the samples rather than between). The output alignment is identical to
-  the `'same_zeros'` mode.
-
-  Examples: see `'same_zeros'`.
-
-  When applying several convolutions with down- or upsampling in a sequence,
-  it can be helpful to keep the axis of symmetry for the reflections
-  consistent. To do this, set `extra_pad_end = False` and make sure that the
-  input has length `M`, such that `M % S == 1`, where `S` is the product of
-  stride lengths of all subsequent convolutions. Example for subsequent
-  downsampling (here, `M = 9`, `S = 4`, and `^` indicate the symmetry axes
-  for reflection):
-
-  ```
-  inputs:       |0 1 2 3 4 5 6 7 8|
-  intermediate: |0 . 1 . 2 . 3 . 4|
-  outputs:      |0 . . . 1 . . . 2|
-                 ^               ^
-  ```
-
-Note that due to limitations of the underlying operations, not all
-combinations of arguments are currently implemented. In this case, this class
-will throw a `NotImplementedError` exception.
-
-Speed tips:
-
-- Prefer combining correlations with downsampling, and convolutions with
-  upsampling, as the underlying ops implement these combinations directly.
-- If that isn't desirable, prefer using odd-length kernel supports, since
-  odd-length kernels can be flipped if necessary, to use the fastest
-  implementation available.
-- Combining upsampling and downsampling (for rational resampling ratios)
-  is relatively slow, because no underlying ops exist for that use case.
-  Downsampling in this case is implemented by discarding computed output
-  values.
-- Note that `channel_separable` is only implemented for 1D and 2D. Also,
-  upsampled channel-separable convolutions are currently only implemented for
-  `filters == 1`. When using `channel_separable`, prefer using identical
-  strides in all dimensions to maximize performance.
+Symmetric conditional entropy model.
 
 #### Arguments:
 
-* <b>`filters`</b>: Integer. If `not channel_separable`, specifies the total number of
-    filters, which is equal to the number of output channels. Otherwise,
-    specifies the number of filters per channel, which makes the number of
-    output channels equal to `filters` times the number of input channels.
-* <b>`kernel_support`</b>: An integer or iterable of 3 integers, specifying the
-    length of the convolution/correlation window in each dimension.
-* <b>`corr`</b>: Boolean. If True, compute cross correlation. If False, convolution.
-* <b>`strides_down`</b>: An integer or iterable of 3 integers, specifying an
-    optional downsampling stride after the convolution/correlation.
-* <b>`strides_up`</b>: An integer or iterable of 3 integers, specifying an
-    optional upsampling stride before the convolution/correlation.
-* <b>`padding`</b>: String. One of the supported padding modes (see above).
-* <b>`extra_pad_end`</b>: Boolean. When upsampling, use extra skipped samples at the
-    end of each dimension (default). For examples, refer to the discussion
-    of padding modes above.
-* <b>`channel_separable`</b>: Boolean. If `False` (default), each output channel is
-    computed by summing over all filtered input channels. If `True`, each
-    output channel is computed from only one input channel, and `filters`
-    specifies the number of filters per channel. The output channels are
-    ordered such that the first block of `filters` channels is computed from
-    the first input channel, the second block from the second input channel,
-    etc.
-* <b>`data_format`</b>: String, one of `channels_last` (default) or `channels_first`.
-    The ordering of the input dimensions. `channels_last` corresponds to
-    input tensors with shape `(batch, ..., channels)`, while `channels_first`
-    corresponds to input tensors with shape `(batch, channels, ...)`.
-* <b>`activation`</b>: Activation function or `None`.
-* <b>`use_bias`</b>: Boolean, whether an additive constant will be applied to each
-    output channel.
-* <b>`kernel_initializer`</b>: An initializer for the filter kernel.
-* <b>`bias_initializer`</b>: An initializer for the bias vector.
-* <b>`kernel_regularizer`</b>: Optional regularizer for the filter kernel.
-* <b>`bias_regularizer`</b>: Optional regularizer for the bias vector.
-* <b>`activity_regularizer`</b>: Regularizer function for the output.
-* <b>`kernel_parameterizer`</b>: Reparameterization applied to filter kernel. If not
-    `None`, must be a `Parameterizer` object. Defaults to `RDFTParameterizer`.
-* <b>`bias_parameterizer`</b>: Reparameterization applied to bias. If not `None`,
-    must be a `Parameterizer` object. Defaults to `None`.
+* <b>`scale`</b>: `Tensor`, the scale parameters for the conditional distributions.
+* <b>`scale_table`</b>: Iterable of positive floats. It's optimal to choose the scales
+    in a logarithmic way. For each predicted scale, the next greater entry in
+    the table is selected during compression.
+* <b>`scale_bound`</b>: Float. Lower bound for scales. Any values in `scale` smaller
+    than this value are set to this value to prevent non-positive scales. By
+    default (or when set to `None`), uses the smallest value in `scale_table`.
+    To disable, set to 0.
+* <b>`mean`</b>: `Tensor`, the mean parameters for the conditional distributions. If
+    `None`, the mean is assumed to be zero.
+* <b>`indexes`</b>: `Tensor` of type `int32` or `None`. Can be used to override the
+    selection of indexes based on `scale`. Only affects compression and
+    decompression.
+* <b>`tail_mass`</b>: Float, between 0 and 1. Values occurring in the tails of the
+    distributions will not be encoded with range coding, but using a
+    Golomb-like code. `tail_mass` determines the amount of probability mass in
+    the tails which will be Golomb-coded. For example, the default value of
+    `2 ** -8` means that on average, one 256th of all values will use the
+    Golomb code.
+* <b>`likelihood_bound`</b>: Float. If positive, the returned likelihood values are
+    ensured to be greater than or equal to this value. This prevents very
+    large gradients with a typical entropy loss (defaults to 1e-9).
+* <b>`range_coder_precision`</b>: Integer, between 1 and 16. The precision of the range
+    coder used for compression and decompression. This trades off computation
+    speed with compression efficiency, where 16 is the slowest but most
+    efficient setting. Choosing lower values may increase the average
+    codelength slightly compared to the estimated entropies.
+* <b>`data_format`</b>: Either `'channels_first'` or `'channels_last'` (default).
 * <b>`trainable`</b>: Boolean. Whether the layer should be trained.
 * <b>`name`</b>: String. The name of the layer.
-* <b>`dtype`</b>: `DType` of the layer's inputs (default of `None` means use the type
-    of the first input).
+* <b>`dtype`</b>: `DType` of the layer's inputs, parameters, returned likelihoods, and
+    outputs during training. Default of `None` means to use the type of the
+    first input.
 
 Read-only properties:
-* <b>`filters`</b>: See above.
-* <b>`kernel_support`</b>: See above.
-* <b>`corr`</b>: See above.
-* <b>`strides_down`</b>: See above.
-* <b>`strides_up`</b>: See above.
-* <b>`padding`</b>: See above.
-* <b>`extra_pad_end`</b>: See above.
-* <b>`channel_separable`</b>: See above.
+* <b>`scale`</b>: See above.
+* <b>`scale_table`</b>: See above.
+* <b>`scale_bound`</b>: See above.
+* <b>`mean`</b>: See above.
+* <b>`indexes`</b>: `Tensor` of type `int32`, giving the indexes into the scale table
+    for each input element. If not overridden in the constructor, they
+    correspond to the table entry with the smallest scale just larger than
+    each predicted scale.
+* <b>`tail_mass`</b>: See above.
+* <b>`likelihood_bound`</b>: See above.
+* <b>`range_coder_precision`</b>: See above.
 * <b>`data_format`</b>: See above.
-* <b>`activation`</b>: See above.
-* <b>`use_bias`</b>: See above.
-* <b>`kernel_initializer`</b>: See above.
-* <b>`bias_initializer`</b>: See above.
-* <b>`kernel_regularizer`</b>: See above.
-* <b>`bias_regularizer`</b>: See above.
-* <b>`activity_regularizer`</b>: See above.
-* <b>`kernel_parameterizer`</b>: See above.
-* <b>`bias_parameterizer`</b>: See above.
-* <b>`name`</b>: See above.
+* <b>`name`</b>: String. See above.
 * <b>`dtype`</b>: See above.
-* <b>`kernel`</b>: `Tensor`-like object. The convolution kernel as applied to the
-    inputs, i.e. after any reparameterizers.
-* <b>`bias`</b>: `Tensor`-like object. The bias vector as applied to the inputs, i.e.
-    after any reparameterizers.
 * <b>`trainable_variables`</b>: List of trainable variables.
 * <b>`non_trainable_variables`</b>: List of non-trainable variables.
 * <b>`variables`</b>: List of all variables of this layer, trainable and non-trainable.
@@ -254,23 +84,11 @@ Mutable properties:
 
 ``` python
 __init__(
-    filters,
-    kernel_support,
-    corr=False,
-    strides_down=1,
-    strides_up=1,
-    padding='valid',
-    extra_pad_end=True,
-    channel_separable=False,
-    data_format='channels_last',
-    activation=None,
-    use_bias=False,
-    kernel_initializer=tf.initializers.variance_scaling(),
-    bias_initializer=tf.initializers.zeros(),
-    kernel_regularizer=None,
-    bias_regularizer=None,
-    kernel_parameterizer=parameterizers.RDFTParameterizer(),
-    bias_parameterizer=None,
+    scale,
+    scale_table,
+    scale_bound=None,
+    mean=None,
+    indexes=None,
     **kwargs
 )
 ```
@@ -281,41 +99,9 @@ __init__(
 
 ## Properties
 
-<h3 id="activation"><code>activation</code></h3>
-
-
-
 <h3 id="activity_regularizer"><code>activity_regularizer</code></h3>
 
 Optional regularizer function for the output of this layer.
-
-<h3 id="bias"><code>bias</code></h3>
-
-
-
-<h3 id="bias_initializer"><code>bias_initializer</code></h3>
-
-
-
-<h3 id="bias_parameterizer"><code>bias_parameterizer</code></h3>
-
-
-
-<h3 id="bias_regularizer"><code>bias_regularizer</code></h3>
-
-
-
-<h3 id="channel_separable"><code>channel_separable</code></h3>
-
-
-
-<h3 id="corr"><code>corr</code></h3>
-
-
-
-<h3 id="data_format"><code>data_format</code></h3>
-
-
 
 <h3 id="dtype"><code>dtype</code></h3>
 
@@ -325,11 +111,7 @@ Optional regularizer function for the output of this layer.
 
 
 
-<h3 id="extra_pad_end"><code>extra_pad_end</code></h3>
-
-
-
-<h3 id="filters"><code>filters</code></h3>
+<h3 id="indexes"><code>indexes</code></h3>
 
 
 
@@ -393,23 +175,7 @@ Input shape, as an integer shape tuple
 * <b>`AttributeError`</b>: if the layer has no defined input_shape.
 * <b>`RuntimeError`</b>: if called in Eager mode.
 
-<h3 id="kernel"><code>kernel</code></h3>
-
-
-
-<h3 id="kernel_initializer"><code>kernel_initializer</code></h3>
-
-
-
-<h3 id="kernel_parameterizer"><code>kernel_parameterizer</code></h3>
-
-
-
-<h3 id="kernel_regularizer"><code>kernel_regularizer</code></h3>
-
-
-
-<h3 id="kernel_support"><code>kernel_support</code></h3>
+<h3 id="likelihood_bound"><code>likelihood_bound</code></h3>
 
 
 
@@ -424,6 +190,10 @@ propagate gradients back to the corresponding variables.
 #### Returns:
 
 A list of tensors.
+
+<h3 id="mean"><code>mean</code></h3>
+
+
 
 <h3 id="metrics"><code>metrics</code></h3>
 
@@ -495,15 +265,23 @@ Output shape, as an integer shape tuple
 * <b>`AttributeError`</b>: if the layer has no defined output shape.
 * <b>`RuntimeError`</b>: if called in Eager mode.
 
-<h3 id="padding"><code>padding</code></h3>
+<h3 id="range_coder_precision"><code>range_coder_precision</code></h3>
 
 
 
-<h3 id="strides_down"><code>strides_down</code></h3>
+<h3 id="scale"><code>scale</code></h3>
 
 
 
-<h3 id="strides_up"><code>strides_up</code></h3>
+<h3 id="scale_bound"><code>scale_bound</code></h3>
+
+
+
+<h3 id="scale_table"><code>scale_table</code></h3>
+
+
+
+<h3 id="tail_mass"><code>tail_mass</code></h3>
 
 
 
@@ -516,10 +294,6 @@ Output shape, as an integer shape tuple
 
 
 <h3 id="updates"><code>updates</code></h3>
-
-
-
-<h3 id="use_bias"><code>use_bias</code></h3>
 
 
 
@@ -634,7 +408,46 @@ Output tensor(s).
 build(input_shape)
 ```
 
+Builds the entropy model.
 
+This function precomputes the quantized CDF table based on the scale table.
+This can be done at graph construction time. Then, it creates the graph for
+computing the indexes into that table based on the scale tensor, and then
+uses this index tensor to determine the starting positions of the PMFs for
+each scale.
+
+#### Arguments:
+
+* <b>`input_shape`</b>: Shape of the input tensor.
+
+
+#### Raises:
+
+* <b>`ValueError`</b>: If `input_shape` doesn't specify number of input dimensions.
+
+<h3 id="compress"><code>compress</code></h3>
+
+``` python
+compress(inputs)
+```
+
+Compress inputs and store their binary representations into strings.
+
+#### Arguments:
+
+* <b>`inputs`</b>: `Tensor` with values to be compressed.
+
+
+#### Returns:
+
+* <b>`compressed`</b>: String `Tensor` vector containing the compressed
+    representation of each batch element of `inputs`.
+
+
+#### Raises:
+
+* <b>`ValueError`</b>: if `inputs` has an integral or inconsistent `DType`, or
+    inconsistent number of channels.
 
 <h3 id="compute_mask"><code>compute_mask</code></h3>
 
@@ -683,6 +496,23 @@ An integer count.
 
 * <b>`ValueError`</b>: if the layer isn't yet built
       (in which case its weights aren't yet defined).
+
+<h3 id="decompress"><code>decompress</code></h3>
+
+``` python
+decompress(strings)
+```
+
+Decompress values from their compressed string representations.
+
+#### Arguments:
+
+* <b>`strings`</b>: A string `Tensor` vector containing the compressed data.
+
+
+#### Returns:
+
+The decompressed `Tensor`.
 
 <h3 id="from_config"><code>from_config</code></h3>
 

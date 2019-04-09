@@ -1,15 +1,23 @@
-<div itemscope itemtype="http://developers.google.com/ReferenceObject">
-<meta itemprop="name" content="tfc.irdft_matrix" />
-</div>
 
 # tfc.irdft_matrix
+
+### Aliases:
+
+* `tfc.irdft_matrix`
+* `tfc.python.ops.spectral_ops.irdft_matrix`
 
 ``` python
 tfc.irdft_matrix(
     shape,
-    dtype=dtypes.float32
+    dtype=tf.float32
 )
 ```
+
+
+
+Defined in [`python/ops/spectral_ops.py`](https://github.com/tensorflow/compression/tree/master/python/ops/spectral_ops.py).
+
+<!-- Placeholder for "Used in" -->
 
 Matrix for implementing kernel reparameterization with `tf.matmul`.
 

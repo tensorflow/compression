@@ -1,8 +1,10 @@
-<div itemscope itemtype="http://developers.google.com/ReferenceObject">
-<meta itemprop="name" content="tfc.lower_bound" />
-</div>
 
 # tfc.lower_bound
+
+### Aliases:
+
+* `tfc.lower_bound`
+* `tfc.python.ops.math_ops.lower_bound`
 
 ``` python
 tfc.lower_bound(
@@ -12,6 +14,12 @@ tfc.lower_bound(
     name=None
 )
 ```
+
+
+
+Defined in [`python/ops/math_ops.py`](https://github.com/tensorflow/compression/tree/master/python/ops/math_ops.py).
+
+<!-- Placeholder for "Used in" -->
 
 Same as `tf.maximum`, but with helpful gradient for `inputs < bound`.
 

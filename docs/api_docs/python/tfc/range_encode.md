@@ -1,8 +1,10 @@
-<div itemscope itemtype="http://developers.google.com/ReferenceObject">
-<meta itemprop="name" content="tfc.range_encode" />
-</div>
 
 # tfc.range_encode
+
+### Aliases:
+
+* `tfc.python.ops.range_coding_ops.range_encode`
+* `tfc.range_encode`
 
 ``` python
 tfc.range_encode(
@@ -12,6 +14,12 @@ tfc.range_encode(
     name=None
 )
 ```
+
+
+
+Defined in [`python/ops/range_coding_ops.py`](https://github.com/tensorflow/compression/tree/master/python/ops/range_coding_ops.py).
+
+<!-- Placeholder for "Used in" -->
 
 Using the provided cumulative distribution functions (CDF) inside `cdf`, returns
 

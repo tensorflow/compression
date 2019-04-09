@@ -1,8 +1,10 @@
-<div itemscope itemtype="http://developers.google.com/ReferenceObject">
-<meta itemprop="name" content="tfc.range_decode" />
-</div>
 
 # tfc.range_decode
+
+### Aliases:
+
+* `tfc.python.ops.range_coding_ops.range_decode`
+* `tfc.range_decode`
 
 ``` python
 tfc.range_decode(
@@ -13,6 +15,12 @@ tfc.range_decode(
     name=None
 )
 ```
+
+
+
+Defined in [`python/ops/range_coding_ops.py`](https://github.com/tensorflow/compression/tree/master/python/ops/range_coding_ops.py).
+
+<!-- Placeholder for "Used in" -->
 
 Decodes a range-coded `code` into an int32 tensor of shape `shape`.
 
