@@ -40,7 +40,6 @@ limitations under the License.
 #include "tensorflow/core/platform/test.h"
 #include "tensorflow/core/public/session.h"
 #include "tensorflow/core/public/session_options.h"
-
 #include "tensorflow_compression/cc/kernels/range_coder.h"
 
 namespace tensorflow_compression {
@@ -51,6 +50,9 @@ namespace test = tensorflow::test;
 using tensorflow::DT_INT32;
 using tensorflow::DT_STRING;
 using tensorflow::Graph;
+using tensorflow::int16;
+using tensorflow::int32;
+using tensorflow::int64;
 using tensorflow::Log2Ceiling;
 using tensorflow::Node;
 using tensorflow::NodeBuilder;
@@ -59,27 +61,13 @@ using tensorflow::OpRegistry;
 using tensorflow::OpsTestBase;
 using tensorflow::ShapeRefiner;
 using tensorflow::Status;
+using tensorflow::string;
 using tensorflow::Tensor;
 using tensorflow::TensorShape;
 using tensorflow::TTypes;
-using tensorflow::int16;
-using tensorflow::int32;
-using tensorflow::int64;
-using tensorflow::string;
-using tensorflow::uint8;
 using tensorflow::uint32;
 using tensorflow::uint64;
-
-int LogUniform(random::SimplePhilox* gen, uint32 n) {
-  CHECK_GT(n, 0);
-  const int m = Log2Ceiling(n);
-
-  int outcome;
-  do {
-    outcome = gen->Skewed(m);
-  } while (n <= outcome);
-  return outcome;
-}
+using tensorflow::uint8;
 
 void BuildDataAndCdf(random::SimplePhilox* gen, Tensor* data_tensor,
                      const Tensor& index_tensor, Tensor* cdf_tensor,
@@ -150,16 +138,28 @@ void BuildDataAndCdf(random::SimplePhilox* gen, Tensor* data_tensor,
   }
 }
 
-class RangeCoderOpsTest : public OpsTestBase {
+class UnboundedIndexRangeCoderOpsTest : public OpsTestBase {
  protected:
+  Status RunEncodeOpDebug(int precision, int overflow_width,
+                          gtl::ArraySlice<Tensor> input) {
+    Tensor unused;
+    return RunEncodeOpImpl(precision, overflow_width, 1, input, &unused);
+  }
+
   Status RunEncodeOp(int precision, int overflow_width,
                      gtl::ArraySlice<Tensor> input, Tensor* output) {
+    return RunEncodeOpImpl(precision, overflow_width, 0, input, output);
+  }
+
+  Status RunEncodeOpImpl(int precision, int overflow_width, int debug_level,
+                         gtl::ArraySlice<Tensor> input, Tensor* output) {
     NodeDefBuilder builder("encode", "UnboundedIndexRangeEncode");
     for (const Tensor& tensor : input) {
       builder.Input(tensorflow::FakeInput(tensor.dtype()));
     }
     TF_RETURN_IF_ERROR(builder.Attr("precision", precision)
                            .Attr("overflow_width", overflow_width)
+                           .Attr("debug_level", debug_level)
                            .Finalize(node_def()));
     TF_RETURN_IF_ERROR(InitOp());
 
@@ -178,14 +178,26 @@ class RangeCoderOpsTest : public OpsTestBase {
     return Status::OK();
   }
 
+  Status RunDecodeOpDebug(int precision, int overflow_width,
+                          gtl::ArraySlice<Tensor> input) {
+    Tensor unused;
+    return RunDecodeOpImpl(precision, overflow_width, 1, input, &unused);
+  }
+
   Status RunDecodeOp(int precision, int overflow_width,
                      gtl::ArraySlice<Tensor> input, Tensor* output) {
+    return RunDecodeOpImpl(precision, overflow_width, 0, input, output);
+  }
+
+  Status RunDecodeOpImpl(int precision, int overflow_width, int debug_level,
+                         gtl::ArraySlice<Tensor> input, Tensor* output) {
     NodeDefBuilder builder("decode", "UnboundedIndexRangeDecode");
     for (const Tensor& tensor : input) {
       builder.Input(tensorflow::FakeInput(tensor.dtype()));
     }
     TF_RETURN_IF_ERROR(builder.Attr("precision", precision)
                            .Attr("overflow_width", overflow_width)
+                           .Attr("debug_level", debug_level)
                            .Finalize(node_def()));
     TF_RETURN_IF_ERROR(InitOp());
 
@@ -252,7 +264,7 @@ class RangeCoderOpsTest : public OpsTestBase {
   }
 };
 
-TEST_F(RangeCoderOpsTest, RandomIndex) {
+TEST_F(UnboundedIndexRangeCoderOpsTest, RandomIndex) {
   constexpr int kPrecision = 14;
   constexpr int kOverflowWidth = 3;
   constexpr int kCdfCount = 10;
@@ -284,7 +296,96 @@ TEST_F(RangeCoderOpsTest, RandomIndex) {
                       offset);
 }
 
-TEST_F(RangeCoderOpsTest, Broadcast1Axis) {
+TEST_F(UnboundedIndexRangeCoderOpsTest, EncoderDebug) {
+  Tensor data(DT_INT32, {});
+  data.scalar<int32>()() = 0;
+
+  Tensor index(DT_INT32, {});
+  index.scalar<int32>()() = 0;
+
+  Tensor cdf(DT_INT32, {1, 4});
+  cdf.flat<int32>().setValues({0, 16, 18, 32});
+
+  Tensor cdf_size(DT_INT32, {1});
+  cdf_size.vec<int32>().setValues({4});
+
+  Tensor offset(DT_INT32, {1});
+  offset.vec<int32>().setValues({1});
+
+  auto status = RunEncodeOpDebug(5, 2, {data, index, cdf, cdf_size, offset});
+  EXPECT_TRUE(status.ok());
+
+#define EXPECT_STATUS_SUBSTR(message)                                 \
+  {                                                                   \
+    auto status =                                                     \
+        RunEncodeOpDebug(5, 2, {data, index, cdf, cdf_size, offset}); \
+    EXPECT_FALSE(status.ok());                                        \
+    EXPECT_NE(status.error_message().find((message)), string::npos)   \
+        << status.error_message();                                    \
+  }
+
+  index.scalar<int32>()() = -1;
+  EXPECT_STATUS_SUBSTR("'index' has a value not in");
+  index.scalar<int32>()() = 0;
+
+  cdf_size.vec<int32>().setValues({1});
+  EXPECT_STATUS_SUBSTR("'cdf_size' has a value not in");
+  cdf_size.vec<int32>().setValues({5});
+  EXPECT_STATUS_SUBSTR("'cdf_size' has a value not in");
+  cdf_size.vec<int32>().setValues({4});
+
+  cdf.flat<int32>().setValues({1, 16, 18, 32});
+  EXPECT_STATUS_SUBSTR("cdf[0]=");
+  cdf.flat<int32>().setValues({0, 16, 18, 31});
+  EXPECT_STATUS_SUBSTR("cdf[^1]=");
+  cdf.flat<int32>().setValues({0, 18, 16, 32});
+  EXPECT_STATUS_SUBSTR("monotonic");
+  cdf.flat<int32>().setValues({0, 16, 18, 32});
+
+  Tensor temp = cdf;
+  cdf = Tensor(DT_INT32, {4});
+  EXPECT_STATUS_SUBSTR("'cdf' should be 2-D");
+  cdf = Tensor(DT_INT32, {1, 2});
+  EXPECT_STATUS_SUBSTR("cdf.dim_size(1) >= 3");
+  cdf = temp;
+
+  temp = cdf_size;
+  cdf_size = Tensor(DT_INT32, {1, 1});
+  EXPECT_STATUS_SUBSTR("'cdf_size' should be 1-D");
+  cdf_size = Tensor(DT_INT32, {2});
+  EXPECT_STATUS_SUBSTR("should match the number of rows");
+  cdf_size = temp;
+
+  temp = offset;
+  offset = Tensor(DT_INT32, {1, 1});
+  EXPECT_STATUS_SUBSTR("'offset' should be 1-D");
+  offset = Tensor(DT_INT32, {2});
+  EXPECT_STATUS_SUBSTR("should match the number of rows");
+  offset = temp;
+
+#undef EXPECT_STATUS_SUBSTR
+}
+
+TEST_F(UnboundedIndexRangeCoderOpsTest, DecoderDebug) {
+  Tensor encoded(DT_STRING, {});
+
+  Tensor index(DT_INT32, {});
+  index.scalar<int32>()() = 0;
+
+  Tensor cdf(DT_INT32, {1, 4});
+  cdf.flat<int32>().setValues({0, 16, 18, 32});
+
+  Tensor cdf_size(DT_INT32, {1});
+  cdf_size.vec<int32>().setValues({4});
+
+  Tensor offset(DT_INT32, {1});
+  offset.vec<int32>().setValues({1});
+
+  auto status = RunDecodeOpDebug(5, 2, {encoded, index, cdf, cdf_size, offset});
+  EXPECT_TRUE(status.ok());
+}
+
+TEST_F(UnboundedIndexRangeCoderOpsTest, Broadcast1Axis) {
   constexpr int kPrecision = 9;
   constexpr int kOverflowWidth = 4;
   constexpr int kDimensionSize = 1 << kPrecision;
@@ -318,7 +419,7 @@ TEST_F(RangeCoderOpsTest, Broadcast1Axis) {
   }
 }
 
-TEST_F(RangeCoderOpsTest, Broadcast2Axes) {
+TEST_F(UnboundedIndexRangeCoderOpsTest, Broadcast2Axes) {
   constexpr int kPrecision = 13;
   constexpr int kOverflowWidth = 2;
   constexpr int kDimensionSize1 = 1 << (kPrecision / 2);
@@ -340,7 +441,7 @@ TEST_F(RangeCoderOpsTest, Broadcast2Axes) {
                       offset);
 }
 
-TEST_F(RangeCoderOpsTest, DecoderShapeFn) {
+TEST_F(UnboundedIndexRangeCoderOpsTest, DecoderShapeFn) {
   Tensor encoded_tensor(DT_STRING, TensorShape{2});
   Tensor index_tensor(DT_INT32, TensorShape{4, 6, 8});
   Tensor cdf_tensor(DT_INT32, TensorShape{4 * 6 * 8, 2});

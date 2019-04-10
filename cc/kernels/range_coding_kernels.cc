@@ -31,7 +31,6 @@ limitations under the License.
 #include "tensorflow/core/platform/logging.h"
 #include "tensorflow/core/platform/macros.h"
 #include "tensorflow/core/platform/types.h"
-
 #include "tensorflow_compression/cc/kernels/range_coder.h"
 #include "tensorflow_compression/cc/kernels/range_coding_kernels_util.h"
 
@@ -40,21 +39,21 @@ namespace {
 namespace errors = tensorflow::errors;
 namespace gtl = tensorflow::gtl;
 using tensorflow::DEVICE_CPU;
+using tensorflow::int16;
+using tensorflow::int32;
+using tensorflow::int64;
 using tensorflow::OpKernel;
 using tensorflow::OpKernelConstruction;
 using tensorflow::OpKernelContext;
 using tensorflow::Status;
+using tensorflow::string;
 using tensorflow::Tensor;
 using tensorflow::TensorShape;
 using tensorflow::TensorShapeUtils;
 using tensorflow::TTypes;
-using tensorflow::int16;
-using tensorflow::int32;
-using tensorflow::int64;
-using tensorflow::string;
-using tensorflow::uint8;
 using tensorflow::uint32;
 using tensorflow::uint64;
+using tensorflow::uint8;
 
 // A helper class to iterate over data and cdf simultaneously, while cdf is
 // broadcasted to data.
@@ -151,7 +150,31 @@ Status CheckCdfShape(const TensorShape& data_shape,
   return Status::OK();
 }
 
-// Non-incremental encoder op -------------------------------------------------
+tensorflow::Status CheckCdfValues(int precision,
+                                  const tensorflow::Tensor& cdf_tensor) {
+  const auto cdf = cdf_tensor.flat_inner_dims<int32, 2>();
+  const auto size = cdf.dimension(1);
+  if (size <= 2) {
+    return errors::InvalidArgument("CDF size should be > 2: ", size);
+  }
+
+  const int32 upper_bound = 1 << precision;
+  for (int64 i = 0; i < cdf.dimension(0); ++i) {
+    auto slice = tensorflow::gtl::ArraySlice<int32>(&cdf(i, 0), size);
+    if (slice[0] != 0 || slice[size - 1] != upper_bound) {
+      return errors::InvalidArgument("CDF should start from 0 and end at ",
+                                     upper_bound, ": cdf[0]=", slice[0],
+                                     ", cdf[^1]=", slice[size - 1]);
+    }
+    for (int64 j = 0; j + 1 < size; ++j) {
+      if (slice[j + 1] <= slice[j]) {
+        return errors::InvalidArgument("CDF is not monotonic");
+      }
+    }
+  }
+  return tensorflow::Status::OK();
+}
+
 class RangeEncodeOp : public OpKernel {
  public:
   explicit RangeEncodeOp(OpKernelConstruction* context) : OpKernel(context) {
@@ -159,6 +182,10 @@ class RangeEncodeOp : public OpKernel {
     OP_REQUIRES(context, 0 < precision_ && precision_ <= 16,
                 errors::InvalidArgument("`precision` must be in [1, 16]: ",
                                         precision_));
+    OP_REQUIRES_OK(context, context->GetAttr("debug_level", &debug_level_));
+    OP_REQUIRES(context, debug_level_ == 0 || debug_level_ == 1,
+                errors::InvalidArgument("`debug_level` must be 0 or 1: ",
+                                        debug_level_));
   }
 
   void Compute(OpKernelContext* context) override {
@@ -166,6 +193,10 @@ class RangeEncodeOp : public OpKernel {
     const Tensor& cdf = context->input(1);
 
     OP_REQUIRES_OK(context, CheckCdfShape(data.shape(), cdf.shape()));
+
+    if (debug_level_ > 0) {
+      OP_REQUIRES_OK(context, CheckCdfValues(precision_, cdf));
+    }
 
     std::vector<int64> data_shape, cdf_shape;
     OP_REQUIRES_OK(
@@ -177,10 +208,12 @@ class RangeEncodeOp : public OpKernel {
     string* output = &output_tensor->scalar<string>()();
 
     switch (data_shape.size()) {
-#define RANGE_ENCODE_CASE(dims)                                                \
-  case dims: {                                                                 \
-    RangeEncodeImpl<dims>(data.flat<int16>(), data_shape,                      \
-                          cdf.flat_inner_dims<int32, 2>(), cdf_shape, output); \
+#define RANGE_ENCODE_CASE(dims)                                           \
+  case dims: {                                                            \
+    OP_REQUIRES_OK(context,                                               \
+                   RangeEncodeImpl<dims>(data.flat<int16>(), data_shape,  \
+                                         cdf.flat_inner_dims<int32, 2>(), \
+                                         cdf_shape, output));             \
   } break
       RANGE_ENCODE_CASE(1);
       RANGE_ENCODE_CASE(2);
@@ -199,10 +232,11 @@ class RangeEncodeOp : public OpKernel {
 
  private:
   template <int N>
-  void RangeEncodeImpl(TTypes<int16>::ConstFlat data,
-                       gtl::ArraySlice<int64> data_shape,
-                       TTypes<int32>::ConstMatrix cdf,
-                       gtl::ArraySlice<int64> cdf_shape, string* output) const {
+  tensorflow::Status RangeEncodeImpl(TTypes<int16>::ConstFlat data,
+                                     gtl::ArraySlice<int64> data_shape,
+                                     TTypes<int32>::ConstMatrix cdf,
+                                     gtl::ArraySlice<int64> cdf_shape,
+                                     string* output) const {
     const int64 data_size = data.size();
     const int64 cdf_size = cdf.size();
     const int64 chip_size = cdf.dimension(1);
@@ -214,8 +248,15 @@ class RangeEncodeOp : public OpKernel {
       const auto pair = view.Next();
 
       const int64 index = *pair.first;
-      DCHECK_GE(index, 0);
-      DCHECK_LT(index + 1, chip_size);
+      if (debug_level_ > 0) {
+        if (index < 0 || chip_size <= index + 1) {
+          return errors::InvalidArgument("'data' value not in [0, ",
+                                         chip_size - 1, "): value=", index);
+        }
+      } else {
+        DCHECK_GE(index, 0);
+        DCHECK_LT(index + 1, chip_size);
+      }
 
       const int32* cdf_slice = pair.second;
       DCHECK_LE(cdf_slice + chip_size, cdf.data() + cdf_size);
@@ -226,14 +267,15 @@ class RangeEncodeOp : public OpKernel {
     }
 
     encoder.Finalize(output);
+    return tensorflow::Status::OK();
   }
 
   int precision_;
+  int debug_level_;
 };
 
 REGISTER_KERNEL_BUILDER(Name("RangeEncode").Device(DEVICE_CPU), RangeEncodeOp);
 
-// Non-incremental decoder op -------------------------------------------------
 class RangeDecodeOp : public OpKernel {
  public:
   explicit RangeDecodeOp(OpKernelConstruction* context) : OpKernel(context) {
@@ -241,6 +283,10 @@ class RangeDecodeOp : public OpKernel {
     OP_REQUIRES(context, 0 < precision_ && precision_ <= 16,
                 errors::InvalidArgument("`precision` must be in [1, 16]: ",
                                         precision_));
+    OP_REQUIRES_OK(context, context->GetAttr("debug_level", &debug_level_));
+    OP_REQUIRES(context, debug_level_ == 0 || debug_level_ == 1,
+                errors::InvalidArgument("`debug_level` must be 0 or 1: ",
+                                        debug_level_));
   }
 
   void Compute(OpKernelContext* context) override {
@@ -254,10 +300,15 @@ class RangeDecodeOp : public OpKernel {
     OP_REQUIRES(context, TensorShapeUtils::IsVector(shape.shape()),
                 errors::InvalidArgument("Invalid `shape` shape: ",
                                         shape.shape().DebugString()));
+
     TensorShape output_shape;
     OP_REQUIRES_OK(context, TensorShapeUtils::MakeShape(shape.vec<int32>(),
                                                         &output_shape));
     OP_REQUIRES_OK(context, CheckCdfShape(output_shape, cdf.shape()));
+
+    if (debug_level_ > 0) {
+      OP_REQUIRES_OK(context, CheckCdfValues(precision_, cdf));
+    }
 
     std::vector<int64> data_shape, cdf_shape;
     OP_REQUIRES_OK(
@@ -269,10 +320,12 @@ class RangeDecodeOp : public OpKernel {
     OP_REQUIRES_OK(context, context->allocate_output(0, output_shape, &output));
 
     switch (data_shape.size()) {
-#define RANGE_DECODE_CASE(dim)                                              \
-  case dim: {                                                               \
-    RangeDecodeImpl<dim>(output->flat<int16>(), data_shape,                 \
-                         cdf.flat_inner_dims<int32>(), cdf_shape, encoded); \
+#define RANGE_DECODE_CASE(dim)                                                 \
+  case dim: {                                                                  \
+    OP_REQUIRES_OK(                                                            \
+        context, RangeDecodeImpl<dim>(output->flat<int16>(), data_shape,       \
+                                      cdf.flat_inner_dims<int32>(), cdf_shape, \
+                                      encoded));                               \
   } break
       RANGE_DECODE_CASE(1);
       RANGE_DECODE_CASE(2);
@@ -291,11 +344,11 @@ class RangeDecodeOp : public OpKernel {
 
  private:
   template <int N>
-  void RangeDecodeImpl(TTypes<int16>::Flat output,
-                       gtl::ArraySlice<int64> output_shape,
-                       TTypes<int32>::ConstMatrix cdf,
-                       gtl::ArraySlice<int64> cdf_shape,
-                       const string& encoded) const {
+  tensorflow::Status RangeDecodeImpl(TTypes<int16>::Flat output,
+                                     gtl::ArraySlice<int64> output_shape,
+                                     TTypes<int32>::ConstMatrix cdf,
+                                     gtl::ArraySlice<int64> cdf_shape,
+                                     const string& encoded) const {
     BroadcastRange<int16, int32, N> view{output.data(), output_shape,
                                          cdf.data(), cdf_shape};
 
@@ -315,11 +368,13 @@ class RangeDecodeOp : public OpKernel {
       const int32* cdf_slice = pair.second;
       DCHECK_LE(cdf_slice + chip_size, cdf.data() + cdf_size);
 
-      *data = decoder.Decode(gtl::ArraySlice<int32>{cdf_slice, chip_size});
+      *data = decoder.Decode({cdf_slice, chip_size});
     }
+    return tensorflow::Status::OK();
   }
 
   int precision_;
+  int debug_level_;
 };
 
 REGISTER_KERNEL_BUILDER(Name("RangeDecode").Device(DEVICE_CPU), RangeDecodeOp);

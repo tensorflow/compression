@@ -37,7 +37,6 @@ limitations under the License.
 #include "tensorflow/core/platform/test.h"
 #include "tensorflow/core/public/session.h"
 #include "tensorflow/core/public/session_options.h"
-
 #include "tensorflow_compression/cc/kernels/range_coder.h"
 
 namespace tensorflow_compression {
@@ -100,10 +99,21 @@ class RangeCoderOpsTest : public OpsTestBase {
  protected:
   Status RunEncodeOp(int precision, gtl::ArraySlice<Tensor> input,
                      Tensor* output) {
+    return RunEncodeOpImpl(precision, input, 0, output);
+  }
+
+  Status RunEncodeOpDebug(int precision, gtl::ArraySlice<Tensor> input,
+                          Tensor* output) {
+    return RunEncodeOpImpl(precision, input, 1, output);
+  }
+
+  Status RunEncodeOpImpl(int precision, gtl::ArraySlice<Tensor> input,
+                         int debug_level, Tensor* output) {
     TF_RETURN_IF_ERROR(NodeDefBuilder("encode", "RangeEncode")
                            .Input(tensorflow::FakeInput(DT_INT16))
                            .Input(tensorflow::FakeInput(DT_INT32))
                            .Attr("precision", precision)
+                           .Attr("debug_level", debug_level)
                            .Finalize(node_def()));
     TF_RETURN_IF_ERROR(InitOp());
 
@@ -124,11 +134,22 @@ class RangeCoderOpsTest : public OpsTestBase {
 
   Status RunDecodeOp(int precision, gtl::ArraySlice<Tensor> input,
                      Tensor* output) {
+    return RunDecodeOpImpl(precision, input, 0, output);
+  }
+
+  Status RunDecodeOpDebug(int precision, gtl::ArraySlice<Tensor> input,
+                          Tensor* output) {
+    return RunDecodeOpImpl(precision, input, 1, output);
+  }
+
+  Status RunDecodeOpImpl(int precision, gtl::ArraySlice<Tensor> input,
+                         int debug_level, Tensor* output) {
     TF_RETURN_IF_ERROR(NodeDefBuilder("decode", "RangeDecode")
                            .Input(tensorflow::FakeInput(DT_STRING))
                            .Input(tensorflow::FakeInput(DT_INT32))
                            .Input(tensorflow::FakeInput(DT_INT32))
                            .Attr("precision", precision)
+                           .Attr("debug_level", debug_level)
                            .Finalize(node_def()));
     TF_RETURN_IF_ERROR(InitOp());
 
@@ -419,6 +440,70 @@ TEST_F(RangeCoderOpsTest, InvalidBroadcast) {
   }
 }
 
+#define EXPECT_STATUS_SUBSTR(status_expr, message)                  \
+  {                                                                 \
+    auto status = (status_expr);                                    \
+    EXPECT_FALSE(status.ok());                                      \
+    EXPECT_NE(status.error_message().find((message)), string::npos) \
+        << status.error_message();                                  \
+  }
+
+TEST_F(RangeCoderOpsTest, EncoderDebug) {
+  Tensor data(DT_INT16, {});
+  data.scalar<int16>()() = 1;
+
+  Tensor cdf(DT_INT32, {4});
+  cdf.vec<int32>().setValues({0, 16, 18, 32});
+
+  Tensor unused;
+  auto status = RunEncodeOpDebug(5, {data, cdf}, &unused);
+  EXPECT_TRUE(status.ok());
+
+  data.scalar<int16>()() = -1;
+  EXPECT_STATUS_SUBSTR(RunEncodeOpDebug(5, {data, cdf}, &unused),
+                       "value not in [0, 3)");
+
+  data.scalar<int16>()() = 5;
+  EXPECT_STATUS_SUBSTR(RunEncodeOpDebug(5, {data, cdf}, &unused),
+                       "value not in [0, 3)");
+}
+
+TEST_F(RangeCoderOpsTest, DecoderDebug) {
+  RangeEncoder encoder(5);
+
+  string encoded_string;
+  encoder.Encode(16, 18, &encoded_string);
+  encoder.Finalize(&encoded_string);
+
+  Tensor encoded(DT_STRING, {});
+  encoded.scalar<string>()().swap(encoded_string);
+
+  Tensor shape(DT_INT32, {0});
+
+  Tensor cdf(DT_INT32, {4});
+  cdf.vec<int32>().setValues({0, 16, 18, 32});
+
+  Tensor unused;
+  auto status = RunDecodeOpDebug(5, {encoded, shape, cdf}, &unused);
+  EXPECT_TRUE(status.ok());
+
+  cdf.vec<int32>().setValues({1, 16, 18, 32});
+  EXPECT_STATUS_SUBSTR(RunDecodeOpDebug(5, {encoded, shape, cdf}, &unused),
+                       "cdf[0]=1");
+
+  cdf.vec<int32>().setValues({0, 16, 18, 31});
+  EXPECT_STATUS_SUBSTR(RunDecodeOpDebug(5, {encoded, shape, cdf}, &unused),
+                       "cdf[^1]=31");
+
+  cdf.vec<int32>().setValues({0, 18, 16, 32});
+  EXPECT_STATUS_SUBSTR(RunDecodeOpDebug(5, {encoded, shape, cdf}, &unused),
+                       "monotonic");
+
+  cdf = Tensor(DT_INT32, {2});
+  cdf.vec<int32>().setValues({0, 32});
+  EXPECT_STATUS_SUBSTR(RunDecodeOpDebug(5, {encoded, shape, cdf}, &unused),
+                       "CDF size");
+}
 }  // namespace
 }  // namespace tensorflow_compression
 

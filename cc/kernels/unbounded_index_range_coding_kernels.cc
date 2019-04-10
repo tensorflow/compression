@@ -31,7 +31,6 @@ limitations under the License.
 #include "tensorflow/core/platform/logging.h"
 #include "tensorflow/core/platform/macros.h"
 #include "tensorflow/core/platform/types.h"
-
 #include "tensorflow_compression/cc/kernels/range_coder.h"
 
 namespace tensorflow_compression {
@@ -39,21 +38,105 @@ namespace {
 namespace errors = tensorflow::errors;
 namespace gtl = tensorflow::gtl;
 using tensorflow::DEVICE_CPU;
+using tensorflow::int16;
+using tensorflow::int32;
+using tensorflow::int64;
 using tensorflow::OpKernel;
 using tensorflow::OpKernelConstruction;
 using tensorflow::OpKernelContext;
 using tensorflow::Status;
+using tensorflow::string;
 using tensorflow::Tensor;
 using tensorflow::TensorShape;
 using tensorflow::TensorShapeUtils;
 using tensorflow::TTypes;
-using tensorflow::int16;
-using tensorflow::int32;
-using tensorflow::int64;
-using tensorflow::string;
-using tensorflow::uint8;
 using tensorflow::uint32;
 using tensorflow::uint64;
+using tensorflow::uint8;
+
+tensorflow::Status CheckIndex(int64 upper_bound, const Tensor& index) {
+  auto flat = index.flat<int32>();
+  for (int64 i = 0; i < flat.size(); ++i) {
+    if (flat(i) < 0 || upper_bound <= flat(i)) {
+      return errors::InvalidArgument("'index' has a value not in [0, ",
+                                     upper_bound, "): value=", flat(i));
+    }
+  }
+  return tensorflow::Status::OK();
+}
+
+tensorflow::Status CheckCdfSize(int64 upper_bound, const Tensor& cdf_size) {
+  auto flat = cdf_size.vec<int32>();
+  for (int64 i = 0; i < flat.size(); ++i) {
+    if (flat(i) < 3 || upper_bound < flat(i)) {
+      return errors::InvalidArgument("'cdf_size' has a value not in [3, ",
+                                     upper_bound, "]: value=", flat(i));
+    }
+  }
+  return tensorflow::Status::OK();
+}
+
+tensorflow::Status CheckCdf(int precision, const Tensor& cdf,
+                            const Tensor& cdf_size) {
+  auto matrix = cdf.matrix<int32>();
+  auto size = cdf_size.vec<int32>();
+  CHECK_EQ(matrix.dimension(0), size.size());
+  CHECK_GT(matrix.dimension(1), 2);
+
+  const int32 upper_bound = 1 << precision;
+
+  for (int64 i = 0; i < matrix.dimension(0); ++i) {
+    const TTypes<int32, 1>::ConstVec slice(&matrix(i, 0), size(i));
+    if (slice(0) != 0 || slice(slice.size() - 1) != upper_bound) {
+      return errors::InvalidArgument("Each cdf should start from 0 and end at ",
+                                     upper_bound, ": cdf[0]=", slice(0),
+                                     ", cdf[^1]=", slice(slice.size() - 1));
+    }
+
+    for (int64 j = 0; j + 1 < slice.size(); ++j) {
+      if (slice(j + 1) <= slice(j)) {
+        return errors::InvalidArgument("CDF is not monotonic");
+      }
+    }
+  }
+  return tensorflow::Status::OK();
+}
+
+// Assumes that CheckArgumentShapes().ok().
+tensorflow::Status CheckArgumentValues(int precision, const Tensor& index,
+                                       const Tensor& cdf,
+                                       const Tensor& cdf_size,
+                                       const Tensor& offset) {
+  TF_RETURN_IF_ERROR(CheckIndex(cdf.dim_size(0), index));
+  TF_RETURN_IF_ERROR(CheckCdfSize(cdf.dim_size(1), cdf_size));
+  TF_RETURN_IF_ERROR(CheckCdf(precision, cdf, cdf_size));
+  return tensorflow::Status::OK();
+}
+
+tensorflow::Status CheckArgumentShapes(const Tensor& index, const Tensor& cdf,
+                                       const Tensor& cdf_size,
+                                       const Tensor& offset) {
+  if (!TensorShapeUtils::IsMatrix(cdf.shape()) || cdf.dim_size(1) < 3) {
+    return errors::InvalidArgument(
+        "'cdf' should be 2-D and cdf.dim_size(1) >= 3: ",
+        cdf.shape());
+  }
+  if (!TensorShapeUtils::IsVector(cdf_size.shape()) ||
+      cdf_size.dim_size(0) != cdf.dim_size(0)) {
+    return errors::InvalidArgument(
+        "'cdf_size' should be 1-D and its length "
+        "should match the number of rows in 'cdf': ",
+        cdf_size.shape());
+  }
+  if (!TensorShapeUtils::IsVector(offset.shape()) ||
+      offset.dim_size(0) != cdf.dim_size(0)) {
+    return errors::InvalidArgument(
+        "'offset' should be 1-D and its length "
+        "should match the number of rows in 'cdf': offset.shape=",
+        offset.shape(), ", cdf.shape=", cdf.shape());
+  }
+  return tensorflow::Status::OK();
+}
 
 // Non-incremental encoder op -------------------------------------------------
 class UnboundedIndexRangeEncodeOp : public OpKernel {
@@ -70,6 +153,10 @@ class UnboundedIndexRangeEncodeOp : public OpKernel {
         context, 0 < overflow_width_ && overflow_width_ <= precision_,
         errors::InvalidArgument("`overflow_width` must be in [1, precision]: ",
                                 overflow_width_));
+    OP_REQUIRES_OK(context, context->GetAttr("debug_level", &debug_level_));
+    OP_REQUIRES(context, debug_level_ == 0 || debug_level_ == 1,
+                errors::InvalidArgument("`debug_level` must be 0 or 1: ",
+                                        debug_level_));
   }
 
   void Compute(OpKernelContext* context) override {
@@ -79,24 +166,17 @@ class UnboundedIndexRangeEncodeOp : public OpKernel {
     const Tensor& cdf_size = context->input(3);
     const Tensor& offset = context->input(4);
 
-    OP_REQUIRES(context, data.shape() == index.shape(),
-                errors::InvalidArgument(
-                    "`data` and `index` should have the same shape"));
+    OP_REQUIRES(
+        context, data.shape() == index.shape(),
+        errors::InvalidArgument(
+            "`data` and `index` should have the same shape: data.shape=",
+            data.shape(), ", index.shape=", index.shape()));
 
-    OP_REQUIRES(context, TensorShapeUtils::IsMatrix(cdf.shape()),
-                errors::InvalidArgument("`cdf` should be 2-D."));
-    OP_REQUIRES(
-        context,
-        TensorShapeUtils::IsVector(cdf_size.shape()) &&
-            cdf_size.dim_size(0) == cdf.dim_size(0),
-        errors::InvalidArgument("`cdf_size` should be 1-D and its length "
-                                "should match the number of rows in `cdf`."));
-    OP_REQUIRES(
-        context,
-        TensorShapeUtils::IsVector(offset.shape()) &&
-            offset.dim_size(0) == cdf.dim_size(0),
-        errors::InvalidArgument("`offset` should be 1-D and its length "
-                                "should match the number of rows in `cdf`."));
+    OP_REQUIRES_OK(context, CheckArgumentShapes(index, cdf, cdf_size, offset));
+    if (debug_level_ > 0) {
+      OP_REQUIRES_OK(context, CheckArgumentValues(precision_, index, cdf,
+                                                  cdf_size, offset));
+    }
 
     Tensor* output;
     OP_REQUIRES_OK(context,
@@ -175,6 +255,7 @@ class UnboundedIndexRangeEncodeOp : public OpKernel {
 
   int precision_;
   int overflow_width_;
+  int debug_level_;
 };
 
 REGISTER_KERNEL_BUILDER(Name("UnboundedIndexRangeEncode").Device(DEVICE_CPU),
@@ -191,6 +272,10 @@ class UnboundedIndexRangeDecodeOp : public OpKernel {
     OP_REQUIRES(context, 0 < precision_ && precision_ <= 16,
                 errors::InvalidArgument("`precision` must be in [1, 16]: ",
                                         precision_));
+    OP_REQUIRES_OK(context, context->GetAttr("debug_level", &debug_level_));
+    OP_REQUIRES(context, debug_level_ == 0 || debug_level_ == 1,
+                errors::InvalidArgument("`debug_level` must be 0 or 1: ",
+                                        debug_level_));
   }
 
   void Compute(OpKernelContext* context) override {
@@ -200,23 +285,15 @@ class UnboundedIndexRangeDecodeOp : public OpKernel {
     const Tensor& cdf_size = context->input(3);
     const Tensor& offset = context->input(4);
 
-    OP_REQUIRES(context, encoded.shape() == TensorShape{},
-                errors::InvalidArgument("Invalid `encoded` shape: ",
-                                        encoded.shape().DebugString()));
-    OP_REQUIRES(context, TensorShapeUtils::IsMatrix(cdf.shape()),
-                errors::InvalidArgument("`cdf` should be 2-D."));
-    OP_REQUIRES(
-        context,
-        TensorShapeUtils::IsVector(cdf_size.shape()) &&
-            cdf_size.dim_size(0) == cdf.dim_size(0),
-        errors::InvalidArgument("`cdf_size` should be 1-D and its length "
-                                "should match the number of rows in `cdf`."));
-    OP_REQUIRES(
-        context,
-        TensorShapeUtils::IsVector(offset.shape()) &&
-            offset.dim_size(0) == cdf.dim_size(0),
-        errors::InvalidArgument("`offset` should be 1-D and its length "
-                                "should match the number of rows in `cdf`."));
+    OP_REQUIRES(context, encoded.dims() == 0,
+                errors::InvalidArgument("`encoded` should be a scalar: ",
+                                        encoded.shape()));
+
+    OP_REQUIRES_OK(context, CheckArgumentShapes(index, cdf, cdf_size, offset));
+    if (debug_level_ > 0) {
+      OP_REQUIRES_OK(context, CheckArgumentValues(precision_, index, cdf,
+                                                  cdf_size, offset));
+    }
 
     Tensor* output;
     OP_REQUIRES_OK(context,
@@ -296,6 +373,7 @@ class UnboundedIndexRangeDecodeOp : public OpKernel {
 
   int precision_;
   int overflow_width_;
+  int debug_level_;
 };
 
 REGISTER_KERNEL_BUILDER(Name("UnboundedIndexRangeDecode").Device(DEVICE_CPU),

@@ -259,7 +259,8 @@ class EntropyModel(tf.keras.layers.Layer):
         string = range_coding_ops.unbounded_index_range_encode(
             args[0], indexes if broadcast_indexes else args[1],
             self._quantized_cdf, self._cdf_length, self._offset,
-            precision=self.range_coder_precision, overflow_width=4)
+            precision=self.range_coder_precision, overflow_width=4,
+            debug_level=0)
         return string
 
       strings = tf.map_fn(
@@ -298,7 +299,8 @@ class EntropyModel(tf.keras.layers.Layer):
         symbols = range_coding_ops.unbounded_index_range_decode(
             args[0], indexes if broadcast_indexes else args[1],
             self._quantized_cdf, self._cdf_length, self._offset,
-            precision=self.range_coder_precision, overflow_width=4)
+            precision=self.range_coder_precision, overflow_width=4,
+            debug_level=0)
         return symbols
 
       symbols = tf.map_fn(

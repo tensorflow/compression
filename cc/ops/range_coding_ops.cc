@@ -32,6 +32,7 @@ REGISTER_OP("RangeEncode")
     .Input("cdf: int32")
     .Output("encoded: string")
     .Attr("precision: int >= 1")
+    .Attr("debug_level: int = 1")
     .SetShapeFn(shape_inference::ScalarShape)
     .Doc(R"doc(
 Using the provided cumulative distribution functions (CDF) inside `cdf`, returns
@@ -85,6 +86,7 @@ cdf: An int32 tensor representing the CDF's of `data`. Each integer is divided
   by `2^precision` to represent a fraction.
 encoded: A range-coded scalar string.
 precision: The number of bits for probability quantization. Must be <= 16.
+debug_level: Either 0 or 1.
 )doc");
 
 REGISTER_OP("RangeDecode")
@@ -93,6 +95,7 @@ REGISTER_OP("RangeDecode")
     .Input("cdf: int32")
     .Output("decoded: int16")
     .Attr("precision: int >= 1")
+    .Attr("debug_level: int = 1")
     .SetShapeFn([] (InferenceContext* c) {
       ShapeHandle out;
       TF_RETURN_IF_ERROR(c->MakeShapeFromShapeTensor(1, &out));
@@ -117,6 +120,7 @@ shape: An int32 1-D tensor representing the shape of the data encoded by
 decoded: An int16 tensor with shape equal to `shape`.
 precision: The number of bits for probability quantization. Must be <= 16, and
   must match the precision used by RangeEncode that produced `encoded`.
+debug_level: Either 0 or 1.
 )doc");
 
 REGISTER_OP("UnboundedIndexRangeEncode")
@@ -128,6 +132,7 @@ REGISTER_OP("UnboundedIndexRangeEncode")
     .Output("encoded: string")
     .Attr("precision: int >= 1")
     .Attr("overflow_width: int >= 1")
+    .Attr("debug_level: int = 1")
     .SetShapeFn(tensorflow::shape_inference::ScalarShape)
     .Doc(R"doc(
 Range encodes unbounded integer `data` using an indexed probability table.
@@ -205,6 +210,7 @@ REGISTER_OP("UnboundedIndexRangeDecode")
     .Output("decoded: int32")
     .Attr("precision: int >= 1")
     .Attr("overflow_width: int >= 1")
+    .Attr("debug_level: int = 1")
     .SetShapeFn([] (InferenceContext* c) {
       c->set_output(0, c->input(1));
       return Status::OK();
