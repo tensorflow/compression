@@ -48,9 +48,8 @@ def load_image(filename):
 
 
 def quantize_image(image):
-  image = tf.clip_by_value(image, 0, 1)
   image = tf.round(image * 255)
-  image = tf.cast(image, tf.uint8)
+  image = tf.saturate_cast(image, tf.uint8)
   return image
 
 
