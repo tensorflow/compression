@@ -15,7 +15,7 @@ tfc.array_fingerprint(
 
 
 
-Defined in [`python/ops/range_coding_ops.py`](https://github.com/tensorflow/compression/tree/master/python/ops/range_coding_ops.py).
+Defined in [`python/ops/_range_coding_ops.py`](https://github.com/tensorflow/compression/tree/master/python/ops/_range_coding_ops.py).
 
 <!-- Placeholder for "Used in" -->
 

@@ -37,6 +37,7 @@ py_library(
         "python/layers/parameterizers.py",
         "python/layers/signal_conv.py",
         "python/ops/__init__.py",
+        "python/ops/_namespace_helper.py",
         "python/ops/math_ops.py",
         "python/ops/padding_ops.py",
         "python/ops/range_coding_ops.py",

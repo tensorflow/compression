@@ -15,13 +15,14 @@ tfc.unbounded_index_range_encode(
     offset,
     precision,
     overflow_width,
+    debug_level=1,
     name=None
 )
 ```
 
 
 
-Defined in [`python/ops/range_coding_ops.py`](https://github.com/tensorflow/compression/tree/master/python/ops/range_coding_ops.py).
+Defined in [`python/ops/_range_coding_ops.py`](https://github.com/tensorflow/compression/tree/master/python/ops/_range_coding_ops.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -94,6 +95,7 @@ integers representing quantized probability mass rather than floating points.
 * <b>`overflow_width`</b>: An `int` that is `>= 1`.
     The bit width of the variable-length overflow code. Must be <=
     precision.
+* <b>`debug_level`</b>: An optional `int`. Defaults to `1`.
 * <b>`name`</b>: A name for the operation (optional).
 
 

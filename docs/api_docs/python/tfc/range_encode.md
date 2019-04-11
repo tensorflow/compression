@@ -11,13 +11,14 @@ tfc.range_encode(
     data,
     cdf,
     precision,
+    debug_level=1,
     name=None
 )
 ```
 
 
 
-Defined in [`python/ops/range_coding_ops.py`](https://github.com/tensorflow/compression/tree/master/python/ops/range_coding_ops.py).
+Defined in [`python/ops/_range_coding_ops.py`](https://github.com/tensorflow/compression/tree/master/python/ops/_range_coding_ops.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -76,6 +77,7 @@ integers representing quantized probability mass rather than floating points.
     by `2^precision` to represent a fraction.
 * <b>`precision`</b>: An `int` that is `>= 1`.
     The number of bits for probability quantization. Must be <= 16.
+* <b>`debug_level`</b>: An optional `int`. Defaults to `1`. Either 0 or 1.
 * <b>`name`</b>: A name for the operation (optional).
 
 

@@ -12,13 +12,14 @@ tfc.range_decode(
     shape,
     cdf,
     precision,
+    debug_level=1,
     name=None
 )
 ```
 
 
 
-Defined in [`python/ops/range_coding_ops.py`](https://github.com/tensorflow/compression/tree/master/python/ops/range_coding_ops.py).
+Defined in [`python/ops/_range_coding_ops.py`](https://github.com/tensorflow/compression/tree/master/python/ops/_range_coding_ops.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -44,6 +45,7 @@ potential performance issues, the decoder does not return error status.
 * <b>`precision`</b>: An `int` that is `>= 1`.
     The number of bits for probability quantization. Must be <= 16, and
     must match the precision used by RangeEncode that produced `encoded`.
+* <b>`debug_level`</b>: An optional `int`. Defaults to `1`. Either 0 or 1.
 * <b>`name`</b>: A name for the operation (optional).
 
 

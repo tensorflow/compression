@@ -15,7 +15,7 @@ Defined in [`python/ops/__init__.py`](https://github.com/tensorflow/compression/
 
 [`padding_ops`](../../tfc/python/ops/padding_ops.md) module: Padding ops.
 
-[`range_coding_ops`](../../tfc/python/ops/range_coding_ops.md) module: Python wrappers around TensorFlow ops.
+[`range_coding_ops`](../../tfc/python/ops/range_coding_ops.md) module: Range coding operations.
 
 [`spectral_ops`](../../tfc/python/ops/spectral_ops.md) module: Parameterizations for layer classes.
 

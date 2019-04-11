@@ -15,13 +15,14 @@ tfc.unbounded_index_range_decode(
     offset,
     precision,
     overflow_width,
+    debug_level=1,
     name=None
 )
 ```
 
 
 
-Defined in [`python/ops/range_coding_ops.py`](https://github.com/tensorflow/compression/tree/master/python/ops/range_coding_ops.py).
+Defined in [`python/ops/_range_coding_ops.py`](https://github.com/tensorflow/compression/tree/master/python/ops/_range_coding_ops.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -56,6 +57,7 @@ potential performance issues, the decoder does not return an error status.
     The bit width of the variable-length overflow code. Must be <=
     precision, and must match the width used by `UnboundedIndexRangeEncode` that
     produced `encoded`.
+* <b>`debug_level`</b>: An optional `int`. Defaults to `1`.
 * <b>`name`</b>: A name for the operation (optional).
 
 
