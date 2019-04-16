@@ -2,9 +2,9 @@ This project contains data compression ops and layers for TensorFlow. The
 project website is at
 [tensorflow.github.io/compression](https://tensorflow.github.io/compression).
 
-You can use this library to build your own ML models with optimized lossy data
-compression built in. It's useful to find storage-efficient representations of
-your data (features, examples, images, etc.) while only sacrificing a tiny
+You can use this library to build your own ML models with end-to-end optimized
+data compression built in. It's useful to find storage-efficient representations
+of your data (features, examples, images, etc.) while only sacrificing a tiny
 fraction of model performance. It can compress any floating point tensor to a
 much smaller sequence of bits.
 
@@ -16,36 +16,57 @@ completed, it encodes floating point tensors into optimal bit sequences by
 automating the design of probability tables and calling a range coder
 implementation behind the scenes.
 
-For an introduction to lossy data compression with machine learning, take a look
-at @jonycgn's
+For an introduction to lossy image compression with machine learning, take a
+look at @jonycgn's
 [talk on Learned Image Compression](https://www.youtube.com/watch?v=x_q7cZviXkY).
 
 # Quick start
 
-Install TensorFlow 1.13.
+## Installing release 1.1 (stable)
 
-**Please note**: We are currently transitioning to providing pip packages. At
-this point, the master will not work. Make sure to use the released version.
+Install TensorFlow 1.13 using one of the methods described in the
+[TensorFlow installation instructions](https://www.tensorflow.org/install).
 
-Download the
-[ZIP file for release v1.1](https://github.com/tensorflow/compression/releases/tag/v1.1)
+Download the ZIP file for
+[release v1.1](https://github.com/tensorflow/compression/releases/tag/v1.1)
 and unpack it. Then include its root directory in your `PYTHONPATH`
 environment variable:
 
 ```bash
 cd <target directory>
-git clone https://github.com/tensorflow/compression.git tensorflow_compression
-export PYTHONPATH="$PWD/tensorflow_compression:$PYTHONPATH"
+wget https://github.com/tensorflow/compression/archive/v1.1.zip
+unzip v1.1.zip
+export PYTHONPATH="$PWD/compression-1.1:$PYTHONPATH"
 ```
 
 To make sure the library imports succeed, try running the unit tests:
 
 ```bash
-cd tensorflow_compression
-for i in tensorflow_compression/python/*/*_test.py; do
-  python $i
-done
+cd compression-1.1
+for i in tensorflow_compression/python/*/*_test.py; do python $i; done
 ```
+
+## Installing release 1.2b1 (beta)
+
+Set up an environment in which you can install precompiled binary Python
+packages using the `pip` command. Refer to the
+[TensorFlow installation instructions](https://www.tensorflow.org/install/pip)
+for more information on how to set up such a Python environment.
+
+Run the following command to install the binary PIP package:
+
+```bash
+pip install tensorflow-compression
+```
+
+***Note: for this beta release, we only support Python 2.7 and 3.4 versions on
+Linux platforms. We are working on Darwin (Mac) binaries as well. For the time
+being, if you need to run the beta release on Mac, we suggest to use Docker
+Desktop for Mac, and run the above command inside a container based on the
+[TensorFlow docker image](https://www.tensorflow.org/install/docker) for
+Python 2.7.***
+
+## Using the library
 
 We recommend importing the library from your Python code as follows:
 
@@ -54,7 +75,38 @@ import tensorflow as tf
 import tensorflow_compression as tfc
 ```
 
-## Example model
+## Using a pre-trained model to compress an image
+
+***Note: you need to have a release >1.1 installed for pre-trained model
+support.***
+
+In the
+[examples directory](https://github.com/tensorflow/compression/tree/master/examples),
+you'll find a python script `tfci.py`. Download the file and run:
+
+```bash
+python tfci.py -h
+```
+
+This will give you a list of options. Briefly, the command
+
+```bash
+python tfci.py compress <model> <PNG file>
+```
+
+will compress an image using a pre-trained model and write a file ending in
+`.tfci`. Execute `python tfci.py models` to give you a list of supported
+pre-trained models. The command
+
+```bash
+python tfci.py decompress <TFCI file>
+```
+
+will decompress a TFCI file and write a PNG file. By default, an output file
+will be named like the input file, only with the appropriate file extension
+appended (any existing extensions will not be removed).
+
+## Training your own model
 
 The
 [examples directory](https://github.com/tensorflow/compression/tree/master/examples)
@@ -64,10 +116,9 @@ contains an implementation of the image compression model described in:
 > J. Ballé, V. Laparra, E. P. Simoncelli<br />
 > https://arxiv.org/abs/1611.01704
 
-To see a list of options, change to the directory and run:
+To see a list of options, download the file `bls2017.py` and run:
 
 ```bash
-cd examples
 python bls2017.py -h
 ```
 

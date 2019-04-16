@@ -1,3 +1,2 @@
-numpy
-scipy
+scipy >= 1.0.0
 tensorflow >= 1.13.0
