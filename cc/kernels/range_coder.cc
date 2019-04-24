@@ -19,14 +19,14 @@ limitations under the License.
 // a digitised message", presented to the Video & Data Recording Conference,
 // held in Southampton, July 24-27, 1979.
 //
+#include "tensorflow_compression/cc/kernels/range_coder.h"
+
 #include <limits>
 #include <string>
 
 #include "tensorflow/core/lib/gtl/array_slice.h"
 #include "tensorflow/core/platform/logging.h"
 #include "tensorflow/core/platform/types.h"
-
-#include "tensorflow_compression/cc/kernels/range_coder.h"
 
 namespace tensorflow_compression {
 namespace gtl = tensorflow::gtl;
@@ -36,16 +36,16 @@ using tensorflow::uint32;
 using tensorflow::uint64;
 using tensorflow::uint8;
 
-RangeEncoder::RangeEncoder(int precision) : precision_(precision) {
-  CHECK_GT(precision, 0);
-  CHECK_LE(precision, 16);
-}
+void RangeEncoder::Encode(int32 lower, int32 upper, int precision,
+                          string* sink) {
+  // Input requirement: 0 < precision < 16.
+  DCHECK_GT(precision, 0);
+  DCHECK_LE(precision, 16);
 
-void RangeEncoder::Encode(int32 lower, int32 upper, string* sink) {
   // Input requirement: 0 <= lower < upper <= 2^precision.
   DCHECK_LE(0, lower);
   DCHECK_LT(lower, upper);
-  DCHECK_LE(upper, 1 << precision_);
+  DCHECK_LE(upper, 1 << precision);
 
   // `base` and `size` represent a half-open interval [base, base + size).
   // Loop invariant: 2^16 <= size <= 2^32.
@@ -69,8 +69,8 @@ void RangeEncoder::Encode(int32 lower, int32 upper, string* sink) {
   // NOTE: The max value of `size` is 2^32 and size > 0. Therefore `size * u`
   // can be rewritten as `(size - 1) * u + u` and all the computation can be
   // done in 32-bit mode. If 32-bit multiply is faster, then rewrite.
-  const uint32 a = (size * static_cast<uint64>(lower)) >> precision_;
-  const uint32 b = ((size * static_cast<uint64>(upper)) >> precision_) - 1;
+  const uint32 a = (size * static_cast<uint64>(lower)) >> precision;
+  const uint32 b = ((size * static_cast<uint64>(upper)) >> precision) - 1;
   DCHECK_LE(a, b);
 
   // Let's confirm the RHS of a, b fit in uint32 type.
@@ -301,23 +301,21 @@ void RangeEncoder::Finalize(string* sink) {
   delay_ = 0;
 }
 
-RangeDecoder::RangeDecoder(const string& source, int precision)
-    : current_(source.begin()),
-      begin_(source.begin()),
-      end_(source.end()),
-      precision_(precision) {
-  CHECK_LE(precision, 16);
-
+RangeDecoder::RangeDecoder(const string& source)
+    : current_(source.begin()), end_(source.end()) {
   Read16BitValue();
   Read16BitValue();
 }
 
-int32 RangeDecoder::Decode(gtl::ArraySlice<int32> cdf) {
+int32 RangeDecoder::Decode(gtl::ArraySlice<int32> cdf, int precision) {
+  // Input requirement: 0 < precision < 16.
+  DCHECK_GT(precision, 0);
+  DCHECK_LE(precision, 16);
+
   const uint64 size = static_cast<uint64>(size_minus1_) + 1;
   const uint64 offset =
-      ((static_cast<uint64>(value_ - base_) + 1) << precision_) - 1;
+      ((static_cast<uint64>(value_ - base_) + 1) << precision) - 1;
 
-  // This is similar to std::lower_range() with std::less_equal as comparison.
   // After the binary search, `pv` points to the smallest number v that
   // satisfies offset < (size * v) / 2^precision.
 
@@ -333,7 +331,7 @@ int32 RangeDecoder::Decode(gtl::ArraySlice<int32> cdf) {
     const auto half = len / 2;
     const int32* mid = pv + half;
     DCHECK_GE(*mid, 0);
-    DCHECK_LE(*mid, 1 << precision_);
+    DCHECK_LE(*mid, 1 << precision);
     if (size * static_cast<uint64>(*mid) <= offset) {
       pv = mid + 1;
       len -= half + 1;
@@ -349,10 +347,10 @@ int32 RangeDecoder::Decode(gtl::ArraySlice<int32> cdf) {
   // cdf.size() - 2 instead and give up detecting this error.
   CHECK_LT(pv, cdf.data() + cdf.size());
 
-  const uint32 a = (size * static_cast<uint64>(*(pv - 1))) >> precision_;
-  const uint32 b = ((size * static_cast<uint64>(*pv)) >> precision_) - 1;
-  DCHECK_LE(a, offset >> precision_);
-  DCHECK_LE(offset >> precision_, b);
+  const uint32 a = (size * static_cast<uint64>(*(pv - 1))) >> precision;
+  const uint32 b = ((size * static_cast<uint64>(*pv)) >> precision) - 1;
+  DCHECK_LE(a, offset >> precision);
+  DCHECK_LE(offset >> precision, b);
 
   base_ += a;
   size_minus1_ = b - a;
@@ -378,5 +376,4 @@ void RangeDecoder::Read16BitValue() {
     value_ |= static_cast<uint8>(*current_++);
   }
 }
-
 }  // namespace tensorflow_compression

@@ -243,7 +243,7 @@ class RangeEncodeOp : public OpKernel {
 
     BroadcastRange<const int16, int32, N> view{data.data(), data_shape,
                                                cdf.data(), cdf_shape};
-    RangeEncoder encoder{precision_};
+    RangeEncoder encoder;
     for (int64 linear = 0; linear < data_size; ++linear) {
       const auto pair = view.Next();
 
@@ -263,7 +263,7 @@ class RangeEncodeOp : public OpKernel {
 
       const int32 lower = cdf_slice[index];
       const int32 upper = cdf_slice[index + 1];
-      encoder.Encode(lower, upper, output);
+      encoder.Encode(lower, upper, precision_, output);
     }
 
     encoder.Finalize(output);
@@ -352,7 +352,7 @@ class RangeDecodeOp : public OpKernel {
     BroadcastRange<int16, int32, N> view{output.data(), output_shape,
                                          cdf.data(), cdf_shape};
 
-    RangeDecoder decoder{encoded, precision_};
+    RangeDecoder decoder(encoded);
 
     const int64 output_size = output.size();
     const int64 cdf_size = cdf.size();
@@ -368,7 +368,7 @@ class RangeDecodeOp : public OpKernel {
       const int32* cdf_slice = pair.second;
       DCHECK_LE(cdf_slice + chip_size, cdf.data() + cdf_size);
 
-      *data = decoder.Decode({cdf_slice, chip_size});
+      *data = decoder.Decode({cdf_slice, chip_size}, precision_);
     }
     return tensorflow::Status::OK();
   }

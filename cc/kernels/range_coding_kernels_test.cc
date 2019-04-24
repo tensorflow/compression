@@ -469,10 +469,10 @@ TEST_F(RangeCoderOpsTest, EncoderDebug) {
 }
 
 TEST_F(RangeCoderOpsTest, DecoderDebug) {
-  RangeEncoder encoder(5);
+  RangeEncoder encoder;
 
   string encoded_string;
-  encoder.Encode(16, 18, &encoded_string);
+  encoder.Encode(16, 18, 5, &encoded_string);
   encoder.Finalize(&encoded_string);
 
   Tensor encoded(DT_STRING, {});

@@ -26,11 +26,7 @@ namespace tensorflow_compression {
 
 class RangeEncoder {
  public:
-  // `precision` determines the granularity of probability masses passed to
-  // Encode() function below.
-  //
-  // REQUIRES: 0 < precision <= 16.
-  explicit RangeEncoder(int precision);
+  RangeEncoder() = default;
 
   // Encodes a half-open interval [lower / 2^precision, upper / 2^precision).
   // Suppose each character to be encoded is from an integer-valued
@@ -47,7 +43,8 @@ class RangeEncoder {
   // ...
   //
   // REQUIRES: 0 <= lower < upper <= 2^precision.
-  void Encode(tensorflow::int32 lower, tensorflow::int32 upper,
+  // REQUIRES: 0 < precision <= 16.
+  void Encode(tensorflow::int32 lower, tensorflow::int32 upper, int precision,
               tensorflow::string* sink);
 
   // The encode may contain some under-determined values from previous encoding.
@@ -60,18 +57,13 @@ class RangeEncoder {
   tensorflow::uint32 size_minus1_ =
       std::numeric_limits<tensorflow::uint32>::max();
   tensorflow::uint64 delay_ = 0;
-
-  const int precision_;
 };
 
 class RangeDecoder {
  public:
   // Holds a reference to `source`. The caller has to make sure that `source`
   // outlives the decoder object.
-  //
-  // REQUIRES: `precision` must be the same as the encoder's precision.
-  // REQUIRES: 0 < precision <= 16.
-  RangeDecoder(const tensorflow::string& source, int precision);
+  explicit RangeDecoder(const tensorflow::string& source);
 
   // Decodes a character from `source` using CDF. The size of `cdf` should be
   // one more than the number of the character in the alphabet.
@@ -90,9 +82,11 @@ class RangeDecoder {
   // REQUIRES: cdf.size() > 1.
   // REQUIRES: cdf[i] <= cdf[i + 1] for i = 0, 1, ..., cdf.size() - 2.
   // REQUIRES: cdf[cdf.size() - 1] <= 2^precision.
+  // REQUIRES: 0 < precision <= 16.
   //
   // In practice the last element of `cdf` should equal to 2^precision.
-  tensorflow::int32 Decode(tensorflow::gtl::ArraySlice<tensorflow::int32> cdf);
+  tensorflow::int32 Decode(tensorflow::gtl::ArraySlice<tensorflow::int32> cdf,
+                           int precision);
 
  private:
   void Read16BitValue();
@@ -103,10 +97,7 @@ class RangeDecoder {
   tensorflow::uint32 value_ = 0;
 
   tensorflow::string::const_iterator current_;
-  const tensorflow::string::const_iterator begin_;
   const tensorflow::string::const_iterator end_;
-
-  const int precision_;
 };
 
 }  // namespace tensorflow_compression

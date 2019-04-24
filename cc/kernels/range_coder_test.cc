@@ -67,11 +67,11 @@ void RangeEncodeDecodeTest(int precision, random::SimplePhilox* gen) {
     ideal_code_length[i] = -std::log2((cdf[i + 1] - cdf[i]) / normalizer);
   }
 
-  RangeEncoder encoder(precision);
+  RangeEncoder encoder;
   string encoded;
   double ideal_length = 0.0;
   for (uint8 x : data) {
-    encoder.Encode(cdf[x], cdf[x + 1], &encoded);
+    encoder.Encode(cdf[x], cdf[x + 1], precision, &encoded);
     ideal_length += ideal_code_length[x];
   }
   encoder.Finalize(&encoded);
@@ -82,9 +82,9 @@ void RangeEncodeDecodeTest(int precision, random::SimplePhilox* gen) {
             << " (ideal compression rate " << ideal_length / (8 * data.size())
             << ")";
 
-  RangeDecoder decoder(encoded, precision);
+  RangeDecoder decoder(encoded);
   for (int i = 0; i < data.size(); ++i) {
-    const int32 decoded = decoder.Decode(cdf);
+    const int32 decoded = decoder.Decode(cdf, precision);
     ASSERT_EQ(decoded, static_cast<int32>(data[i])) << i;
   }
 }
@@ -110,12 +110,12 @@ TEST(RangeCoderTest, FinalizeState0) {
   constexpr int kPrecision = 2;
 
   string output;
-  RangeEncoder encoder(kPrecision);
-  encoder.Encode(0, 2, &output);
+  RangeEncoder encoder;
+  encoder.Encode(0, 2, kPrecision, &output);
   encoder.Finalize(&output);
 
-  RangeDecoder decoder(output, kPrecision);
-  EXPECT_EQ(decoder.Decode({0, 2, 4}), 0);
+  RangeDecoder decoder(output);
+  EXPECT_EQ(decoder.Decode({0, 2, 4}, kPrecision), 0);
 }
 
 }  // namespace
