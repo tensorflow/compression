@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 Google LLC. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,18 +12,3 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Range coding operations."""
-
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
-from tensorflow.python.framework import load_library
-from tensorflow.python.platform import resource_loader
-from tensorflow_compression.python.ops import _namespace_helper
-
-
-_ops = _namespace_helper.get_ops(load_library.load_op_library(
-    resource_loader.get_path_to_datafile("../../_range_coding_ops.so")))
-globals().update(_ops)
-__all__ = list(_ops)

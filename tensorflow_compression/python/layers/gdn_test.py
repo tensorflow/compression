@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 Google LLC. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,18 +18,17 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-# Dependency imports
-
 import numpy as np
 import tensorflow as tf
-import tensorflow_compression as tfc
+
+from tensorflow_compression.python.layers import gdn
 
 
 class GDNTest(tf.test.TestCase):
 
   def _run_gdn(self, x, shape, inverse, rectify, data_format):
     inputs = tf.placeholder(tf.float32, shape)
-    layer = tfc.GDN(
+    layer = gdn.GDN(
         inverse=inverse, rectify=rectify, data_format=data_format)
     outputs = layer(inputs)
     with self.test_session() as sess:

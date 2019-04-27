@@ -5,14 +5,14 @@ package(default_visibility = ["//visibility:public"])
 cc_binary(
     name = "_range_coding_ops.so",
     srcs = [
-        "cc/kernels/range_coder.cc",
-        "cc/kernels/range_coder.h",
-        "cc/kernels/range_coding_helper_kernels.cc",
-        "cc/kernels/range_coding_kernels_util.cc",
-        "cc/kernels/range_coding_kernels_util.h",
-        "cc/kernels/range_coding_kernels.cc",
-        "cc/kernels/unbounded_index_range_coding_kernels.cc",
-        "cc/ops/range_coding_ops.cc",
+        "tensorflow_compression/cc/kernels/range_coder.cc",
+        "tensorflow_compression/cc/kernels/range_coder.h",
+        "tensorflow_compression/cc/kernels/range_coding_helper_kernels.cc",
+        "tensorflow_compression/cc/kernels/range_coding_kernels_util.cc",
+        "tensorflow_compression/cc/kernels/range_coding_kernels_util.h",
+        "tensorflow_compression/cc/kernels/range_coding_kernels.cc",
+        "tensorflow_compression/cc/kernels/unbounded_index_range_coding_kernels.cc",
+        "tensorflow_compression/cc/ops/range_coding_ops.cc",
     ],
     linkshared = 1,
     deps = [
@@ -29,19 +29,20 @@ py_library(
     name = "tensorflow_compression",
     srcs = [
         "__init__.py",
-        "python/__init__.py",
-        "python/layers/__init__.py",
-        "python/layers/entropy_models.py",
-        "python/layers/gdn.py",
-        "python/layers/initializers.py",
-        "python/layers/parameterizers.py",
-        "python/layers/signal_conv.py",
-        "python/ops/__init__.py",
-        "python/ops/_namespace_helper.py",
-        "python/ops/math_ops.py",
-        "python/ops/padding_ops.py",
-        "python/ops/range_coding_ops.py",
-        "python/ops/spectral_ops.py",
+        "tensorflow_compression/__init__.py",
+        "tensorflow_compression/python/__init__.py",
+        "tensorflow_compression/python/layers/__init__.py",
+        "tensorflow_compression/python/layers/entropy_models.py",
+        "tensorflow_compression/python/layers/gdn.py",
+        "tensorflow_compression/python/layers/initializers.py",
+        "tensorflow_compression/python/layers/parameterizers.py",
+        "tensorflow_compression/python/layers/signal_conv.py",
+        "tensorflow_compression/python/ops/__init__.py",
+        "tensorflow_compression/python/ops/namespace_helper.py",
+        "tensorflow_compression/python/ops/math_ops.py",
+        "tensorflow_compression/python/ops/padding_ops.py",
+        "tensorflow_compression/python/ops/range_coding_ops.py",
+        "tensorflow_compression/python/ops/spectral_ops.py",
     ],
     data = [
         ":_range_coding_ops.so"
@@ -51,49 +52,49 @@ py_library(
 py_test(
     name = "entropy_models_test",
     timeout = "long",
-    srcs = ["python/layers/entropy_models_test.py"],
+    srcs = ["tensorflow_compression/python/layers/entropy_models_test.py"],
     deps = [":tensorflow_compression"],
 )
 
 py_test(
     name = "gdn_test",
-    srcs = ["python/layers/gdn_test.py"],
+    srcs = ["tensorflow_compression/python/layers/gdn_test.py"],
     deps = [":tensorflow_compression"],
 )
 
 py_test(
     name = "parameterizers_test",
-    srcs = ["python/layers/parameterizers_test.py"],
+    srcs = ["tensorflow_compression/python/layers/parameterizers_test.py"],
     deps = [":tensorflow_compression"],
 )
 
 py_test(
     name = "signal_conv_test",
     timeout = "long",
-    srcs = ["python/layers/signal_conv_test.py"],
+    srcs = ["tensorflow_compression/python/layers/signal_conv_test.py"],
     deps = [":tensorflow_compression"],
 )
 
 py_test(
     name = "math_ops_test",
-    srcs = ["python/ops/math_ops_test.py"],
+    srcs = ["tensorflow_compression/python/ops/math_ops_test.py"],
     deps = [":tensorflow_compression"],
 )
 
 py_test(
     name = "padding_ops_test",
-    srcs = ["python/ops/padding_ops_test.py"],
+    srcs = ["tensorflow_compression/python/ops/padding_ops_test.py"],
     deps = [":tensorflow_compression"],
 )
 
 py_test(
     name = "spectral_ops_test",
-    srcs = ["python/ops/spectral_ops_test.py"],
+    srcs = ["tensorflow_compression/python/ops/spectral_ops_test.py"],
     deps = [":tensorflow_compression"],
 )
 
 py_test(
     name = "range_coding_ops_test",
-    srcs = ["python/ops/range_coding_ops_test.py"],
+    srcs = ["tensorflow_compression/python/ops/range_coding_ops_test.py"],
     deps = [":tensorflow_compression"],
 )

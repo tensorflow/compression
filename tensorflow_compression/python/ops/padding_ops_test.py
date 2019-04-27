@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 Google LLC. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,11 +18,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-# Dependency imports
-
 import numpy as np
 import tensorflow as tf
-import tensorflow_compression as tfc
+
+from tensorflow_compression.python.ops import padding_ops
 
 
 class PaddingOpsTest(tf.test.TestCase):
@@ -43,7 +41,7 @@ class PaddingOpsTest(tf.test.TestCase):
           outputs = np.squeeze(sess.run(outputs))
         pos_inp = np.squeeze(np.nonzero(inputs))
         pos_out = np.squeeze(np.nonzero(outputs))
-        padding = tfc.same_padding_for_kernel(kshape, True)
+        padding = padding_ops.same_padding_for_kernel(kshape, True)
         self.assertEqual(padding[0][0], pos_inp - pos_out)
 
   def test_same_padding_conv(self):
@@ -63,7 +61,7 @@ class PaddingOpsTest(tf.test.TestCase):
           outputs = np.squeeze(sess.run(outputs))
         pos_inp = np.squeeze(np.nonzero(inputs))
         pos_out = np.squeeze(np.nonzero(outputs))
-        padding = tfc.same_padding_for_kernel(kshape, False)
+        padding = padding_ops.same_padding_for_kernel(kshape, False)
         self.assertEqual(padding[0][0], pos_inp - pos_out)
 
 

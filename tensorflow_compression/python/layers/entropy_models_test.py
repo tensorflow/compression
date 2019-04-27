@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 Google LLC. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,13 +18,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-# Dependency imports
-
 import numpy as np
 import scipy.stats
 import tensorflow as tf
 
-import tensorflow_compression as tfc
+from tensorflow_compression.python.layers import entropy_models
 
 
 class EntropyBottleneckTest(tf.test.TestCase):
@@ -33,7 +30,7 @@ class EntropyBottleneckTest(tf.test.TestCase):
   def test_noise(self):
     # Tests that the noise added is uniform noise between -0.5 and 0.5.
     inputs = tf.placeholder(tf.float32, (None, 1))
-    layer = tfc.EntropyBottleneck()
+    layer = entropy_models.EntropyBottleneck()
     noisy, _ = layer(inputs, training=True)
     with self.test_session() as sess:
       sess.run(tf.global_variables_initializer())
@@ -46,7 +43,7 @@ class EntropyBottleneckTest(tf.test.TestCase):
     # Tests that inputs are quantized to full integer values right after
     # initialization.
     inputs = tf.placeholder(tf.float32, (None, 1))
-    layer = tfc.EntropyBottleneck()
+    layer = entropy_models.EntropyBottleneck()
     quantized, _ = layer(inputs, training=False)
     with self.test_session() as sess:
       sess.run(tf.global_variables_initializer())
@@ -59,7 +56,7 @@ class EntropyBottleneckTest(tf.test.TestCase):
     # have been updated. However, the difference between input and output should
     # be between -0.5 and 0.5, and the offset must be consistent.
     inputs = tf.placeholder(tf.float32, (None, 1))
-    layer = tfc.EntropyBottleneck()
+    layer = entropy_models.EntropyBottleneck()
     quantized, _ = layer(inputs, training=False)
     opt = tf.train.GradientDescentOptimizer(learning_rate=1)
     self.assertEqual(1, len(layer.losses))
@@ -78,7 +75,7 @@ class EntropyBottleneckTest(tf.test.TestCase):
     # Tests that inputs are compressed and decompressed correctly, and quantized
     # to full integer values right after initialization.
     inputs = tf.placeholder(tf.float32, (1, None, 1))
-    layer = tfc.EntropyBottleneck(
+    layer = entropy_models.EntropyBottleneck(
         data_format="channels_last", init_scale=30)
     bitstrings = layer.compress(inputs)
     decoded = layer.decompress(bitstrings, tf.shape(inputs)[1:])
@@ -94,7 +91,7 @@ class EntropyBottleneckTest(tf.test.TestCase):
     # However, the difference between input and output should be between -0.5
     # and 0.5, and the offset must be consistent.
     inputs = tf.placeholder(tf.float32, (1, None, 1))
-    layer = tfc.EntropyBottleneck(
+    layer = entropy_models.EntropyBottleneck(
         data_format="channels_last", init_scale=40)
     bitstrings = layer.compress(inputs)
     decoded = layer.decompress(bitstrings, tf.shape(inputs)[1:])
@@ -117,7 +114,7 @@ class EntropyBottleneckTest(tf.test.TestCase):
     # Test the layer with more than one channel and multiple input dimensions,
     # with the channels in the last dimension.
     inputs = tf.placeholder(tf.float32, (None, None, None, 2))
-    layer = tfc.EntropyBottleneck(
+    layer = entropy_models.EntropyBottleneck(
         data_format="channels_last", init_scale=20)
     noisy, _ = layer(inputs, training=True)
     quantized, _ = layer(inputs, training=False)
@@ -138,7 +135,7 @@ class EntropyBottleneckTest(tf.test.TestCase):
     # Test the layer with more than one channel and multiple input dimensions,
     # with the channel dimension right after the batch dimension.
     inputs = tf.placeholder(tf.float32, (None, 3, None, None))
-    layer = tfc.EntropyBottleneck(
+    layer = entropy_models.EntropyBottleneck(
         data_format="channels_first", init_scale=10)
     noisy, _ = layer(inputs, training=True)
     quantized, _ = layer(inputs, training=False)
@@ -160,7 +157,7 @@ class EntropyBottleneckTest(tf.test.TestCase):
     # `test_decompress`. If you set the constant at the end to `True`, this test
     # will fail and the log will contain the new test data.
     inputs = tf.placeholder(tf.float32, (2, 3, 9))
-    layer = tfc.EntropyBottleneck(
+    layer = entropy_models.EntropyBottleneck(
         data_format="channels_first", filters=(), init_scale=2)
     bitstrings = layer.compress(inputs)
     decoded = layer.decompress(bitstrings, tf.shape(inputs)[1:])
@@ -209,7 +206,7 @@ class EntropyBottleneckTest(tf.test.TestCase):
     input_shape = tf.placeholder(tf.int32)
     quantized_cdf = tf.placeholder(tf.int32)
     cdf_length = tf.placeholder(tf.int32)
-    layer = tfc.EntropyBottleneck(
+    layer = entropy_models.EntropyBottleneck(
         data_format="channels_first", filters=(), init_scale=2,
         dtype=tf.float32)
     layer.build(self.expected.shape)
@@ -227,14 +224,14 @@ class EntropyBottleneckTest(tf.test.TestCase):
     # Test that layer can be built when `decompress` is the first call to it.
     bitstrings = tf.placeholder(tf.string)
     input_shape = tf.placeholder(tf.int32, shape=[3])
-    layer = tfc.EntropyBottleneck(dtype=tf.float32)
+    layer = entropy_models.EntropyBottleneck(dtype=tf.float32)
     layer.decompress(bitstrings, input_shape[1:], channels=5)
     self.assertTrue(layer.built)
 
   def test_normalization(self):
     # Test that densities are normalized correctly.
     inputs = tf.placeholder(tf.float32, (None, 1))
-    layer = tfc.EntropyBottleneck(filters=(2,))
+    layer = entropy_models.EntropyBottleneck(filters=(2,))
     _, likelihood = layer(inputs, training=True)
     with self.test_session() as sess:
       sess.run(tf.global_variables_initializer())
@@ -247,7 +244,7 @@ class EntropyBottleneckTest(tf.test.TestCase):
   def test_entropy_estimates(self):
     # Test that entropy estimates match actual range coding.
     inputs = tf.placeholder(tf.float32, (1, None, 1))
-    layer = tfc.EntropyBottleneck(
+    layer = entropy_models.EntropyBottleneck(
         filters=(2, 3), data_format="channels_last")
     _, likelihood = layer(inputs, training=True)
     diff_entropy = tf.reduce_sum(tf.log(likelihood)) / -np.log(2)
@@ -504,7 +501,7 @@ class SymmetricConditionalTest(object):
 
 class GaussianConditionalTest(tf.test.TestCase, SymmetricConditionalTest):
 
-  subclass = tfc.GaussianConditional
+  subclass = entropy_models.GaussianConditional
   scipy_class = scipy.stats.norm
 
   # Data generated by `test_compress`.
@@ -539,7 +536,7 @@ class GaussianConditionalTest(tf.test.TestCase, SymmetricConditionalTest):
 
 class LogisticConditionalTest(tf.test.TestCase, SymmetricConditionalTest):
 
-  subclass = tfc.LogisticConditional
+  subclass = entropy_models.LogisticConditional
   scipy_class = scipy.stats.logistic
 
   # Data generated by `test_compress`.
@@ -580,7 +577,7 @@ class LogisticConditionalTest(tf.test.TestCase, SymmetricConditionalTest):
 
 class LaplacianConditionalTest(tf.test.TestCase, SymmetricConditionalTest):
 
-  subclass = tfc.LaplacianConditional
+  subclass = entropy_models.LaplacianConditional
   scipy_class = scipy.stats.laplace
 
   # Data generated by `test_compress`.
