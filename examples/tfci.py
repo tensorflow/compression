@@ -22,13 +22,12 @@ from __future__ import print_function
 import argparse
 import os
 
-# Dependency imports
-
 from absl import app
 from absl.flags import argparse_flags
 import numpy as np
 from six.moves import urllib
 import tensorflow as tf
+
 import tensorflow_compression as tfc  # pylint:disable=unused-import
 
 

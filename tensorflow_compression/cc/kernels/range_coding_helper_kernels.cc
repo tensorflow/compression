@@ -28,17 +28,16 @@ limitations under the License.
 #include "tensorflow/core/lib/core/errors.h"
 #include "tensorflow/core/lib/core/threadpool.h"
 #include "tensorflow/core/lib/gtl/array_slice.h"
-#include "tensorflow/core/platform/fingerprint.h"
 #include "tensorflow/core/platform/logging.h"
 #include "tensorflow/core/platform/macros.h"
 #include "tensorflow/core/platform/types.h"
+#include "external/farmhash_archive/src/farmhash.h"
 
 namespace tensorflow_compression {
 namespace {
 namespace gtl = tensorflow::gtl;
 namespace thread = tensorflow::thread;
 using tensorflow::DEVICE_CPU;
-using tensorflow::Fingerprint64;
 using tensorflow::int32;
 using tensorflow::int64;
 using tensorflow::OpKernel;
@@ -229,7 +228,7 @@ class ArrayFingerprintOp : public tensorflow::OpKernel {
                    context->allocate_output(0, TensorShape{}, &output));
 
     output->scalar<int64>()() =
-        Fingerprint64({data.data(), static_cast<size_t>(data.size())});
+        farmhash::Fingerprint64(data.data(), static_cast<size_t>(data.size()));
   }
 };
 
@@ -253,11 +252,11 @@ class CheckArrayFingerprintOp : public tensorflow::OpKernel {
         input.shape().num_elements() * tensorflow::DataTypeSize(input.dtype());
     auto data = input.bit_casted_shaped<char, 1>({size});
 
-    OP_REQUIRES(
-        context,
-        fingerprint.scalar<int64>()() ==
-            Fingerprint64({data.data(), static_cast<size_t>(data.size())}),
-        tensorflow::errors::DataLoss("Fingerprint mismatch"));
+    OP_REQUIRES(context,
+                static_cast<uint64>(fingerprint.scalar<int64>()()) ==
+                    farmhash::Fingerprint64(data.data(),
+                                            static_cast<size_t>(data.size())),
+                tensorflow::errors::DataLoss("Fingerprint mismatch"));
 
     context->set_output(0, input);
   }

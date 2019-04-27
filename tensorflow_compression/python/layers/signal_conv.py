@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 Google LLC. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,8 +19,6 @@ from __future__ import division
 from __future__ import print_function
 
 import functools
-
-# Dependency imports
 
 import tensorflow as tf
 

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 Google LLC. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,10 +18,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-# Dependency imports
-
 import tensorflow as tf
-import tensorflow_compression as tfc
+
+from tensorflow_compression.python.ops import range_coding_ops
 
 
 class RangeCodingOpsTest(tf.test.TestCase):
@@ -40,8 +38,9 @@ class RangeCodingOpsTest(tf.test.TestCase):
     cdf = tf.reshape(cdf, [1, 1, -1])
 
     data = tf.cast(data, tf.int16)
-    encoded = tfc.range_encode(data, cdf, precision=14)
-    decoded = tfc.range_decode(encoded, tf.shape(data), cdf, precision=14)
+    encoded = range_coding_ops.range_encode(data, cdf, precision=14)
+    decoded = range_coding_ops.range_decode(
+        encoded, tf.shape(data), cdf, precision=14)
 
     with self.cached_session() as sess:
       self.assertAllEqual(*sess.run((data, decoded)))

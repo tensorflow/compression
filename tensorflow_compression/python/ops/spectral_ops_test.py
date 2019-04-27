@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 Google LLC. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,11 +18,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-# Dependency imports
-
 import numpy as np
 import tensorflow as tf
-import tensorflow_compression as tfc
+
+from tensorflow_compression.python.ops import spectral_ops
 
 
 class SpectralOpsTest(tf.test.TestCase):
@@ -31,7 +29,7 @@ class SpectralOpsTest(tf.test.TestCase):
   def test_irdft1_matrix(self):
     for shape in [(4,), (3,)]:
       size = shape[0]
-      matrix = tfc.irdft_matrix(shape)
+      matrix = spectral_ops.irdft_matrix(shape)
       # Test that the matrix is orthonormal.
       result = tf.matmul(matrix, tf.transpose(matrix))
       with self.test_session() as sess:
@@ -41,7 +39,7 @@ class SpectralOpsTest(tf.test.TestCase):
   def test_irdft2_matrix(self):
     for shape in [(7, 4), (8, 9)]:
       size = shape[0] * shape[1]
-      matrix = tfc.irdft_matrix(shape)
+      matrix = spectral_ops.irdft_matrix(shape)
       # Test that the matrix is orthonormal.
       result = tf.matmul(matrix, tf.transpose(matrix))
       with self.test_session() as sess:
@@ -51,7 +49,7 @@ class SpectralOpsTest(tf.test.TestCase):
   def test_irdft3_matrix(self):
     for shape in [(3, 4, 2), (6, 3, 1)]:
       size = shape[0] * shape[1] * shape[2]
-      matrix = tfc.irdft_matrix(shape)
+      matrix = spectral_ops.irdft_matrix(shape)
       # Test that the matrix is orthonormal.
       result = tf.matmul(matrix, tf.transpose(matrix))
       with self.test_session() as sess:

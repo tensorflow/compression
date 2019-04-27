@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 Google LLC. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,37 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Generates docs for the TensorFlow compression library."""
+"""Range coding operations."""
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
-
-import os
-import sys
-
-from absl import app
-from absl import flags
-
-from tensorflow_docs.api_generator import generate_lib
-
-import tensorflow_compression as tfc
-
-FLAGS = flags.FLAGS
+from tensorflow.python.framework import load_library
+from tensorflow.python.platform import resource_loader
+from tensorflow_compression.python.ops import namespace_helper
 
 
-def main(_):
-  doc_generator = generate_lib.DocGenerator(
-      root_title="TensorFlow/compression",
-      py_modules=[("tfc", tfc)],
-      base_dir=os.path.dirname(tfc.__file__),
-      code_url_prefix="https://github.com/tensorflow/compression/tree/master",
-      api_cache=False,
-  )
-  sys.exit(doc_generator.build(FLAGS.output_dir))
+ops = namespace_helper.get_ops(load_library.load_op_library(
+    resource_loader.get_path_to_datafile("../../_range_coding_ops.so")))
 
-
-if __name__ == "__main__":
-  flags.DEFINE_string("output_dir", "/tmp/api_docs/python", "Output directory.")
-
-  app.run(main)
+globals().update(ops)
+__all__ = list(ops)

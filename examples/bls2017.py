@@ -30,8 +30,6 @@ from __future__ import print_function
 import argparse
 import glob
 
-# Dependency imports
-
 import numpy as np
 import tensorflow as tf
 import tensorflow_compression as tfc
