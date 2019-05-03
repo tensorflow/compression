@@ -49,6 +49,18 @@ py_library(
     ],
 )
 
+sh_binary(
+    name = "build_pip_pkg",
+    srcs = ["build_pip_pkg.sh"],
+    data = [
+        "LICENSE",
+        "MANIFEST.in",
+        "README.md",
+        "setup.py",
+        ":tensorflow_compression",
+    ],
+)
+
 py_test(
     name = "entropy_models_test",
     timeout = "long",
