@@ -1,1 +1,4 @@
-recursive-include tensorflow_compression/ *.so
+global-include LICENSE
+global-include NOTICE
+global-include *.md
+recursive-include tensorflow_compression/cc/ *.so

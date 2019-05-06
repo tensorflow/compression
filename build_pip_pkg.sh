@@ -13,9 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-
 # This is based on
 # https://github.com/tensorflow/custom-op/blob/master/build_pip_pkg.sh
+# and modified for this project.
+# ==============================================================================
 
 set -e
 set -x
@@ -36,7 +37,12 @@ function main() {
   echo $(date) : "=== Using tmpdir: ${TMPDIR}"
 
   echo "=== Copying files"
+  PKGDIR="${TMPDIR}/tensorflow_compression"
   rsync -avm -L --exclude='*_test.py' --exclude='build_pip_pkg*' ${PIP_FILE_PREFIX} "${TMPDIR}"
+  for FILENAME in "LICENSE" "README.md"
+  do
+    mv "${TMPDIR}/${FILENAME}" "${PKGDIR}"
+  done
 
   echo $(date) : "=== Building wheel"
   pushd ${TMPDIR}

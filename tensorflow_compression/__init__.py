@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 Google LLC. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,3 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+"""Data compression tools."""
+
+from __future__ import absolute_import as _absolute_import
+from __future__ import division as _division
+from __future__ import print_function as _print_function
+
+# pylint: disable=wildcard-import
+from tensorflow_compression.python.layers.entropy_models import *
+from tensorflow_compression.python.layers.gdn import *
+from tensorflow_compression.python.layers.initializers import *
+from tensorflow_compression.python.layers.parameterizers import *
+from tensorflow_compression.python.layers.signal_conv import *
+from tensorflow_compression.python.ops.math_ops import *
+from tensorflow_compression.python.ops.padding_ops import *
+from tensorflow_compression.python.ops.range_coding_ops import *
+from tensorflow_compression.python.ops.spectral_ops import *
+# pylint: enable=wildcard-import

@@ -23,7 +23,8 @@ from tensorflow_compression.python.ops import namespace_helper
 
 
 ops = namespace_helper.get_ops(load_library.load_op_library(
-    resource_loader.get_path_to_datafile("../../../_range_coding_ops.so")))
+    resource_loader.get_path_to_datafile(
+        "../../cc/libtensorflow_compression.so")))
 
 globals().update(ops)
 __all__ = list(ops)
