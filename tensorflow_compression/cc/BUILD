@@ -25,7 +25,6 @@ cc_binary(
         # as, say "org_tensorflow" and replace the deps with
         #   "@org_tensorflow//tensorflow/core:framework",
         #   "@org_tensorflow//tensorflow/core:lib",
-        "@local_config_tf//:libtensorflow_framework",
-        "@local_config_tf//:tf_header_lib",
+        "@tensorflow_pip//:libtensorflow_framework",
     ],
 )

@@ -19,38 +19,49 @@
 # ==============================================================================
 
 set -e
-set -x
 
-PIP_FILE_PREFIX="bazel-bin/build_pip_pkg.runfiles/__main__/"
-
+# This script needs some improvements.
+#   - Needs a flag to use 'python' or 'python3' to run setup.py.
+#   - Needs a flag to control shared library file extension.
 function main() {
-  DEST=${1}
-  if [[ -z ${DEST} ]]; then
-    DEST=/tmp
+  if [ -z "${1}" ]; then
+    DEST=/tmp/tensorflow_compression
+  else
+    DEST="${1}"
   fi
 
-  mkdir -p ${DEST}
-  DEST=$(readlink -f "${DEST}")
-  echo "=== destination directory: ${DEST}"
+  mkdir -p "${DEST}"
+  DEST="$(readlink -f "${DEST}")"
 
   TMPDIR=$(mktemp -d -t tmp.XXXXXXXXXX)
-  echo $(date) : "=== Using tmpdir: ${TMPDIR}"
+  trap 'rm -rf "${TMPDIR}"' EXIT
 
-  echo "=== Copying files"
+  echo $(date) : "=== Using tmpdir: ${TMPDIR}"
   PKGDIR="${TMPDIR}/tensorflow_compression"
-  rsync -avm -L --exclude='*_test.py' --exclude='build_pip_pkg*' ${PIP_FILE_PREFIX} "${TMPDIR}"
-  for FILENAME in "LICENSE" "README.md"
-  do
-    mv "${TMPDIR}/${FILENAME}" "${PKGDIR}"
-  done
+
+  echo $(date) : "=== Copying files"
+  rsync -amqL tensorflow_compression/ "${PKGDIR}/"
+  cp MANIFEST.in setup.py "${TMPDIR}"
+  cp LICENSE README.md "${PKGDIR}"
+
+  pushd ${TMPDIR} > /dev/null
+
+  # Check if shared library file is copied. If this fails, it is likely that
+  # this script was run directly from the workspace directory. This should be
+  # run inside bazel-bin/build_pip_pkg.runfiles/tensorflow_compression/, or
+  # simply run using "bazel run".
+  if [ ! -f tensorflow_compression/cc/libtensorflow_compression.so ]; then
+    echo "libtensorflow_compression.so not found. Did you use \"bazel run?\""
+    exit 1
+  fi
 
   echo $(date) : "=== Building wheel"
-  pushd ${TMPDIR}
-  python setup.py bdist_wheel > /dev/null
-  cp dist/*.whl "${DEST}"
-  popd
+  python setup.py bdist_wheel
 
-  rm -rf ${TMPDIR}
+  echo $(date) : "=== Copying wheel to /tmp/"
+  rsync -a --info=name dist/*.whl "${DEST}"
+  popd > /dev/null
+
   echo $(date) : "=== Output wheel file is in: ${DEST}"
 }
 

@@ -5,23 +5,21 @@ py_library(
     srcs = [
         "tensorflow_compression/__init__.py",
         "tensorflow_compression/python/__init__.py",
-        "tensorflow_compression/python/layers/__init__.py",
-        "tensorflow_compression/python/layers/entropy_models.py",
-        "tensorflow_compression/python/layers/gdn.py",
-        "tensorflow_compression/python/layers/initializers.py",
-        "tensorflow_compression/python/layers/parameterizers.py",
-        "tensorflow_compression/python/layers/signal_conv.py",
-        "tensorflow_compression/python/ops/__init__.py",
-        "tensorflow_compression/python/ops/math_ops.py",
-        "tensorflow_compression/python/ops/namespace_helper.py",
-        "tensorflow_compression/python/ops/padding_ops.py",
-        "tensorflow_compression/python/ops/range_coding_ops.py",
-        "tensorflow_compression/python/ops/spectral_ops.py",
     ],
-    data = [
-        "//tensorflow_compression/cc:libtensorflow_compression.so",
+    deps = [
+        "//tensorflow_compression/python/layers",
+        "//tensorflow_compression/python/ops",
     ],
     visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "pip_src",
+    srcs = [
+        "MANIFEST.in",
+        "setup.py",
+        "tensorflow_compression/python/all_test.py",
+    ],
 )
 
 sh_binary(
@@ -29,59 +27,11 @@ sh_binary(
     srcs = ["build_pip_pkg.sh"],
     data = [
         "LICENSE",
-        "MANIFEST.in",
         "README.md",
-        "setup.py",
+        ":pip_src",
         ":tensorflow_compression",
+        # The following targets are for Python test files.
+        "//tensorflow_compression/python/layers:py_src",
+        "//tensorflow_compression/python/ops:py_src",
     ],
-)
-
-py_test(
-    name = "entropy_models_test",
-    timeout = "long",
-    srcs = ["tensorflow_compression/python/layers/entropy_models_test.py"],
-    deps = [":tensorflow_compression"],
-)
-
-py_test(
-    name = "gdn_test",
-    srcs = ["tensorflow_compression/python/layers/gdn_test.py"],
-    deps = [":tensorflow_compression"],
-)
-
-py_test(
-    name = "parameterizers_test",
-    srcs = ["tensorflow_compression/python/layers/parameterizers_test.py"],
-    deps = [":tensorflow_compression"],
-)
-
-py_test(
-    name = "signal_conv_test",
-    timeout = "long",
-    srcs = ["tensorflow_compression/python/layers/signal_conv_test.py"],
-    deps = [":tensorflow_compression"],
-)
-
-py_test(
-    name = "math_ops_test",
-    srcs = ["tensorflow_compression/python/ops/math_ops_test.py"],
-    deps = [":tensorflow_compression"],
-)
-
-py_test(
-    name = "padding_ops_test",
-    srcs = ["tensorflow_compression/python/ops/padding_ops_test.py"],
-    deps = [":tensorflow_compression"],
-)
-
-py_test(
-    name = "spectral_ops_test",
-    srcs = ["tensorflow_compression/python/ops/spectral_ops_test.py"],
-    deps = [":tensorflow_compression"],
-)
-
-py_test(
-    name = "range_coding_ops_test",
-    srcs = ["tensorflow_compression/python/ops/range_coding_ops_test.py"],
-    deps = [":tensorflow_compression"],
 )
