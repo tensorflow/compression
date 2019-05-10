@@ -185,13 +185,17 @@ Note that this is different from `tensorflow/tensorflow:devel`. To be compatible
 with TensorFlow PIP package, the GCC version must match, but
 `tensorflow/tensorflow:devel` has a different GCC version installed.
 
-Inside a Docker container, Git repo is cloned from GitHub, then run script
-`//:build_pip_pkg`.
+Inside a Docker container from the image, the following steps need to be done.
+
+1. Install TensorFlow PIP package.
+2. Clone `tensorflow-compression` repo from GitHub.
+3. Run `:build_pip_pkg` inside the cloned repo.
 
 ```bash
 sudo docker run -v /tmp/tensorflow_compression:/tmp/tensorflow_compression \
     tensorflow/tensorflow:custom-op \
-    bash -c "git clone https://github.com/tensorflow/compression.git
+    bash -c "pip install tensorflow &&
+    git clone https://github.com/tensorflow/compression.git
     /tensorflow_compression && cd /tensorflow_compression &&
     bazel run -c opt :build_pip_pkg"
 ```
