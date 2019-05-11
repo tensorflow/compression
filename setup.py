@@ -38,7 +38,6 @@ setup(
     description=('Data compression in TensorFlow'),
     url='https://tensorflow.github.io/compression/',
     author='Google LLC',
-    author_email='opensource@google.com',
     # Contained modules and scripts.
     packages=find_packages(),
     install_requires=[
