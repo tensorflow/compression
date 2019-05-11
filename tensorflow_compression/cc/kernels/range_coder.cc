@@ -24,12 +24,11 @@ limitations under the License.
 #include <limits>
 #include <string>
 
-#include "tensorflow/core/lib/gtl/array_slice.h"
+#include "absl/types/span.h"
 #include "tensorflow/core/platform/logging.h"
 #include "tensorflow/core/platform/types.h"
 
 namespace tensorflow_compression {
-namespace gtl = tensorflow::gtl;
 using tensorflow::int32;
 using tensorflow::string;
 using tensorflow::uint32;
@@ -307,7 +306,7 @@ RangeDecoder::RangeDecoder(const string& source)
   Read16BitValue();
 }
 
-int32 RangeDecoder::Decode(gtl::ArraySlice<int32> cdf, int precision) {
+int32 RangeDecoder::Decode(absl::Span<const int32> cdf, int precision) {
   // Input requirement: 0 < precision < 16.
   DCHECK_GT(precision, 0);
   DCHECK_LE(precision, 16);

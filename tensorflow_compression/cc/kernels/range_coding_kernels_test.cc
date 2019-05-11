@@ -17,6 +17,7 @@ limitations under the License.
 #include <random>
 #include <vector>
 
+#include "absl/types/span.h"
 #include "tensorflow/core/common_runtime/shape_refiner.h"
 #include "tensorflow/core/framework/fake_input.h"
 #include "tensorflow/core/framework/node_def.proto.h"
@@ -31,7 +32,6 @@ limitations under the License.
 #include "tensorflow/core/kernels/ops_testutil.h"
 #include "tensorflow/core/lib/core/bits.h"
 #include "tensorflow/core/lib/core/status_test_util.h"
-#include "tensorflow/core/lib/gtl/array_slice.h"
 #include "tensorflow/core/lib/random/simple_philox.h"
 #include "tensorflow/core/platform/stacktrace_handler.h"
 #include "tensorflow/core/platform/test.h"
@@ -41,7 +41,6 @@ limitations under the License.
 
 namespace tensorflow_compression {
 namespace {
-namespace gtl = tensorflow::gtl;
 namespace random = tensorflow::random;
 namespace test = tensorflow::test;
 using tensorflow::DT_INT16;
@@ -97,17 +96,17 @@ std::vector<int64> ComputeStrides(const TensorShape& shape) {
 
 class RangeCoderOpsTest : public OpsTestBase {
  protected:
-  Status RunEncodeOp(int precision, gtl::ArraySlice<Tensor> input,
+  Status RunEncodeOp(int precision, absl::Span<const Tensor> input,
                      Tensor* output) {
     return RunEncodeOpImpl(precision, input, 0, output);
   }
 
-  Status RunEncodeOpDebug(int precision, gtl::ArraySlice<Tensor> input,
+  Status RunEncodeOpDebug(int precision, absl::Span<const Tensor> input,
                           Tensor* output) {
     return RunEncodeOpImpl(precision, input, 1, output);
   }
 
-  Status RunEncodeOpImpl(int precision, gtl::ArraySlice<Tensor> input,
+  Status RunEncodeOpImpl(int precision, absl::Span<const Tensor> input,
                          int debug_level, Tensor* output) {
     TF_RETURN_IF_ERROR(NodeDefBuilder("encode", "RangeEncode")
                            .Input(tensorflow::FakeInput(DT_INT16))
@@ -132,17 +131,17 @@ class RangeCoderOpsTest : public OpsTestBase {
     return Status::OK();
   }
 
-  Status RunDecodeOp(int precision, gtl::ArraySlice<Tensor> input,
+  Status RunDecodeOp(int precision, absl::Span<const Tensor> input,
                      Tensor* output) {
     return RunDecodeOpImpl(precision, input, 0, output);
   }
 
-  Status RunDecodeOpDebug(int precision, gtl::ArraySlice<Tensor> input,
+  Status RunDecodeOpDebug(int precision, absl::Span<const Tensor> input,
                           Tensor* output) {
     return RunDecodeOpImpl(precision, input, 1, output);
   }
 
-  Status RunDecodeOpImpl(int precision, gtl::ArraySlice<Tensor> input,
+  Status RunDecodeOpImpl(int precision, absl::Span<const Tensor> input,
                          int debug_level, Tensor* output) {
     TF_RETURN_IF_ERROR(NodeDefBuilder("decode", "RangeDecode")
                            .Input(tensorflow::FakeInput(DT_STRING))

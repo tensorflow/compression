@@ -21,13 +21,13 @@ limitations under the License.
 #include <numeric>
 #include <vector>
 
+#include "absl/types/span.h"
 #include "tensorflow/core/framework/op_kernel.h"
 #include "tensorflow/core/framework/tensor.h"
 #include "tensorflow/core/framework/tensor_shape.h"
 #include "tensorflow/core/framework/tensor_types.h"
 #include "tensorflow/core/lib/core/errors.h"
 #include "tensorflow/core/lib/core/threadpool.h"
-#include "tensorflow/core/lib/gtl/array_slice.h"
 #include "tensorflow/core/platform/logging.h"
 #include "tensorflow/core/platform/macros.h"
 #include "tensorflow/core/platform/types.h"
@@ -35,7 +35,6 @@ limitations under the License.
 
 namespace tensorflow_compression {
 namespace {
-namespace gtl = tensorflow::gtl;
 namespace thread = tensorflow::thread;
 using tensorflow::DEVICE_CPU;
 using tensorflow::int32;
@@ -87,7 +86,7 @@ class PmfToCdfOp : public OpKernel {
     thread_pool->ParallelFor(
         pmf.dimension(0), cost_per_unit,
         [this, pmf, &cdf](int64 start, int64 limit) {
-          const gtl::ArraySlice<float>::size_type pmf_size = pmf.dimension(1);
+          const absl::Span<const float>::size_type pmf_size = pmf.dimension(1);
           for (int64 i = start; i < limit; ++i) {
             cdf(i, 0) = 0;
             PerShard({&pmf(i, 0), pmf_size}, {&cdf(i, 1), pmf_size});
@@ -151,8 +150,7 @@ class PmfToCdfOp : public OpKernel {
     double gain;
   };
 
-  void PerShard(gtl::ArraySlice<float> pmf,
-                gtl::MutableArraySlice<int32> cdf) const {
+  void PerShard(absl::Span<const float> pmf, absl::Span<int32> cdf) const {
     CHECK_EQ(pmf.size(), cdf.size());
 
     const int32 normalizer = 1 << precision_;
@@ -168,7 +166,7 @@ class PmfToCdfOp : public OpKernel {
     if (sum > normalizer) {
       std::vector<PenaltyItem> queue;
       queue.reserve(cdf.size());
-      for (int i = 0; i < cdf.size(); ++i) {
+      for (absl::Span<int32>::size_type i = 0; i < cdf.size(); ++i) {
         queue.emplace_back(&cdf[i], pmf[i]);
       }
 
@@ -185,7 +183,7 @@ class PmfToCdfOp : public OpKernel {
     } else if (sum < normalizer) {
       std::vector<GainItem> queue;
       queue.reserve(cdf.size());
-      for (int i = 0; i < cdf.size(); ++i) {
+      for (absl::Span<int32>::size_type i = 0; i < cdf.size(); ++i) {
         queue.emplace_back(&cdf[i], pmf[i]);
       }
 

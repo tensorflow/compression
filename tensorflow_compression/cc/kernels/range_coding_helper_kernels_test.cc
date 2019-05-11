@@ -17,6 +17,7 @@ limitations under the License.
 #include <limits>
 #include <random>
 
+#include "absl/types/span.h"
 #include "tensorflow/core/framework/fake_input.h"
 #include "tensorflow/core/framework/node_def.proto.h"
 #include "tensorflow/core/framework/node_def_builder.h"
@@ -25,7 +26,6 @@ limitations under the License.
 #include "tensorflow/core/framework/types.proto.h"
 #include "tensorflow/core/kernels/ops_testutil.h"
 #include "tensorflow/core/lib/core/status_test_util.h"
-#include "tensorflow/core/lib/gtl/array_slice.h"
 #include "tensorflow/core/lib/random/philox_random.h"
 #include "tensorflow/core/lib/random/simple_philox.h"
 #include "tensorflow/core/platform/stacktrace_handler.h"
@@ -33,7 +33,6 @@ limitations under the License.
 
 namespace tensorflow_compression {
 namespace {
-namespace gtl = tensorflow::gtl;
 namespace random = tensorflow::random;
 using tensorflow::DT_FLOAT;
 using tensorflow::NodeDefBuilder;
@@ -56,8 +55,7 @@ class PmfToQuantizedCdfOpTest : public OpsTestBase {
     inputs_.emplace_back(input);
   }
 
-  void GenerateData(random::SimplePhilox* rand,
-                    gtl::MutableArraySlice<float> slice) {
+  void GenerateData(random::SimplePhilox* rand, absl::Span<float> slice) {
     constexpr float minimum = std::numeric_limits<float>::epsilon();
     float sum = 0;
     for (float& value : slice) {

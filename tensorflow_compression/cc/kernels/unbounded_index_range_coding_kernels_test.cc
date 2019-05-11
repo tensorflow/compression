@@ -19,6 +19,7 @@ limitations under the License.
 #include <random>
 #include <vector>
 
+#include "absl/types/span.h"
 #include "tensorflow/core/common_runtime/shape_refiner.h"
 #include "tensorflow/core/framework/fake_input.h"
 #include "tensorflow/core/framework/node_def.proto.h"
@@ -33,7 +34,6 @@ limitations under the License.
 #include "tensorflow/core/kernels/ops_testutil.h"
 #include "tensorflow/core/lib/core/bits.h"
 #include "tensorflow/core/lib/core/status_test_util.h"
-#include "tensorflow/core/lib/gtl/array_slice.h"
 #include "tensorflow/core/lib/random/distribution_sampler.h"
 #include "tensorflow/core/lib/random/simple_philox.h"
 #include "tensorflow/core/platform/stacktrace_handler.h"
@@ -44,7 +44,6 @@ limitations under the License.
 
 namespace tensorflow_compression {
 namespace {
-namespace gtl = tensorflow::gtl;
 namespace random = tensorflow::random;
 namespace test = tensorflow::test;
 using tensorflow::DT_INT32;
@@ -141,18 +140,18 @@ void BuildDataAndCdf(random::SimplePhilox* gen, Tensor* data_tensor,
 class UnboundedIndexRangeCoderOpsTest : public OpsTestBase {
  protected:
   Status RunEncodeOpDebug(int precision, int overflow_width,
-                          gtl::ArraySlice<Tensor> input) {
+                          absl::Span<const Tensor> input) {
     Tensor unused;
     return RunEncodeOpImpl(precision, overflow_width, 1, input, &unused);
   }
 
   Status RunEncodeOp(int precision, int overflow_width,
-                     gtl::ArraySlice<Tensor> input, Tensor* output) {
+                     absl::Span<const Tensor> input, Tensor* output) {
     return RunEncodeOpImpl(precision, overflow_width, 0, input, output);
   }
 
   Status RunEncodeOpImpl(int precision, int overflow_width, int debug_level,
-                         gtl::ArraySlice<Tensor> input, Tensor* output) {
+                         absl::Span<const Tensor> input, Tensor* output) {
     NodeDefBuilder builder("encode", "UnboundedIndexRangeEncode");
     for (const Tensor& tensor : input) {
       builder.Input(tensorflow::FakeInput(tensor.dtype()));
@@ -179,18 +178,18 @@ class UnboundedIndexRangeCoderOpsTest : public OpsTestBase {
   }
 
   Status RunDecodeOpDebug(int precision, int overflow_width,
-                          gtl::ArraySlice<Tensor> input) {
+                          absl::Span<const Tensor> input) {
     Tensor unused;
     return RunDecodeOpImpl(precision, overflow_width, 1, input, &unused);
   }
 
   Status RunDecodeOp(int precision, int overflow_width,
-                     gtl::ArraySlice<Tensor> input, Tensor* output) {
+                     absl::Span<const Tensor> input, Tensor* output) {
     return RunDecodeOpImpl(precision, overflow_width, 0, input, output);
   }
 
   Status RunDecodeOpImpl(int precision, int overflow_width, int debug_level,
-                         gtl::ArraySlice<Tensor> input, Tensor* output) {
+                         absl::Span<const Tensor> input, Tensor* output) {
     NodeDefBuilder builder("decode", "UnboundedIndexRangeDecode");
     for (const Tensor& tensor : input) {
       builder.Input(tensorflow::FakeInput(tensor.dtype()));

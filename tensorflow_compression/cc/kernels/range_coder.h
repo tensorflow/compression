@@ -19,7 +19,7 @@ limitations under the License.
 #include <limits>
 #include <string>
 
-#include "tensorflow/core/lib/gtl/array_slice.h"
+#include "absl/types/span.h"
 #include "tensorflow/core/platform/types.h"
 
 namespace tensorflow_compression {
@@ -85,7 +85,7 @@ class RangeDecoder {
   // REQUIRES: 0 < precision <= 16.
   //
   // In practice the last element of `cdf` should equal to 2^precision.
-  tensorflow::int32 Decode(tensorflow::gtl::ArraySlice<tensorflow::int32> cdf,
+  tensorflow::int32 Decode(absl::Span<const tensorflow::int32> cdf,
                            int precision);
 
  private:

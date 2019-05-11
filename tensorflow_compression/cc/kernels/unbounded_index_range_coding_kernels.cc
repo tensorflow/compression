@@ -22,13 +22,13 @@ limitations under the License.
 
 #define EIGEN_USE_THREADS
 
+#include "absl/types/span.h"
 #include "tensorflow/core/framework/op_kernel.h"
 #include "tensorflow/core/framework/tensor.h"
 #include "tensorflow/core/framework/tensor_shape.h"
 #include "tensorflow/core/framework/tensor_types.h"
 #include "tensorflow/core/lib/core/errors.h"
 #include "tensorflow/core/lib/core/status.h"
-#include "tensorflow/core/lib/gtl/array_slice.h"
 #include "tensorflow/core/platform/logging.h"
 #include "tensorflow/core/platform/macros.h"
 #include "tensorflow/core/platform/types.h"
@@ -37,7 +37,6 @@ limitations under the License.
 namespace tensorflow_compression {
 namespace {
 namespace errors = tensorflow::errors;
-namespace gtl = tensorflow::gtl;
 using tensorflow::DEVICE_CPU;
 using tensorflow::int16;
 using tensorflow::int32;
@@ -215,7 +214,7 @@ class UnboundedIndexRangeEncodeOp : public OpKernel {
       value -= offset(cdf_index);
       // If outside of this range, map value to non-negative integer overflow.
       // NOTE: It might be a good idea to check overflow is within uint32 range.
-      uint32 overflow;
+      uint32 overflow = 0;
       if (value < 0) {
         overflow = -2 * value - 1;
         value = max_value;
@@ -334,7 +333,7 @@ class UnboundedIndexRangeDecodeOp : public OpKernel {
 
       const int32* cdf_slice = &cdf(cdf_index, 0);
       int32 value = decoder.Decode(
-          gtl::ArraySlice<int32>(cdf_slice, max_value + 2), precision_);
+          absl::Span<const int32>(cdf_slice, max_value + 2), precision_);
 
       // Decode overflow using variable length code.
       if (value == max_value) {

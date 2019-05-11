@@ -13,8 +13,6 @@ cc_binary(
         "-pthread",
         "-std=c++11",
         "-D_GLIBCXX_USE_CXX11_ABI=0",
-        "-Wno-sign-compare",
-        "-Wno-maybe-uninitialized",
     ],
     linkshared = 1,
     linkstatic = 0,

@@ -21,13 +21,13 @@ limitations under the License.
 #include <type_traits>
 #include <vector>
 
+#include "absl/types/span.h"
 #include "tensorflow/core/framework/op_kernel.h"
 #include "tensorflow/core/framework/tensor.h"
 #include "tensorflow/core/framework/tensor_shape.h"
 #include "tensorflow/core/framework/tensor_types.h"
 #include "tensorflow/core/lib/core/errors.h"
 #include "tensorflow/core/lib/core/status.h"
-#include "tensorflow/core/lib/gtl/array_slice.h"
 #include "tensorflow/core/platform/logging.h"
 #include "tensorflow/core/platform/macros.h"
 #include "tensorflow/core/platform/types.h"
@@ -37,7 +37,6 @@ limitations under the License.
 namespace tensorflow_compression {
 namespace {
 namespace errors = tensorflow::errors;
-namespace gtl = tensorflow::gtl;
 using tensorflow::DEVICE_CPU;
 using tensorflow::int16;
 using tensorflow::int32;
@@ -63,8 +62,8 @@ using tensorflow::uint8;
 template <typename T, typename U, int N>
 class BroadcastRange {
  public:
-  BroadcastRange(T* data_pointer, gtl::ArraySlice<int64> data_shape,
-                 const U* cdf_pointer, gtl::ArraySlice<int64> cdf_shape)
+  BroadcastRange(T* data_pointer, absl::Span<const int64> data_shape,
+                 const U* cdf_pointer, absl::Span<const int64> cdf_shape)
       : data_pointer_(data_pointer), cdf_pointer_(cdf_pointer) {
     CHECK(!data_shape.empty());
     CHECK_EQ(data_shape.size(), N);
@@ -160,7 +159,7 @@ tensorflow::Status CheckCdfValues(int precision,
 
   const int32 upper_bound = 1 << precision;
   for (int64 i = 0; i < cdf.dimension(0); ++i) {
-    auto slice = tensorflow::gtl::ArraySlice<int32>(&cdf(i, 0), size);
+    auto slice = absl::Span<const int32>(&cdf(i, 0), size);
     if (slice[0] != 0 || slice[size - 1] != upper_bound) {
       return errors::InvalidArgument("CDF should start from 0 and end at ",
                                      upper_bound, ": cdf[0]=", slice[0],
@@ -233,9 +232,9 @@ class RangeEncodeOp : public OpKernel {
  private:
   template <int N>
   tensorflow::Status RangeEncodeImpl(TTypes<int16>::ConstFlat data,
-                                     gtl::ArraySlice<int64> data_shape,
+                                     absl::Span<const int64> data_shape,
                                      TTypes<int32>::ConstMatrix cdf,
-                                     gtl::ArraySlice<int64> cdf_shape,
+                                     absl::Span<const int64> cdf_shape,
                                      string* output) const {
     const int64 data_size = data.size();
     const int64 cdf_size = cdf.size();
@@ -345,9 +344,9 @@ class RangeDecodeOp : public OpKernel {
  private:
   template <int N>
   tensorflow::Status RangeDecodeImpl(TTypes<int16>::Flat output,
-                                     gtl::ArraySlice<int64> output_shape,
+                                     absl::Span<const int64> output_shape,
                                      TTypes<int32>::ConstMatrix cdf,
-                                     gtl::ArraySlice<int64> cdf_shape,
+                                     absl::Span<const int64> cdf_shape,
                                      const string& encoded) const {
     BroadcastRange<int16, int32, N> view{output.data(), output_shape,
                                          cdf.data(), cdf_shape};
@@ -357,7 +356,7 @@ class RangeDecodeOp : public OpKernel {
     const int64 output_size = output.size();
     const int64 cdf_size = cdf.size();
     const auto chip_size =
-        static_cast<gtl::ArraySlice<int32>::size_type>(cdf.dimension(1));
+        static_cast<absl::Span<const int32>::size_type>(cdf.dimension(1));
 
     for (int64 i = 0; i < output_size; ++i) {
       const auto pair = view.Next();
