@@ -41,13 +41,11 @@ sh_binary(
 py_binary(
     name = "tfci",
     srcs = ["examples/tfci.py"],
-    python_version = "PY2",
     deps = [":tensorflow_compression"],
 )
 
 py_binary(
     name = "generate_docs",
     srcs = ["tools/generate_docs.py"],
-    python_version = "PY2",
     deps = [":tensorflow_compression"],
 )
