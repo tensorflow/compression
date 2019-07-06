@@ -26,7 +26,6 @@ using tensorflow::shape_inference::DimensionHandle;
 using tensorflow::shape_inference::InferenceContext;
 using tensorflow::shape_inference::ShapeHandle;
 
-// clang-format off
 REGISTER_OP("RangeEncode")
     .Input("data: int16")
     .Input("cdf: int32")
@@ -96,7 +95,7 @@ REGISTER_OP("RangeDecode")
     .Output("decoded: int16")
     .Attr("precision: int >= 1")
     .Attr("debug_level: int = 1")
-    .SetShapeFn([] (InferenceContext* c) {
+    .SetShapeFn([](InferenceContext* c) {
       ShapeHandle out;
       TF_RETURN_IF_ERROR(c->MakeShapeFromShapeTensor(1, &out));
       c->set_output(0, out);
@@ -133,7 +132,7 @@ REGISTER_OP("UnboundedIndexRangeEncode")
     .Attr("precision: int >= 1")
     .Attr("overflow_width: int >= 1")
     .Attr("debug_level: int = 1")
-    .SetShapeFn(tensorflow::shape_inference::ScalarShape)
+    .SetShapeFn(shape_inference::ScalarShape)
     .Doc(R"doc(
 Range encodes unbounded integer `data` using an indexed probability table.
 
@@ -211,7 +210,7 @@ REGISTER_OP("UnboundedIndexRangeDecode")
     .Attr("precision: int >= 1")
     .Attr("overflow_width: int >= 1")
     .Attr("debug_level: int = 1")
-    .SetShapeFn([] (InferenceContext* c) {
+    .SetShapeFn([](InferenceContext* c) {
       c->set_output(0, c->input(1));
       return Status::OK();
     })
@@ -246,7 +245,7 @@ REGISTER_OP("PmfToQuantizedCdf")
     .Input("pmf: float")
     .Output("cdf: int32")
     .Attr("precision: int >= 1")
-    .SetShapeFn([] (InferenceContext* c) {
+    .SetShapeFn([](InferenceContext* c) {
       ShapeHandle in;
       TF_RETURN_IF_ERROR(c->WithRankAtLeast(c->input(0), 1, &in));
       DimensionHandle last;
@@ -275,34 +274,12 @@ REGISTER_OP("ArrayFingerprint")
     .Input("input: T")
     .Output("fingerprint: int64")
     .Attr("T: realnumbertype")
-    .SetShapeFn(tensorflow::shape_inference::ScalarShape)
+    .SetShapeFn(shape_inference::ScalarShape)
     .Doc(R"doc(
 Produces fingerprint of the input data.
 
 input: Tensor to be fingerprinted.
 fingerprint: Fingerprint value of input.
 )doc");
-
-REGISTER_OP("CheckArrayFingerprint")
-    .Input("input: T")
-    .Input("fingerprint: int64")
-    .Output("output: T")
-    .Attr("T: realnumbertype")
-    .SetShapeFn([](InferenceContext* c) {
-      ShapeHandle unused;
-      TF_RETURN_IF_ERROR(c->WithRank(c->input(1), 0, &unused));
-      c->set_output(0, c->input(0));
-      return tensorflow::Status::OK();
-    })
-    .Doc(R"doc(
-Computes the fingerprint of `input` and checks the computed value against
-`fingerprint`. If the check fails, then this op returns an error status.
-
-input: Tensor to be fingerprinted and checked.
-fingerprint: Fingerprint value to be checked against.
-output: The same as input.
-)doc");
-// clang-format on
-
 }  // namespace
 }  // namespace tensorflow_compression

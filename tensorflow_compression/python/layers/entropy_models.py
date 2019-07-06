@@ -633,7 +633,10 @@ class EntropyBottleneck(EntropyModel):
     # here, or the variable will return the wrong dynamic shape later. A
     # placeholder with default gets the trick done (see initializer above).
     quantized_cdf = self.add_variable(
-        "quantized_cdf", shape=None, dtype=tf.int32, trainable=False,
+        "quantized_cdf",
+        shape=(channels, None),
+        dtype=tf.int32,
+        trainable=False,
         initializer=cdf_initializer)
     cdf_length = self.add_variable(
         "cdf_length", shape=(channels,), dtype=tf.int32, trainable=False,

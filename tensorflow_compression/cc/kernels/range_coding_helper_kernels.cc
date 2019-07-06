@@ -232,37 +232,5 @@ class ArrayFingerprintOp : public tensorflow::OpKernel {
 
 REGISTER_KERNEL_BUILDER(Name("ArrayFingerprint").Device(tensorflow::DEVICE_CPU),
                         ArrayFingerprintOp);
-
-class CheckArrayFingerprintOp : public tensorflow::OpKernel {
- public:
-  using OpKernel::OpKernel;
-
-  void Compute(tensorflow::OpKernelContext* context) override {
-    const Tensor& input = context->input(0);
-    const Tensor& fingerprint = context->input(1);
-    OP_REQUIRES(context, tensorflow::DataTypeCanUseMemcpy(input.dtype()),
-                InvalidArgument("Data type not supported: ",
-                                tensorflow::DataTypeString(input.dtype())));
-    OP_REQUIRES(context, TensorShapeUtils::IsScalar(fingerprint.shape()),
-                InvalidArgument("`fingerprint` should be a scalar"));
-
-    const int64 size =
-        input.shape().num_elements() * tensorflow::DataTypeSize(input.dtype());
-    auto data = input.bit_casted_shaped<char, 1>({size});
-
-    OP_REQUIRES(context,
-                static_cast<uint64>(fingerprint.scalar<int64>()()) ==
-                    ::util::Fingerprint64(data.data(),
-                                            static_cast<size_t>(data.size())),
-                tensorflow::errors::DataLoss("Fingerprint mismatch"));
-
-    context->set_output(0, input);
-  }
-};
-
-REGISTER_KERNEL_BUILDER(
-    Name("CheckArrayFingerprint").Device(tensorflow::DEVICE_CPU),
-    CheckArrayFingerprintOp);
-
 }  // namespace
 }  // namespace tensorflow_compression

@@ -49,21 +49,30 @@ class Parameterizer(object):
 
 
 class StaticParameterizer(Parameterizer):
-  """A parameterizer that always returns a constant tensor.
+  """A parameterizer that returns a non-variable.
 
-  No variables are created, hence the parameter never changes.
+  No variables are created, and `getter` is ignored. If `value` is a `Tensor`,
+  the parameter can depend on some other computation. Otherwise, it never
+  changes.
 
   Args:
-    initializer: An initializer object which will be called to produce the
-      static parameter.
+    value: Either a constant or `Tensor` value, or a callable which returns such
+      a thing given a shape and dtype argument (for example, an initializer).
   """
 
-  def __init__(self, initializer):
-    self.initializer = initializer
+  def __init__(self, value):
+    self.value = value
 
   def __call__(self, getter, name, shape, dtype, initializer, regularizer=None):
-    del getter, name, initializer, regularizer  # unused
-    return self.initializer(shape, dtype)
+    del getter, name, initializer  # unused
+    if regularizer is not None:
+      raise NotImplementedError("Regularizers are not currently supported for "
+                                "static parameterizers.")
+    if callable(self.value):
+      # Treat value as initializer.
+      return self.value(shape, dtype=dtype)
+    else:
+      return self.value
 
 
 class RDFTParameterizer(Parameterizer):
@@ -92,35 +101,41 @@ class RDFTParameterizer(Parameterizer):
     size = var_shape[0]
     for s in var_shape[1:-2]:
       size *= s
-    irdft_matrix = spectral_ops.irdft_matrix(var_shape[:-2], dtype=var_dtype)
     if self.dc:
       rdft_shape = (size, var_shape[-2] * var_shape[-1])
     else:
-      irdft_matrix = irdft_matrix[:, 1:]
       rdft_shape = (size - 1, var_shape[-2] * var_shape[-1])
     rdft_dtype = var_dtype
     rdft_name = name + "_rdft"
 
     def rdft_initializer(shape, dtype=None, partition_info=None):
+      """Initializer wrapper."""
       assert tuple(shape) == rdft_shape, shape
       assert dtype == rdft_dtype, dtype
       init = initializer(
           var_shape, dtype=var_dtype, partition_info=partition_info)
       init = tf.reshape(init, (-1, rdft_shape[-1]))
+      irdft_matrix = spectral_ops.irdft_matrix(var_shape[:-2], dtype=var_dtype)
+      if not self.dc:
+        irdft_matrix = irdft_matrix[:, 1:]
       init = tf.linalg.matmul(irdft_matrix, init, transpose_a=True)
       return init
 
     def reparam(rdft):
+      irdft_matrix = spectral_ops.irdft_matrix(var_shape[:-2], dtype=var_dtype)
+      if not self.dc:
+        irdft_matrix = irdft_matrix[:, 1:]
       var = tf.linalg.matmul(irdft_matrix, rdft)
       var = tf.reshape(var, var_shape)
       return var
 
+    reparam_regularizer = None
     if regularizer is not None:
-      regularizer = lambda rdft: regularizer(reparam(rdft))
+      reparam_regularizer = lambda rdft: regularizer(reparam(rdft))
 
     rdft = getter(
         name=rdft_name, shape=rdft_shape, dtype=rdft_dtype,
-        initializer=rdft_initializer, regularizer=regularizer)
+        initializer=rdft_initializer, regularizer=reparam_regularizer)
     return reparam(rdft)
 
 
@@ -165,10 +180,11 @@ class NonnegativeParameterizer(Parameterizer):
       var = tf.math.square(var) - pedestal
       return var
 
+    reparam_regularizer = None
     if regularizer is not None:
-      regularizer = lambda var: regularizer(reparam(var))
+      reparam_regularizer = lambda var: regularizer(reparam(var))
 
     var = getter(
         name=reparam_name, shape=shape, dtype=dtype,
-        initializer=reparam_initializer, regularizer=regularizer)
+        initializer=reparam_initializer, regularizer=reparam_regularizer)
     return reparam(var)

@@ -161,19 +161,6 @@ class FingerprintOpTest : public tensorflow::OpsTestBase {
     inputs_.clear();
     inputs_.emplace_back(tensor);
   }
-
-  void MakeCheckFingerprintOp(Tensor* tensor, Tensor* fingerprint) {
-    TF_ASSERT_OK(
-        tensorflow::NodeDefBuilder("check_fingerprint", "CheckArrayFingerprint")
-            .Input(tensorflow::FakeInput(tensor->dtype()))
-            .Input(tensorflow::FakeInput(fingerprint->dtype()))
-            .Finalize(node_def()));
-    TF_ASSERT_OK(InitOp());
-
-    inputs_.clear();
-    inputs_.emplace_back(tensor);
-    inputs_.emplace_back(fingerprint);
-  }
 };
 
 TEST_F(FingerprintOpTest, Verify) {
@@ -196,18 +183,17 @@ TEST_F(FingerprintOpTest, Verify) {
 
     MakeFingerprintOp(&tensor);
     TF_ASSERT_OK(RunOpKernel());
-
-    Tensor fingerprint = *GetOutput(0);
-
-    MakeCheckFingerprintOp(&tensor, &fingerprint);
-    TF_ASSERT_OK(RunOpKernel());
+    Tensor fingerprint0 = *GetOutput(0);
 
     // Change one byte in the buffer.
     const int64 pos = rand.Uniform(length);
     buffer(pos) = ~buffer(pos);
 
-    MakeCheckFingerprintOp(&tensor, &fingerprint);
-    ASSERT_FALSE(RunOpKernel().ok());
+    MakeFingerprintOp(&tensor);
+    TF_ASSERT_OK(RunOpKernel());
+    Tensor fingerprint1 = *GetOutput(0);
+
+    EXPECT_NE(fingerprint0.tensor_data(), fingerprint1.tensor_data());
   }
 }
 
@@ -220,17 +206,6 @@ TEST_F(FingerprintOpTest, FingerprintShapeFn) {
   INFER_OK(op, "[1,2]", "[]");
   INFER_OK(op, "[1,2,3]", "[]");
 }
-
-TEST_F(FingerprintOpTest, CheckFingerprintShapeFn) {
-  tensorflow::ShapeInferenceTestOp op("CheckArrayFingerprint");
-
-  INFER_OK(op, "?;?", "in0");
-  INFER_OK(op, "[];?", "in0");
-  INFER_OK(op, "[1,2];?", "in0");
-  INFER_OK(op, "[1,2,3];?", "in0");
-  INFER_ERROR("rank 0", op, "?;[1]");
-}
-
 }  // namespace
 }  // namespace tensorflow_compression
 

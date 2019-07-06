@@ -217,6 +217,8 @@ class _SignalConv(tf.keras.layers.Layer):
     activation: Activation function or `None`.
     use_bias: Boolean, whether an additive constant will be applied to each
       output channel.
+    use_explicit: Boolean, whether to use `EXPLICIT` padding mode (supported in
+      TensorFlow >1.14).
     kernel_initializer: An initializer for the filter kernel.
     bias_initializer: An initializer for the bias vector.
     kernel_regularizer: Optional regularizer for the filter kernel.
@@ -272,7 +274,7 @@ class _SignalConv(tf.keras.layers.Layer):
                corr=False, strides_down=1, strides_up=1, padding="valid",
                extra_pad_end=True, channel_separable=False,
                data_format="channels_last",
-               activation=None, use_bias=False,
+               activation=None, use_bias=False, use_explicit=False,
                kernel_initializer=tf.initializers.variance_scaling(),
                bias_initializer=tf.initializers.zeros(),
                kernel_regularizer=None, bias_regularizer=None,
@@ -301,6 +303,7 @@ class _SignalConv(tf.keras.layers.Layer):
     self._data_format = str(data_format)
     self._activation = activation
     self._use_bias = bool(use_bias)
+    self._use_explicit = bool(use_explicit)
     self._kernel_initializer = kernel_initializer
     self._bias_initializer = bias_initializer
     self._kernel_regularizer = kernel_regularizer
@@ -356,6 +359,10 @@ class _SignalConv(tf.keras.layers.Layer):
   @property
   def use_bias(self):
     return self._use_bias
+
+  @property
+  def use_explicit(self):
+    return self._use_explicit
 
   @property
   def kernel_initializer(self):
@@ -506,8 +513,47 @@ class _SignalConv(tf.keras.layers.Layer):
           strides=strides, padding="VALID", data_format=data_format)
       # Perform remaining downsampling.
       slices = tuple(slice(None, None, s // gcf) for s in self.strides_down)
-      if any(s.step != 1 for s in slices):
+      if any(s.step > 1 for s in slices):
         outputs = outputs[self._padded_tuple(slices, slice(None))]
+    else:
+      self._raise_notimplemented()
+
+    return outputs
+
+  def _correlate_down_explicit(self, inputs, kernel, padding):
+    # Computes correlation followed by downsampling, with arbitrary zero
+    # padding.
+    data_format = self._op_data_format
+    strides = self._padded_tuple(self.strides_down, 1)
+    padding = self._padded_tuple(padding, (0, 0))
+    do_cast = inputs.dtype.is_integer
+
+    if self._rank == 1 and not self.channel_separable:
+      # The 1D correlation op can't do explicit padding, so if that is requested
+      # we insert an extra dimension and use the 2D op.
+      extradim = {"channels_first": 2, "channels_last": 1}[self.data_format]
+      strides = strides[:extradim] + (strides[extradim],) + strides[extradim:]
+      padding = padding[:extradim] + ((0, 0),) + padding[extradim:]
+      data_format = data_format.replace("W", "HW")
+      inputs = tf.expand_dims(inputs, extradim)
+      kernel = tf.expand_dims(kernel, 0)
+      if do_cast:
+        inputs = tf.cast(inputs, tf.float32)
+      outputs = tf.nn.conv2d(
+          inputs, kernel,
+          strides=strides, padding=padding, data_format=data_format)
+      if do_cast:
+        outputs = tf.cast(tf.math.round(outputs), self.accum_dtype)
+      outputs = tf.squeeze(outputs, [extradim])
+    elif self._rank == 2 and not self.channel_separable:
+      # `tf.nn.conv2d` performs correlations followed by optional downsampling.
+      if do_cast:
+        inputs = tf.cast(inputs, tf.float32)
+      outputs = tf.nn.conv2d(
+          inputs, kernel,
+          strides=strides, padding=padding, data_format=data_format)
+      if do_cast:
+        outputs = tf.cast(tf.math.round(outputs), self.accum_dtype)
     else:
       self._raise_notimplemented()
 
@@ -616,6 +662,86 @@ class _SignalConv(tf.keras.layers.Layer):
 
     return outputs
 
+  def _up_convolve_transpose_explicit(self, inputs, kernel, prepadding):
+    # Computes upsampling followed by convolution, via transpose convolution ops
+    # in EXPLICIT mode. This is an efficient implementation of upsampled
+    # convolutions, where we only compute values that are necessary.
+    do_cast = inputs.dtype.is_integer
+
+    # conv2d_backprop_input expects the output and input channels in reversed
+    # order. We implement this by swapping those dimensions of the kernel.
+    kernel = tf.transpose(
+        kernel, list(range(self._rank)) + [self._rank + 1, self._rank])
+
+    # Compute explicit padding corresponding to the equivalent conv2d call,
+    # and the shape of the output, taking into account any pre-padding.
+    input_shape = tf.shape(inputs)
+    padding = (self._rank + 2) * [(0, 0)]
+    output_shape = [input_shape[0]] + (self._rank + 1) * [None]
+    if self.data_format == "channels_last":
+      spatial_axes = range(1, self._rank + 1)
+      output_shape[-1] = self.filters
+    else:
+      spatial_axes = range(2, self._rank + 2)
+      output_shape[1] = self.filters
+    if self.extra_pad_end:
+      get_length = lambda l, s, k, p: l * s + ((k - 1) - p)
+    else:
+      get_length = lambda l, s, k, p: l * s + ((k - 1) - (s - 1) - p)
+    for i, a in enumerate(spatial_axes):
+      if self.padding == "valid":
+        padding[a] = 2 * (self.kernel_support[i] - 1,)
+      else:  # same
+        padding[a] = (
+            prepadding[i][0] * self.strides_up[i] + self.kernel_support[i] // 2,
+            prepadding[i][1] * self.strides_up[i] + (
+                self.kernel_support[i] - 1) // 2,
+        )
+      output_shape[a] = get_length(
+          input_shape[a], self.strides_up[i], self.kernel_support[i],
+          sum(padding[a]))
+
+    data_format = self._op_data_format
+    strides = self._padded_tuple(self.strides_up, 1)
+
+    # Compute convolution.
+    if self._rank == 1 and not self.channel_separable:
+      # There's no 1D equivalent to conv2d_backprop_input, so we insert an
+      # extra dimension and use the 2D op.
+      extradim = {"channels_first": 2, "channels_last": 1}[self.data_format]
+      data_format = data_format.replace("W", "HW")
+      strides = strides[:extradim] + (strides[extradim],) + strides[extradim:]
+      padding = padding[:extradim] + [(0, 0)] + padding[extradim:]
+      output_shape = output_shape[:extradim] + [1] + output_shape[extradim:]
+      kernel = tf.expand_dims(kernel, 0)
+      inputs = tf.expand_dims(inputs, extradim)
+      if do_cast:
+        inputs = tf.cast(inputs, tf.float32)
+      outputs = tf.nn.conv2d_backprop_input(
+          output_shape, kernel, inputs,
+          strides=strides, padding=padding, data_format=data_format)
+      if do_cast:
+        outputs = tf.cast(tf.math.round(outputs), self.accum_dtype)
+      outputs = tf.squeeze(outputs, [extradim])
+    elif self._rank == 2 and not self.channel_separable:
+      if do_cast:
+        inputs = tf.cast(inputs, tf.float32)
+      outputs = tf.nn.conv2d_backprop_input(
+          output_shape, kernel, inputs,
+          strides=strides, padding=padding, data_format=data_format)
+      if do_cast:
+        outputs = tf.cast(tf.math.round(outputs), self.accum_dtype)
+    else:
+      self._raise_notimplemented()
+
+    # Perform downsampling if it is requested.
+    if any(s > 1 for s in self.strides_down):
+      slices = tuple(slice(None, None, s) for s in self.strides_down)
+      slices = self._padded_tuple(slices, slice(None))
+      outputs = outputs[slices]
+
+    return outputs
+
   def call(self, inputs):
     inputs = tf.convert_to_tensor(inputs)
     outputs = inputs
@@ -649,19 +775,42 @@ class _SignalConv(tf.keras.layers.Layer):
 
     # Compute amount of necessary padding, and determine whether to use built-in
     # padding or to pre-pad with a separate op.
-    if self.padding == "valid" or all(s == 1 for s in self.kernel_support):
-      prepadding = self._rank * [[0, 0]]
+    if self.padding == "valid":
+      padding = prepadding = self._rank * ((0, 0),)
     else:  # same_*
       padding = padding_ops.same_padding_for_kernel(
           self.kernel_support, corr, self.strides_up)
-      # Pre-pad and then use built-in valid padding mode.
-      outputs = tf.pad(
-          outputs, self._padded_tuple(padding, (0, 0)), self._pad_mode)
-      prepadding = padding
+      if (self.padding == "same_zeros" and
+          not self.channel_separable and
+          1 <= self._rank <= 2 and
+          self.use_explicit):
+        # Don't pre-pad and use built-in EXPLICIT mode.
+        prepadding = self._rank * ((0, 0),)
+      else:
+        # Pre-pad and then use built-in valid padding mode.
+        outputs = tf.pad(
+            outputs, self._padded_tuple(padding, (0, 0)), self._pad_mode)
+        prepadding = padding
+        padding = self._rank * ((0, 0),)
 
-    # Compute the convolution/correlation.
-    if corr and all(s == 1 for s in self.strides_up):
+    # Compute the convolution/correlation. Prefer EXPLICIT padding ops where
+    # possible, but don't use them to implement VALID padding.
+    if (corr and
+        all(s == 1 for s in self.strides_up) and
+        not self.channel_separable and
+        1 <= self._rank <= 2 and
+        not all(p[0] == p[1] == 0 for p in padding)):
+      outputs = self._correlate_down_explicit(outputs, kernel, padding)
+    elif (corr and
+          all(s == 1 for s in self.strides_up) and
+          all(p[0] == p[1] == 0 for p in padding)):
       outputs = self._correlate_down_valid(outputs, kernel)
+    elif (not corr and
+          not self.channel_separable and
+          1 <= self._rank <= 2 and
+          self.use_explicit):
+      outputs = self._up_convolve_transpose_explicit(
+          outputs, kernel, prepadding)
     elif not corr:
       outputs = self._up_convolve_transpose_valid(
           outputs, kernel, prepadding)
