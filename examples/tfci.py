@@ -21,6 +21,7 @@ from __future__ import print_function
 
 import argparse
 import os
+import sys
 
 from absl import app
 from absl.flags import argparse_flags
@@ -29,6 +30,11 @@ from six.moves import urllib
 import tensorflow as tf
 
 import tensorflow_compression as tfc  # pylint:disable=unused-import
+
+# Default URL to fetch metagraphs from.
+URL_PREFIX = "https://storage.googleapis.com/tensorflow_compression/metagraphs"
+# Default location to store cached metagraphs.
+METAGRAPH_CACHE = "/tmp/tfc_metagraphs"
 
 
 def read_png(filename):
@@ -50,22 +56,28 @@ def write_png(filename, image):
   return tf.io.write_file(filename, string)
 
 
-def load_metagraph(model, url_prefix, metagraph_cache):
-  """Loads and caches a trained model metagraph."""
-  filename = os.path.join(metagraph_cache, model + ".metagraph")
+def load_cached(filename):
+  """Downloads and caches files from web storage."""
+  pathname = os.path.join(METAGRAPH_CACHE, filename)
   try:
-    with tf.io.gfile.GFile(filename, "rb") as f:
+    with tf.io.gfile.GFile(pathname, "rb") as f:
       string = f.read()
   except tf.errors.NotFoundError:
-    url = url_prefix + "/" + model + ".metagraph"
+    url = URL_PREFIX + "/" + filename
     try:
       request = urllib.request.urlopen(url)
       string = request.read()
     finally:
       request.close()
-    tf.io.gfile.makedirs(os.path.dirname(filename))
-    with tf.io.gfile.GFile(filename, "wb") as f:
+    tf.io.gfile.makedirs(os.path.dirname(pathname))
+    with tf.io.gfile.GFile(pathname, "wb") as f:
       f.write(string)
+  return string
+
+
+def import_metagraph(model):
+  """Imports a trained model metagraph into the current graph."""
+  string = load_cached(model + ".metagraph")
   metagraph = tf.MetaGraphDef()
   metagraph.ParseFromString(string)
   tf.train.import_meta_graph(metagraph)
@@ -86,14 +98,11 @@ def instantiate_signature(signature_def):
   return inputs, outputs
 
 
-def compress(model, input_file, output_file, url_prefix, metagraph_cache):
-  """Compresses a PNG file to a TFCI file."""
-  if not output_file:
-    output_file = input_file + ".tfci"
-
+def compress_image(model, input_image):
+  """Compresses an image array into a bitstring."""
   with tf.Graph().as_default():
     # Load model metagraph.
-    signature_defs = load_metagraph(model, url_prefix, metagraph_cache)
+    signature_defs = import_metagraph(model)
     inputs, outputs = instantiate_signature(signature_defs["sender"])
 
     # Just one input tensor.
@@ -103,12 +112,12 @@ def compress(model, input_file, output_file, url_prefix, metagraph_cache):
 
     # Run encoder.
     with tf.Session() as sess:
-      feed_dict = {inputs: sess.run(read_png(input_file))}
+      feed_dict = {inputs: input_image}
       arrays = sess.run(outputs, feed_dict=feed_dict)
 
     # Pack data into tf.Example.
     example = tf.train.Example()
-    example.features.feature["MD"].bytes_list.value[:] = [model]
+    example.features.feature["MD"].bytes_list.value[:] = [model.encode("ascii")]
     for i, (array, tensor) in enumerate(zip(arrays, outputs)):
       feature = example.features.feature[chr(i + 1)]
       if array.ndim != 1:
@@ -121,12 +130,60 @@ def compress(model, input_file, output_file, url_prefix, metagraph_cache):
         raise RuntimeError(
             "Unexpected tensor dtype: '{}'.".format(tensor.dtype))
 
-    # Write serialized tf.Example to disk.
-    with tf.io.gfile.GFile(output_file, "wb") as f:
-      f.write(example.SerializeToString())
+    return example.SerializeToString()
 
 
-def decompress(input_file, output_file, url_prefix, metagraph_cache):
+def compress(model, input_file, output_file, target_bpp=None, bpp_strict=False):
+  """Compresses a PNG file to a TFCI file."""
+  if not output_file:
+    output_file = input_file + ".tfci"
+
+  # Load image.
+  with tf.Graph().as_default():
+    with tf.Session() as sess:
+      input_image = sess.run(read_png(input_file))
+      num_pixels = input_image.shape[-2] * input_image.shape[-3]
+
+  if not target_bpp:
+    # Just compress with a specific model.
+    bitstring = compress_image(model, input_image)
+  else:
+    # Get model list.
+    models = load_cached(model + ".models")
+    models = models.decode("ascii").split()
+
+    # Do a binary search over all RD points.
+    lower = -1
+    upper = len(models)
+    bpp = None
+    best_bitstring = None
+    best_bpp = None
+    while bpp != target_bpp and upper - lower > 1:
+      i = (upper + lower) // 2
+      bitstring = compress_image(models[i], input_image)
+      bpp = 8 * len(bitstring) / num_pixels
+      is_admissible = bpp <= target_bpp or not bpp_strict
+      is_better = (best_bpp is None or
+                   abs(bpp - target_bpp) < abs(best_bpp - target_bpp))
+      if is_admissible and is_better:
+        best_bitstring = bitstring
+        best_bpp = bpp
+      if bpp < target_bpp:
+        lower = i
+      if bpp > target_bpp:
+        upper = i
+    if best_bpp is None:
+      assert bpp_strict
+      raise RuntimeError(
+          "Could not compress image to less than {} bpp.".format(target_bpp))
+    bitstring = best_bitstring
+
+  # Write bitstring to disk.
+  with tf.io.gfile.GFile(output_file, "wb") as f:
+    f.write(bitstring)
+
+
+def decompress(input_file, output_file):
   """Decompresses a TFCI file and writes a PNG file."""
   if not output_file:
     output_file = input_file + ".png"
@@ -136,10 +193,10 @@ def decompress(input_file, output_file, url_prefix, metagraph_cache):
     with tf.io.gfile.GFile(input_file, "rb") as f:
       example = tf.train.Example()
       example.ParseFromString(f.read())
-    model = example.features.feature["MD"].bytes_list.value[0]
+    model = example.features.feature["MD"].bytes_list.value[0].decode("ascii")
 
     # Load model metagraph.
-    signature_defs = load_metagraph(model, url_prefix, metagraph_cache)
+    signature_defs = import_metagraph(model)
     inputs, outputs = instantiate_signature(signature_defs["receiver"])
 
     # Multiple input tensors, ordered alphabetically, without names.
@@ -166,52 +223,59 @@ def decompress(input_file, output_file, url_prefix, metagraph_cache):
       sess.run(outputs, feed_dict=feed_dict)
 
 
-def list_models(url_prefix):
-  url = url_prefix + "/models.txt"
+def list_models():
+  url = URL_PREFIX + "/models.txt"
   try:
     request = urllib.request.urlopen(url)
-    print(request.read())
+    print(request.read().decode("utf-8"))
   finally:
     request.close()
 
 
 def parse_args(argv):
+  """Parses command line arguments."""
   parser = argparse_flags.ArgumentParser(
       formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
   # High-level options.
   parser.add_argument(
       "--url_prefix",
-      default="https://storage.googleapis.com/tensorflow_compression/"
-              "metagraphs",
+      default=URL_PREFIX,
       help="URL prefix for downloading model metagraphs.")
   parser.add_argument(
       "--metagraph_cache",
-      default="/tmp/tfc_metagraphs",
+      default=METAGRAPH_CACHE,
       help="Directory where to cache model metagraphs.")
   subparsers = parser.add_subparsers(
-      title="commands", help="Invoke '<command> -h' for more information.")
+      title="commands", dest="command",
+      help="Invoke '<command> -h' for more information.")
 
   # 'compress' subcommand.
   compress_cmd = subparsers.add_parser(
       "compress",
       description="Reads a PNG file, compresses it using the given model, and "
                   "writes a TFCI file.")
-  compress_cmd.set_defaults(
-      f=compress,
-      a=["model", "input_file", "output_file", "url_prefix", "metagraph_cache"])
   compress_cmd.add_argument(
       "model",
-      help="Unique model identifier. See 'models' command for options.")
+      help="Unique model identifier. See 'models' command for options. If "
+           "'target_bpp' is provided, don't specify the index at the end of "
+           "the model identifier.")
+  compress_cmd.add_argument(
+      "--target_bpp", type=float,
+      help="Target bits per pixel. If provided, a binary search is used to try "
+           "to match the given bpp as close as possible. In this case, don't "
+           "specify the index at the end of the model identifier. It will be "
+           "automatically determined.")
+  compress_cmd.add_argument(
+      "--bpp_strict", action="store_true",
+      help="Try never to exceed 'target_bpp'. Ignored if 'target_bpp' is not "
+           "set.")
 
   # 'decompress' subcommand.
   decompress_cmd = subparsers.add_parser(
       "decompress",
       description="Reads a TFCI file, reconstructs the image using the model "
                   "it was compressed with, and writes back a PNG file.")
-  decompress_cmd.set_defaults(
-      f=decompress,
-      a=["input_file", "output_file", "url_prefix", "metagraph_cache"])
 
   # Arguments for both 'compress' and 'decompress'.
   for cmd, ext in ((compress_cmd, ".tfci"), (decompress_cmd, ".png")):
@@ -224,18 +288,34 @@ def parse_args(argv):
              "the input filename.".format(ext))
 
   # 'models' subcommand.
-  models_cmd = subparsers.add_parser(
+  subparsers.add_parser(
       "models",
       description="Lists available trained models. Requires an internet "
                   "connection.")
-  models_cmd.set_defaults(f=list_models, a=["url_prefix"])
 
   # Parse arguments.
-  return parser.parse_args(argv[1:])
+  args = parser.parse_args(argv[1:])
+  if args.command is None:
+    parser.print_usage()
+    sys.exit(2)
+  return args
+
+
+def main(args):
+  # Command line can override these defaults.
+  global URL_PREFIX, METAGRAPH_CACHE
+  URL_PREFIX = args.url_prefix
+  METAGRAPH_CACHE = args.metagraph_cache
+
+  # Invoke subcommand.
+  if args.command == "compress":
+    compress(args.model, args.input_file, args.output_file,
+             args.target_bpp, args.bpp_strict)
+  if args.command == "decompress":
+    decompress(args.input_file, args.output_file)
+  if args.command == "models":
+    list_models()
 
 
 if __name__ == "__main__":
-  # Parse arguments and run function determined by subcommand.
-  app.run(
-      lambda args: args.f(**{k: getattr(args, k) for k in args.a}),
-      flags_parser=parse_args)
+  app.run(main, flags_parser=parse_args)
