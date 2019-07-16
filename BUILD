@@ -19,14 +19,13 @@ filegroup(
     name = "pip_src",
     srcs = [
         "MANIFEST.in",
-        "setup.py",
         "tensorflow_compression/python/all_test.py",
     ],
 )
 
-sh_binary(
+py_binary(
     name = "build_pip_pkg",
-    srcs = ["build_pip_pkg.sh"],
+    srcs = ["build_pip_pkg.py"],
     data = [
         "LICENSE",
         "README.md",
