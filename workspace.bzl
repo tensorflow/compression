@@ -21,7 +21,11 @@ def _tensorflow_pip_impl(ctx):
     fail("Failed to find include path. Did you remember to pip install " +
          "tensorflow?: %s" % include_path.stderr)
 
-  library_filename = "libtensorflow_framework.so.1"
+  if "linux" in ctx.os.name:
+    library_filename = "libtensorflow_framework.so.1"
+  elif "mac" in ctx.os.name:
+    library_filename = "libtensorflow_framework.dylib"
+
   ctx.symlink("/".join([library_path.stdout.strip(), library_filename]),
               library_filename)
   ctx.symlink(include_path.stdout.strip(), "include")
@@ -29,7 +33,7 @@ def _tensorflow_pip_impl(ctx):
 cc_library(
     name = "libtensorflow_framework",
     srcs = ["{0}"],
-    hdrs = glob(["include/**/*.h"]),
+    hdrs = glob(["include/**"]),
     includes = ["include"],
     visibility = ["//visibility:public"],
 )
