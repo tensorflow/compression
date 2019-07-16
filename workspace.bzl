@@ -21,7 +21,7 @@ def _tensorflow_pip_impl(ctx):
     fail("Failed to find include path. Did you remember to pip install " +
          "tensorflow?: %s" % include_path.stderr)
 
-  library_filename = "libtensorflow_framework.so"
+  library_filename = "libtensorflow_framework.so.1"
   ctx.symlink("/".join([library_path.stdout.strip(), library_filename]),
               library_filename)
   ctx.symlink(include_path.stdout.strip(), "include")

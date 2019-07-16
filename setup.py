@@ -22,7 +22,10 @@ from setuptools import find_packages
 from setuptools import setup
 from setuptools.dist import Distribution
 
-__version__ = '1.2b1'
+# Version string is intentionally set to non-numeric value, so that non-release
+# built packages are different from release packages. During builds for formal
+# releases, we should temporarily change this value to pip release version.
+__version__ = 'custom-build-from-source'
 
 
 class BinaryDistribution(Distribution):
@@ -42,7 +45,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         'scipy >= 1.0.0',
-        'tensorflow >= 1.13.0',
+        'tensorflow >= 1.14.0',
     ],
     # Add in any packaged data.
     include_package_data=True,
