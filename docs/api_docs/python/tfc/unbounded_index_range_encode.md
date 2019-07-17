@@ -1,5 +1,11 @@
+<div itemscope itemtype="http://developers.google.com/ReferenceObject">
+<meta itemprop="name" content="tfc.unbounded_index_range_encode" />
+<meta itemprop="path" content="Stable" />
+</div>
 
 # tfc.unbounded_index_range_encode
+
+Range encodes unbounded integer `data` using an indexed probability table.
 
 ### Aliases:
 
@@ -22,11 +28,9 @@ tfc.unbounded_index_range_encode(
 
 
 
-Defined in [`python/ops/_range_coding_ops.py`](https://github.com/tensorflow/compression/tree/master/python/ops/_range_coding_ops.py).
+Defined in generated file: `python/ops/gen_range_coding_ops.py`
 
 <!-- Placeholder for "Used in" -->
-
-Range encodes unbounded integer `data` using an indexed probability table.
 
 For each value in `data`, the corresponding value in `index` determines which
 probability model in `cdf` is used to encode it. The data can be arbitrary
@@ -68,7 +72,9 @@ The encoded output contains neither the shape information of the encoded data
 nor a termination symbol. Therefore the shape of the encoded data must be
 explicitly provided to the decoder.
 
-Implementation notes:
+#### Implementation notes:
+
+
 
 - Because of potential performance issues, the op does not check if `cdf`
 satisfies monotonic increase property.
@@ -82,19 +88,20 @@ integers representing quantized probability mass rather than floating points.
 
 #### Args:
 
+
 * <b>`data`</b>: A `Tensor` of type `int32`. An int32 tensor.
 * <b>`index`</b>: A `Tensor` of type `int32`.
-    An int32 tensor of the same shape as `data`.
+  An int32 tensor of the same shape as `data`.
 * <b>`cdf`</b>: A `Tensor` of type `int32`.
-    An int32 tensor representing the CDF's of `data`. Each integer is divided
-    by `2^precision` to represent a fraction.
+  An int32 tensor representing the CDF's of `data`. Each integer is divided
+  by `2^precision` to represent a fraction.
 * <b>`cdf_size`</b>: A `Tensor` of type `int32`. An int32 tensor.
 * <b>`offset`</b>: A `Tensor` of type `int32`. An int32 tensor.
 * <b>`precision`</b>: An `int` that is `>= 1`.
-    The number of bits for probability quantization. Must be <= 16.
+  The number of bits for probability quantization. Must be <= 16.
 * <b>`overflow_width`</b>: An `int` that is `>= 1`.
-    The bit width of the variable-length overflow code. Must be <=
-    precision.
+  The bit width of the variable-length overflow code. Must be <=
+  precision.
 * <b>`debug_level`</b>: An optional `int`. Defaults to `1`.
 * <b>`name`</b>: A name for the operation (optional).
 

@@ -1,13 +1,24 @@
+<div itemscope itemtype="http://developers.google.com/ReferenceObject">
+<meta itemprop="name" content="tfc.python.layers.signal_conv" />
+<meta itemprop="path" content="Stable" />
+</div>
 
 # Module: tfc.python.layers.signal_conv
 
+Swiss army tool for convolutions.
 
 
-Defined in [`python/layers/signal_conv.py`](https://github.com/tensorflow/compression/tree/master/python/layers/signal_conv.py).
+
+
+<table class="tfo-github-link" align="left">
+<a target="_blank" href=https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/signal_conv.py>
+  <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+  View source on GitHub
+</a>
+</table>
 
 <!-- Placeholder for "Used in" -->
 
-Swiss army tool for convolutions.
 
 ## Classes
 

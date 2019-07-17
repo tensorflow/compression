@@ -1,5 +1,11 @@
+<div itemscope itemtype="http://developers.google.com/ReferenceObject">
+<meta itemprop="name" content="tfc.range_encode" />
+<meta itemprop="path" content="Stable" />
+</div>
 
 # tfc.range_encode
+
+Using the provided cumulative distribution functions (CDF) inside `cdf`, returns
 
 ### Aliases:
 
@@ -18,11 +24,9 @@ tfc.range_encode(
 
 
 
-Defined in [`python/ops/_range_coding_ops.py`](https://github.com/tensorflow/compression/tree/master/python/ops/_range_coding_ops.py).
+Defined in generated file: `python/ops/gen_range_coding_ops.py`
 
 <!-- Placeholder for "Used in" -->
-
-Using the provided cumulative distribution functions (CDF) inside `cdf`, returns
 
 a range-code of `data`.
 
@@ -56,7 +60,9 @@ The encoded string neither contains the shape information of the encoded data
 nor a termination symbol. Therefore the shape of the encoded data must be
 explicitly provided to the decoder.
 
-Implementation notes:
+#### Implementation notes:
+
+
 
 - Because of potential performance issues, the op does not check whether
 elements of `data` is in the correct range `[0, m)`, or if `cdf` satisfies
@@ -71,12 +77,13 @@ integers representing quantized probability mass rather than floating points.
 
 #### Args:
 
+
 * <b>`data`</b>: A `Tensor` of type `int16`. An int16 tensor.
 * <b>`cdf`</b>: A `Tensor` of type `int32`.
-    An int32 tensor representing the CDF's of `data`. Each integer is divided
-    by `2^precision` to represent a fraction.
+  An int32 tensor representing the CDF's of `data`. Each integer is divided
+  by `2^precision` to represent a fraction.
 * <b>`precision`</b>: An `int` that is `>= 1`.
-    The number of bits for probability quantization. Must be <= 16.
+  The number of bits for probability quantization. Must be <= 16.
 * <b>`debug_level`</b>: An optional `int`. Defaults to `1`. Either 0 or 1.
 * <b>`name`</b>: A name for the operation (optional).
 

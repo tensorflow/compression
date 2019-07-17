@@ -1,5 +1,11 @@
+<div itemscope itemtype="http://developers.google.com/ReferenceObject">
+<meta itemprop="name" content="tfc.irdft_matrix" />
+<meta itemprop="path" content="Stable" />
+</div>
 
 # tfc.irdft_matrix
+
+Matrix for implementing kernel reparameterization with `tf.matmul`.
 
 ### Aliases:
 
@@ -15,11 +21,15 @@ tfc.irdft_matrix(
 
 
 
-Defined in [`python/ops/spectral_ops.py`](https://github.com/tensorflow/compression/tree/master/python/ops/spectral_ops.py).
+
+<table class="tfo-github-link" align="left">
+<a target="_blank" href=https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/ops/spectral_ops.py>
+  <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+  View source on GitHub
+</a>
+</table>
 
 <!-- Placeholder for "Used in" -->
-
-Matrix for implementing kernel reparameterization with `tf.matmul`.
 
 This can be used to represent a kernel with the provided shape in the RDFT
 domain.
@@ -39,6 +49,7 @@ def create_kernel(init):
 ```
 
 #### Args:
+
 
 * <b>`shape`</b>: Iterable of integers. Shape of kernel to apply this matrix to.
 * <b>`dtype`</b>: `dtype` of returned matrix.

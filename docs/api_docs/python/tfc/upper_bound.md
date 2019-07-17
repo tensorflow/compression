@@ -1,5 +1,11 @@
+<div itemscope itemtype="http://developers.google.com/ReferenceObject">
+<meta itemprop="name" content="tfc.upper_bound" />
+<meta itemprop="path" content="Stable" />
+</div>
 
 # tfc.upper_bound
+
+Same as `tf.minimum`, but with helpful gradient for `inputs > bound`.
 
 ### Aliases:
 
@@ -17,11 +23,15 @@ tfc.upper_bound(
 
 
 
-Defined in [`python/ops/math_ops.py`](https://github.com/tensorflow/compression/tree/master/python/ops/math_ops.py).
+
+<table class="tfo-github-link" align="left">
+<a target="_blank" href=https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/ops/math_ops.py>
+  <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+  View source on GitHub
+</a>
+</table>
 
 <!-- Placeholder for "Used in" -->
-
-Same as `tf.minimum`, but with helpful gradient for `inputs > bound`.
 
 This function behaves just like `tf.minimum`, but the behavior of the gradient
 with respect to `inputs` for input values that hit the bound depends on
@@ -45,6 +55,7 @@ won't work reliably for all possible broadcasting scenarios.
 
 #### Args:
 
+
 * <b>`inputs`</b>: Input tensor.
 * <b>`bound`</b>: Upper bound for the input tensor.
 * <b>`gradient`</b>: 'disconnected', 'identity', or 'identity_if_towards' (default).
@@ -56,6 +67,8 @@ won't work reliably for all possible broadcasting scenarios.
 `tf.minimum(inputs, bound)`
 
 
+
 #### Raises:
+
 
 * <b>`ValueError`</b>: for invalid value of `gradient`.

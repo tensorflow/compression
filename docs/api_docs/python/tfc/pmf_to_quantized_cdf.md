@@ -1,5 +1,11 @@
+<div itemscope itemtype="http://developers.google.com/ReferenceObject">
+<meta itemprop="name" content="tfc.pmf_to_quantized_cdf" />
+<meta itemprop="path" content="Stable" />
+</div>
 
 # tfc.pmf_to_quantized_cdf
+
+Converts PMF to quantized CDF. This op uses floating-point operations
 
 ### Aliases:
 
@@ -16,11 +22,9 @@ tfc.pmf_to_quantized_cdf(
 
 
 
-Defined in [`python/ops/_range_coding_ops.py`](https://github.com/tensorflow/compression/tree/master/python/ops/_range_coding_ops.py).
+Defined in generated file: `python/ops/gen_range_coding_ops.py`
 
 <!-- Placeholder for "Used in" -->
-
-Converts PMF to quantized CDF. This op uses floating-point operations
 
 internally. Therefore the quantized output may not be consistent across multiple
 platforms. For entropy encoders and decoders to have the same quantized CDF on
@@ -35,6 +39,7 @@ by this op prior to quantization. Therefore the user is responsible for
 normalizing PMF if necessary.
 
 #### Args:
+
 
 * <b>`pmf`</b>: A `Tensor` of type `float32`.
 * <b>`precision`</b>: An `int` that is `>= 1`.

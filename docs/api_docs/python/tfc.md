@@ -1,13 +1,24 @@
+<div itemscope itemtype="http://developers.google.com/ReferenceObject">
+<meta itemprop="name" content="tfc" />
+<meta itemprop="path" content="Stable" />
+</div>
 
 # Module: tfc
 
+Data compression tools.
 
 
-Defined in [`__init__.py`](https://github.com/tensorflow/compression/tree/master/__init__.py).
+
+
+<table class="tfo-github-link" align="left">
+<a target="_blank" href=https://github.com/tensorflow/compression/tree/master/tensorflow_compression/__init__.py>
+  <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+  View source on GitHub
+</a>
+</table>
 
 <!-- Placeholder for "Used in" -->
 
-Data compression tools.
 
 ## Modules
 
@@ -41,15 +52,13 @@ Data compression tools.
 
 [`class SignalConv3D`](./tfc/SignalConv3D.md): 3D convolution layer.
 
-[`class StaticParameterizer`](./tfc/StaticParameterizer.md): A parameterizer that always returns a constant tensor.
+[`class StaticParameterizer`](./tfc/StaticParameterizer.md): A parameterizer that returns a non-variable.
 
 [`class SymmetricConditional`](./tfc/SymmetricConditional.md): Symmetric conditional entropy model.
 
 ## Functions
 
 [`array_fingerprint(...)`](./tfc/array_fingerprint.md): Produces fingerprint of the input data.
-
-[`check_array_fingerprint(...)`](./tfc/check_array_fingerprint.md): Computes the fingerprint of `input` and checks the computed value against
 
 [`irdft_matrix(...)`](./tfc/irdft_matrix.md): Matrix for implementing kernel reparameterization with `tf.matmul`.
 

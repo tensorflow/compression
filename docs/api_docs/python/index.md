@@ -17,7 +17,6 @@
 *  <a href="./tfc/StaticParameterizer.md"><code>tfc.StaticParameterizer</code></a>
 *  <a href="./tfc/SymmetricConditional.md"><code>tfc.SymmetricConditional</code></a>
 *  <a href="./tfc/array_fingerprint.md"><code>tfc.array_fingerprint</code></a>
-*  <a href="./tfc/check_array_fingerprint.md"><code>tfc.check_array_fingerprint</code></a>
 *  <a href="./tfc/irdft_matrix.md"><code>tfc.irdft_matrix</code></a>
 *  <a href="./tfc/lower_bound.md"><code>tfc.lower_bound</code></a>
 *  <a href="./tfc/pmf_to_quantized_cdf.md"><code>tfc.pmf_to_quantized_cdf</code></a>
@@ -51,7 +50,6 @@
 *  <a href="./tfc/same_padding_for_kernel.md"><code>tfc.python.ops.padding_ops.same_padding_for_kernel</code></a>
 *  <a href="./tfc/python/ops/range_coding_ops.md"><code>tfc.python.ops.range_coding_ops</code></a>
 *  <a href="./tfc/array_fingerprint.md"><code>tfc.python.ops.range_coding_ops.array_fingerprint</code></a>
-*  <a href="./tfc/check_array_fingerprint.md"><code>tfc.python.ops.range_coding_ops.check_array_fingerprint</code></a>
 *  <a href="./tfc/pmf_to_quantized_cdf.md"><code>tfc.python.ops.range_coding_ops.pmf_to_quantized_cdf</code></a>
 *  <a href="./tfc/range_decode.md"><code>tfc.python.ops.range_coding_ops.range_decode</code></a>
 *  <a href="./tfc/range_encode.md"><code>tfc.python.ops.range_coding_ops.range_encode</code></a>

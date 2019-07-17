@@ -1,5 +1,11 @@
+<div itemscope itemtype="http://developers.google.com/ReferenceObject">
+<meta itemprop="name" content="tfc.same_padding_for_kernel" />
+<meta itemprop="path" content="Stable" />
+</div>
 
 # tfc.same_padding_for_kernel
+
+Determine correct amount of padding for `same` convolution.
 
 ### Aliases:
 
@@ -16,11 +22,15 @@ tfc.same_padding_for_kernel(
 
 
 
-Defined in [`python/ops/padding_ops.py`](https://github.com/tensorflow/compression/tree/master/python/ops/padding_ops.py).
+
+<table class="tfo-github-link" align="left">
+<a target="_blank" href=https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/ops/padding_ops.py>
+  <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+  View source on GitHub
+</a>
+</table>
 
 <!-- Placeholder for "Used in" -->
-
-Determine correct amount of padding for `same` convolution.
 
 To implement `'same'` convolutions, we first pad the image, and then perform a
 `'valid'` convolution or correlation. Given the kernel shape, this function
@@ -29,11 +39,12 @@ or correlation is the same size as the pre-padded input.
 
 #### Args:
 
+
 * <b>`shape`</b>: Shape of the convolution kernel (without the channel dimensions).
 * <b>`corr`</b>: Boolean. If `True`, assume cross correlation, if `False`, convolution.
 * <b>`strides_up`</b>: If this is used for an upsampled convolution, specify the
-    strides here. (For downsampled convolutions, specify `(1, 1)`: in that
-    case, the strides don't matter.)
+  strides here. (For downsampled convolutions, specify `(1, 1)`: in that
+  case, the strides don't matter.)
 
 
 #### Returns:

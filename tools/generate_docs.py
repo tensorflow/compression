@@ -37,13 +37,19 @@ def main(_):
       root_title="TensorFlow/compression",
       py_modules=[("tfc", tfc)],
       base_dir=os.path.dirname(tfc.__file__),
-      code_url_prefix="https://github.com/tensorflow/compression/tree/master",
+      private_map={
+          "tfc.python.ops": ["gen_range_coding_ops", "namespace_helper"],
+      },
+      code_url_prefix="https://github.com/tensorflow/compression/tree/master/"
+                      "tensorflow_compression",
       api_cache=False,
   )
   sys.exit(doc_generator.build(FLAGS.output_dir))
 
 
 if __name__ == "__main__":
-  flags.DEFINE_string("output_dir", "/tmp/api_docs/python", "Output directory.")
+  flags.DEFINE_string(
+      "output_dir", "/tmp/tensorflow_compression/api_docs/python",
+      "Output directory.")
 
   app.run(main)

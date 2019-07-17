@@ -1,21 +1,32 @@
+<div itemscope itemtype="http://developers.google.com/ReferenceObject">
+<meta itemprop="name" content="tfc.python.layers.parameterizers" />
+<meta itemprop="path" content="Stable" />
+</div>
 
 # Module: tfc.python.layers.parameterizers
 
+Parameterizers for layer classes.
 
 
-Defined in [`python/layers/parameterizers.py`](https://github.com/tensorflow/compression/tree/master/python/layers/parameterizers.py).
+
+
+<table class="tfo-github-link" align="left">
+<a target="_blank" href=https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/parameterizers.py>
+  <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+  View source on GitHub
+</a>
+</table>
 
 <!-- Placeholder for "Used in" -->
 
-Parameterizers for layer classes.
 
 ## Classes
 
-[`class Parameterizer`](../../../tfc/Parameterizer.md): Parameterization object (abstract base class).
+[`class NonnegativeParameterizer`](../../../tfc/NonnegativeParameterizer.md): Object encapsulating nonnegative parameterization as needed for GDN.
 
-[`class StaticParameterizer`](../../../tfc/StaticParameterizer.md): A parameterizer that always returns a constant tensor.
+[`class Parameterizer`](../../../tfc/Parameterizer.md): Parameterization object (abstract base class).
 
 [`class RDFTParameterizer`](../../../tfc/RDFTParameterizer.md): Object encapsulating RDFT reparameterization.
 
-[`class NonnegativeParameterizer`](../../../tfc/NonnegativeParameterizer.md): Object encapsulating nonnegative parameterization as needed for GDN.
+[`class StaticParameterizer`](../../../tfc/StaticParameterizer.md): A parameterizer that returns a non-variable.
 

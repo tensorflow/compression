@@ -1,7 +1,15 @@
+<div itemscope itemtype="http://developers.google.com/ReferenceObject">
+<meta itemprop="name" content="tfc.IdentityInitializer" />
+<meta itemprop="path" content="Stable" />
+<meta itemprop="property" content="__call__"/>
+<meta itemprop="property" content="__init__"/>
+</div>
 
 # tfc.IdentityInitializer
 
 ## Class `IdentityInitializer`
+
+Initialize to the identity kernel with the given shape.
 
 
 
@@ -12,11 +20,15 @@
 
 
 
-Defined in [`python/layers/initializers.py`](https://github.com/tensorflow/compression/tree/master/python/layers/initializers.py).
+
+<table class="tfo-github-link" align="left">
+<a target="_blank" href=https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/initializers.py>
+  <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+  View source on GitHub
+</a>
+</table>
 
 <!-- Placeholder for "Used in" -->
-
-Initialize to the identity kernel with the given shape.
 
 This creates an n-D kernel suitable for `SignalConv*` with the requested
 support that produces an output identical to its input (except possibly at the
@@ -27,10 +39,13 @@ matrices, not for n-D convolution kernels (i.e., no spatial support).
 
 <h2 id="__init__"><code>__init__</code></h2>
 
+<a target="_blank" href=https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/initializers.py>View source</a>
+
 ``` python
 __init__(gain=1)
 ```
 
+Initialize self.  See help(type(self)) for accurate signature.
 
 
 
@@ -38,6 +53,8 @@ __init__(gain=1)
 ## Methods
 
 <h3 id="__call__"><code>__call__</code></h3>
+
+<a target="_blank" href=https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/initializers.py>View source</a>
 
 ``` python
 __call__(
@@ -47,6 +64,7 @@ __call__(
 )
 ```
 
+Call self as a function.
 
 
 
