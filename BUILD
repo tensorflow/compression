@@ -35,6 +35,7 @@ py_binary(
         "//tensorflow_compression/python/layers:py_src",
         "//tensorflow_compression/python/ops:py_src",
     ],
+    python_version = "PY3",
 )
 
 py_binary(
