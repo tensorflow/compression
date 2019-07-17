@@ -22,6 +22,21 @@ For an introduction to lossy image compression with machine learning, take a
 look at @jonycgn's
 [talk on Learned Image Compression](https://www.youtube.com/watch?v=x_q7cZviXkY).
 
+## Documentation & getting help
+
+For usage questions and discussions, please head over to our
+[Google group](https://groups.google.com/forum/#!forum/tensorflow-compression).
+
+Refer to
+[the API documentation](https://tensorflow.github.io/compression/docs/api_docs/python/tfc.html)
+for a complete description of the Keras layers and TensorFlow ops this package
+implements.
+
+There's also an introduction to our `EntropyBottleneck` class
+[here](https://tensorflow.github.io/compression/docs/entropy_bottleneck.html),
+and a description of the range coding operators
+[here](https://tensorflow.github.io/compression/docs/range_coding.html).
+
 ## Quick start
 
 ### Installing release 1.1 (stable)
@@ -48,25 +63,26 @@ cd compression-1.1
 for i in tensorflow_compression/python/*/*_test.py; do python $i; done
 ```
 
-### Installing release 1.2b1 (beta)
+### Installing release 1.2b2 (beta)
 
 Set up an environment in which you can install precompiled binary Python
 packages using the `pip` command. Refer to the
 [TensorFlow installation instructions](https://www.tensorflow.org/install/pip)
 for more information on how to set up such a Python environment.
 
-Run the following command to install the binary PIP package:
+Install TensorFlow 1.14 or above with or without GPU support:
+```bash
+pip install tensorflow
+```
+or
+```bash
+pip install tensorflow-gpu
+```
 
+Then, run the following command to install the binary PIP package:
 ```bash
 pip install tensorflow-compression
 ```
-
-***Note: for this beta release, we only support Python 2.7 and 3.4 versions on
-Linux platforms. We are working on Darwin (Mac) binaries as well. For the time
-being, if you need to run the beta release on Mac, we suggest to use Docker
-Desktop for Mac, and run the above command inside a container based on the
-[TensorFlow docker image](https://www.tensorflow.org/install/docker) for
-Python 2.7.***
 
 ### Using the library
 
@@ -161,28 +177,13 @@ python bls2017.py [options] compress original.png compressed.bin
 python bls2017.py [options] decompress compressed.bin reconstruction.png
 ```
 
-## Help & documentation
+## Building PIP packages
 
-For usage questions and discussions, please head over to our
-[Google group](https://groups.google.com/forum/#!forum/tensorflow-compression).
+This section describes steps to build PIP packages.
 
-Refer to
-[the API documentation](https://tensorflow.github.io/compression/docs/api_docs/python/tfc.html)
-for a complete description of the Keras layers and TensorFlow ops this package
-implements.
-
-There's also an introduction to our `EntropyBottleneck` class
-[here](https://tensorflow.github.io/compression/docs/entropy_bottleneck.html),
-and a description of the range coding operators
-[here](https://tensorflow.github.io/compression/docs/range_coding.html).
-
-## Building PIP package
-
-This section describes steps to build PIP package.
-
-Docker image `tensorflow/tensorflow:custom-op` is used for PIP package build.
-Note that this is different from `tensorflow/tensorflow:devel`. To be compatible
-with TensorFlow PIP package, the GCC version must match, but
+We use the Docker image `tensorflow/tensorflow:nightly-custom-op` for building 
+PIP packages. Note that this is different from `tensorflow/tensorflow:devel`. To 
+be compatible with the TensorFlow PIP package, the GCC version must match, but
 `tensorflow/tensorflow:devel` has a different GCC version installed.
 
 Inside a Docker container from the image, the following steps need to be done.
@@ -193,16 +194,15 @@ Inside a Docker container from the image, the following steps need to be done.
 
 ```bash
 sudo docker run -v /tmp/tensorflow_compression:/tmp/tensorflow_compression \
-    tensorflow/tensorflow:custom-op \
+    tensorflow/tensorflow:nightly-custom-op \
     bash -c "pip install tensorflow &&
     git clone https://github.com/tensorflow/compression.git
     /tensorflow_compression && cd /tensorflow_compression &&
-    bazel run -c opt :build_pip_pkg"
+    bazel run -c opt --copt=-mavx :build_pip_pkg"
 ```
 
 The wheel file is created inside `/tmp/tensorflow_compression`. Optimization
-flags can be passed via `--copt` to the `bazel run` command above. For example,
-`bazel` command above can be `bazel run -c opt --copt=-mavx :build_pip_pkg`.
+flags can be passed via `--copt` to the `bazel run` command above.
 
 ### Testing PIP package
 
@@ -213,7 +213,7 @@ pip install /tmp/tensorflow_compression/tensorflow_compression-*.whl
 ```
 
 And run tests. (Do not run the tests in the workspace directory where
-`WORKSPACE` of `tensorflow_compression` repo lives. In that case, Python
+`WORKSPACE` of `tensorflow_compression` repo lives. In that case, the Python
 interpreter attempts to import `tensorflow_compression` packages from the source
 tree rather than from the installed package system directory.)
 
