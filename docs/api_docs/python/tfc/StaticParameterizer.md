@@ -22,7 +22,7 @@ Inherits From: [`Parameterizer`](../tfc/Parameterizer.md)
 
 
 <table class="tfo-github-link" align="left">
-<a target="_blank" href=https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/parameterizers.py>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/parameterizers.py">
   <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
   View source on GitHub
 </a>
@@ -42,7 +42,7 @@ changes.
 
 <h2 id="__init__"><code>__init__</code></h2>
 
-<a target="_blank" href=https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/parameterizers.py>View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/parameterizers.py">View source</a>
 
 ``` python
 __init__(value)
@@ -57,7 +57,7 @@ Initialize self.  See help(type(self)) for accurate signature.
 
 <h3 id="__call__"><code>__call__</code></h3>
 
-<a target="_blank" href=https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/parameterizers.py>View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/parameterizers.py">View source</a>
 
 ``` python
 __call__(

@@ -11,7 +11,7 @@ Data compression tools.
 
 
 <table class="tfo-github-link" align="left">
-<a target="_blank" href=https://github.com/tensorflow/compression/tree/master/tensorflow_compression/__init__.py>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/__init__.py">
   <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
   View source on GitHub
 </a>
@@ -57,8 +57,6 @@ Data compression tools.
 [`class SymmetricConditional`](./tfc/SymmetricConditional.md): Symmetric conditional entropy model.
 
 ## Functions
-
-[`array_fingerprint(...)`](./tfc/array_fingerprint.md): Produces fingerprint of the input data.
 
 [`irdft_matrix(...)`](./tfc/irdft_matrix.md): Matrix for implementing kernel reparameterization with `tf.matmul`.
 

@@ -1,4 +1,4 @@
-# TensorFlow Compression
+# Introduction
 
 This project contains data compression ops and layers for TensorFlow. The
 project website is at
@@ -37,54 +37,44 @@ There's also an introduction to our `EntropyBottleneck` class
 and a description of the range coding operators
 [here](https://tensorflow.github.io/compression/docs/range_coding.html).
 
-## Quick start
+## Installation
 
-### Installing release 1.1 (stable)
-
-Install TensorFlow 1.13 using one of the methods described in the
-[TensorFlow installation instructions](https://www.tensorflow.org/install).
-
-Download the ZIP file for
-[release v1.1](https://github.com/tensorflow/compression/releases/tag/v1.1)
-and unpack it. Then include its root directory in your `PYTHONPATH`
-environment variable:
-
-```bash
-cd <target directory>
-wget https://github.com/tensorflow/compression/archive/v1.1.zip
-unzip v1.1.zip
-export PYTHONPATH="$PWD/compression-1.1:$PYTHONPATH"
-```
-
-To make sure the library imports succeed, try running the unit tests:
-
-```bash
-cd compression-1.1
-for i in tensorflow_compression/python/*/*_test.py; do python $i; done
-```
-
-### Installing release 1.2b2 (beta)
+***Note: Precompiled packages are currently only provided for Linux and Darwin
+(Mac OS). To use these packages on Windows, consider using a [TensorFlow
+Docker image](https://www.tensorflow.org/install/docker) and installing
+tensorflow-compression using pip inside the Docker container.***
 
 Set up an environment in which you can install precompiled binary Python
 packages using the `pip` command. Refer to the
 [TensorFlow installation instructions](https://www.tensorflow.org/install/pip)
 for more information on how to set up such a Python environment.
 
-Install TensorFlow 1.14 or above with or without GPU support:
-```bash
-pip install tensorflow
-```
-or
+The current version of tensorflow-compression requires TensorFlow 1.14 or
+above. You can install TensorFlow from any source. To install it via `pip`, run
+the following command:
 ```bash
 pip install tensorflow-gpu
 ```
+for GPU support, or
+```bash
+pip install tensorflow
+```
+for CPU-only.
 
-Then, run the following command to install the binary PIP package:
+Then, run the following command to install the tensorflow-compression `pip`
+package:
 ```bash
 pip install tensorflow-compression
 ```
 
-### Using the library
+To test that the installation works correctly, you can run the unit tests with
+```bash
+python -m tensorflow_compression.python.all_test
+```
+Once the command finishes, you should see a message ```OK (skipped=11)``` or
+similar in the last line.
+
+## Usage
 
 We recommend importing the library from your Python code as follows:
 
@@ -95,31 +85,23 @@ import tensorflow_compression as tfc
 
 ### Using a pre-trained model to compress an image
 
-***Note: you need to have a release >1.1 installed for pre-trained model
-support.***
-
 In the
 [examples directory](https://github.com/tensorflow/compression/tree/master/examples),
 you'll find a python script `tfci.py`. Download the file and run:
-
 ```bash
 python tfci.py -h
 ```
 
 This will give you a list of options. Briefly, the command
-
 ```bash
 python tfci.py compress <model> <PNG file>
 ```
-
 will compress an image using a pre-trained model and write a file ending in
 `.tfci`. Execute `python tfci.py models` to give you a list of supported
 pre-trained models. The command
-
 ```bash
 python tfci.py decompress <TFCI file>
 ```
-
 will decompress a TFCI file and write a PNG file. By default, an output file
 will be named like the input file, only with the appropriate file extension
 appended (any existing extensions will not be removed).
@@ -135,7 +117,6 @@ contains an implementation of the image compression model described in:
 > https://arxiv.org/abs/1611.01704
 
 To see a list of options, download the file `bls2017.py` and run:
-
 ```bash
 python bls2017.py -h
 ```
@@ -143,7 +124,6 @@ python bls2017.py -h
 To train the model, you need to supply it with a dataset of RGB training images.
 They should be provided in PNG format. Training can be as simple as the
 following command:
-
 ```bash
 python bls2017.py -v --train_glob="images/*.png" train
 ```
@@ -163,7 +143,6 @@ enough (or larger). This is described in more detail in:
 If you wish, you can monitor progress with Tensorboard. To do this, create a
 Tensorboard instance in the background before starting the training, then point
 your web browser to [port 6006 on your machine](http://localhost:6006):
-
 ```bash
 tensorboard --logdir=. &
 ```
@@ -171,26 +150,27 @@ tensorboard --logdir=. &
 When training has finished, the Python script can be used to compress and
 decompress images as follows. The same model checkpoint must be accessible to
 both commands.
-
 ```bash
 python bls2017.py [options] compress original.png compressed.bin
 python bls2017.py [options] decompress compressed.bin reconstruction.png
 ```
 
-## Building PIP packages
+## Building `pip` packages
 
-This section describes steps to build PIP packages.
+This section describes the necessary steps to build your own `pip` packages of
+tensorflow-compression. This may be necessary to install it on platforms for
+which we don't provide precompiled binaries (currently only Linux and Darwin).
 
-We use the Docker image `tensorflow/tensorflow:nightly-custom-op` for building 
-PIP packages. Note that this is different from `tensorflow/tensorflow:devel`. To 
-be compatible with the TensorFlow PIP package, the GCC version must match, but
-`tensorflow/tensorflow:devel` has a different GCC version installed.
+We use the Docker image `tensorflow/tensorflow:nightly-custom-op` for building
+`pip` packages. Note that this is different from `tensorflow/tensorflow:devel`.
+To be compatible with the TensorFlow `pip` package, the GCC version must match,
+but `tensorflow/tensorflow:devel` has a different GCC version installed.
 
-Inside a Docker container from the image, the following steps need to be done.
+Inside a Docker container from the image, the following steps need to be taken.
 
-1. Install TensorFlow PIP package.
-2. Clone `tensorflow-compression` repo from GitHub.
-3. Run `:build_pip_pkg` inside the cloned repo.
+1. Install TensorFlow `pip` package.
+2. Clone the `tensorflow/compression` repo from GitHub.
+3. Run `:build_pip_pkg` inside the cloned repo:
 
 ```bash
 sudo docker run -v /tmp/tensorflow_compression:/tmp/tensorflow_compression \
@@ -204,28 +184,22 @@ sudo docker run -v /tmp/tensorflow_compression:/tmp/tensorflow_compression \
 The wheel file is created inside `/tmp/tensorflow_compression`. Optimization
 flags can be passed via `--copt` to the `bazel run` command above.
 
-### Testing PIP package
-
-First install the built wheel file.
-
+To test the created package, first install the resulting wheel file:
 ```bash
 pip install /tmp/tensorflow_compression/tensorflow_compression-*.whl
 ```
 
-And run tests. (Do not run the tests in the workspace directory where
+Then run the unit tests (Do not run the tests in the workspace directory where
 `WORKSPACE` of `tensorflow_compression` repo lives. In that case, the Python
-interpreter attempts to import `tensorflow_compression` packages from the source
-tree rather than from the installed package system directory.)
-
+interpreter would attempt to import `tensorflow_compression` packages from the
+source tree rather than from the installed package system directory):
 ```bash
 pushd /tmp
 python -m tensorflow_compression.python.all_test
 popd
 ```
 
-When done, uninstall the PIP package. The package name is
-`tensorflow-compression` with a hyphen(-).
-
+When done, you can uninstall the `pip` package again:
 ```bash
 pip uninstall tensorflow-compression
 ```

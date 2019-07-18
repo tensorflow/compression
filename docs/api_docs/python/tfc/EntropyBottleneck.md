@@ -70,7 +70,7 @@ Inherits From: [`EntropyModel`](../tfc/EntropyModel.md)
 
 
 <table class="tfo-github-link" align="left">
-<a target="_blank" href=https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/entropy_models.py>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/entropy_models.py">
   <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
   View source on GitHub
 </a>
@@ -177,7 +177,7 @@ Read-only properties:
 
 <h2 id="__init__"><code>__init__</code></h2>
 
-<a target="_blank" href=https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/entropy_models.py>View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/entropy_models.py">View source</a>
 
 ``` python
 __init__(
@@ -531,7 +531,7 @@ Output tensor(s).
 
 <h3 id="build"><code>build</code></h3>
 
-<a target="_blank" href=https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/entropy_models.py>View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/entropy_models.py">View source</a>
 
 ``` python
 build(input_shape)
@@ -559,7 +559,7 @@ cumulative density functions used by the range coder.
 
 <h3 id="compress"><code>compress</code></h3>
 
-<a target="_blank" href=https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/entropy_models.py>View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/entropy_models.py">View source</a>
 
 ``` python
 compress(inputs)
@@ -614,7 +614,7 @@ None or a tensor (or list of tensors,
 
 <h3 id="compute_output_shape"><code>compute_output_shape</code></h3>
 
-<a target="_blank" href=https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/entropy_models.py>View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/entropy_models.py">View source</a>
 
 ``` python
 compute_output_shape(input_shape)
@@ -663,7 +663,7 @@ An integer count.
 
 <h3 id="decompress"><code>decompress</code></h3>
 
-<a target="_blank" href=https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/entropy_models.py>View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/entropy_models.py">View source</a>
 
 ``` python
 decompress(

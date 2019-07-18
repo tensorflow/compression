@@ -11,7 +11,7 @@ Range coding operations.
 
 
 <table class="tfo-github-link" align="left">
-<a target="_blank" href=https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/ops/range_coding_ops.py>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/ops/range_coding_ops.py">
   <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
   View source on GitHub
 </a>
@@ -21,8 +21,6 @@ Range coding operations.
 
 
 ## Functions
-
-[`array_fingerprint(...)`](../../../tfc/array_fingerprint.md): Produces fingerprint of the input data.
 
 [`pmf_to_quantized_cdf(...)`](../../../tfc/pmf_to_quantized_cdf.md): Converts PMF to quantized CDF. This op uses floating-point operations
 

@@ -22,7 +22,7 @@ Initialize to the identity kernel with the given shape.
 
 
 <table class="tfo-github-link" align="left">
-<a target="_blank" href=https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/initializers.py>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/initializers.py">
   <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
   View source on GitHub
 </a>
@@ -39,7 +39,7 @@ matrices, not for n-D convolution kernels (i.e., no spatial support).
 
 <h2 id="__init__"><code>__init__</code></h2>
 
-<a target="_blank" href=https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/initializers.py>View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/initializers.py">View source</a>
 
 ``` python
 __init__(gain=1)
@@ -54,7 +54,7 @@ Initialize self.  See help(type(self)) for accurate signature.
 
 <h3 id="__call__"><code>__call__</code></h3>
 
-<a target="_blank" href=https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/initializers.py>View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/initializers.py">View source</a>
 
 ``` python
 __call__(

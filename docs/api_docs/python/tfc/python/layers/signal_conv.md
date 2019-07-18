@@ -11,7 +11,7 @@ Swiss army tool for convolutions.
 
 
 <table class="tfo-github-link" align="left">
-<a target="_blank" href=https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/signal_conv.py>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/signal_conv.py">
   <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
   View source on GitHub
 </a>
