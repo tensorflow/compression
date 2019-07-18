@@ -270,16 +270,5 @@ by this op prior to quantization. Therefore the user is responsible for
 normalizing PMF if necessary.
 )doc");
 
-REGISTER_OP("ArrayFingerprint")
-    .Input("input: T")
-    .Output("fingerprint: int64")
-    .Attr("T: realnumbertype")
-    .SetShapeFn(shape_inference::ScalarShape)
-    .Doc(R"doc(
-Produces fingerprint of the input data.
-
-input: Tensor to be fingerprinted.
-fingerprint: Fingerprint value of input.
-)doc");
 }  // namespace
 }  // namespace tensorflow_compression

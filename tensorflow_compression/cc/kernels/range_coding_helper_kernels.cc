@@ -31,7 +31,6 @@ limitations under the License.
 #include "tensorflow/core/platform/logging.h"
 #include "tensorflow/core/platform/macros.h"
 #include "tensorflow/core/platform/types.h"
-#include "external/farmhash_archive/src/farmhash.h"
 
 namespace tensorflow_compression {
 namespace {
@@ -207,30 +206,5 @@ class PmfToCdfOp : public OpKernel {
 REGISTER_KERNEL_BUILDER(Name("PmfToQuantizedCdf").Device(DEVICE_CPU),
                         PmfToCdfOp);
 
-class ArrayFingerprintOp : public tensorflow::OpKernel {
- public:
-  using OpKernel::OpKernel;
-
-  void Compute(tensorflow::OpKernelContext* context) override {
-    const Tensor& input = context->input(0);
-    OP_REQUIRES(context, tensorflow::DataTypeCanUseMemcpy(input.dtype()),
-                InvalidArgument("Data type not supported: ",
-                                tensorflow::DataTypeString(input.dtype())));
-
-    const int64 size =
-        input.shape().num_elements() * tensorflow::DataTypeSize(input.dtype());
-    auto data = input.bit_casted_shaped<char, 1>({size});
-
-    Tensor* output;
-    OP_REQUIRES_OK(context,
-                   context->allocate_output(0, TensorShape{}, &output));
-
-    output->scalar<int64>()() =
-        ::util::Fingerprint64(data.data(), static_cast<size_t>(data.size()));
-  }
-};
-
-REGISTER_KERNEL_BUILDER(Name("ArrayFingerprint").Device(tensorflow::DEVICE_CPU),
-                        ArrayFingerprintOp);
 }  // namespace
 }  // namespace tensorflow_compression
