@@ -248,6 +248,11 @@ def decompress():
 
   y_shape = [int(s) for s in y_shape] + [args.num_filters]
 
+  # Create a no-op analysis transform so that the name scopes in the checkpoint
+  # match.
+  analysis_transform(
+      tf.placeholder(tf.float32, (1, None, None, 3)), args.num_filters)
+
   # Add a batch dimension, then decompress and transform the image back.
   strings = tf.expand_dims(string, 0)
   entropy_bottleneck = tfc.EntropyBottleneck(dtype=tf.float32)
@@ -257,7 +262,7 @@ def decompress():
 
   # Remove batch dimension, and crop away any extraneous padding on the bottom
   # or right boundaries.
-  x_hat = x_hat[0, :x_shape[0], :x_shape[1], :]
+  x_hat = x_hat[0, :int(x_shape[0]), :int(x_shape[1]), :]
 
   # Write reconstructed image out as a PNG file.
   op = save_image(args.output, x_hat)
