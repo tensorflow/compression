@@ -40,6 +40,12 @@ py_binary(
 )
 
 py_binary(
+    name = "generate_docs",
+    srcs = ["tools/generate_docs.py"],
+    deps = [":tensorflow_compression"],
+)
+
+py_binary(
     name = "tfci",
     srcs = ["examples/tfci.py"],
     deps = [":tensorflow_compression"],
@@ -52,7 +58,7 @@ py_binary(
 )
 
 py_binary(
-    name = "generate_docs",
-    srcs = ["tools/generate_docs.py"],
+    name = "bmshj2018",
+    srcs = ["examples/bmshj2018.py"],
     deps = [":tensorflow_compression"],
 )

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2018 Google LLC. All Rights Reserved.
+# Copyright 2019 Google LLC. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,15 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Basic nonlinear transform coder for RGB images.
+"""Nonlinear transform coder with hyperprior for RGB images.
 
-This is a close approximation of the image compression model published in:
-J. Ballé, V. Laparra, E.P. Simoncelli (2017):
-"End-to-end Optimized Image Compression"
-Int. Conf. on Learning Representations (ICLR), 2017
-https://arxiv.org/abs/1611.01704
-
-With patches from Victor Xing <victor.t.xing@gmail.com>
+This is the image compression model published in:
+J. Ballé, D. Minnen, S. Singh, S.J. Hwang, N. Johnston:
+"Variational Image Compression with a Scale Hyperprior"
+Int. Conf. on Learning Representations (ICLR), 2018
+https://arxiv.org/abs/1802.01436
 
 This is meant as 'educational' code - you can use this to get started with your
 own experiments. To reproduce the exact results from the paper, tuning of hyper-
@@ -43,6 +41,11 @@ import numpy as np
 import tensorflow as tf
 
 import tensorflow_compression as tfc
+
+
+SCALES_MIN = 0.11
+SCALES_MAX = 256
+SCALES_LEVELS = 64
 
 
 # TODO(jonycgn): Use tfc.PackedTensors once new binary packages have been built.
@@ -149,7 +152,7 @@ class AnalysisTransform(tf.keras.layers.Layer):
   def build(self, input_shape):
     self._layers = [
         tfc.SignalConv2D(
-            self.num_filters, (9, 9), name="layer_0", corr=True, strides_down=4,
+            self.num_filters, (5, 5), name="layer_0", corr=True, strides_down=2,
             padding="same_zeros", use_bias=True,
             activation=tfc.GDN(name="gdn_0")),
         tfc.SignalConv2D(
@@ -158,7 +161,11 @@ class AnalysisTransform(tf.keras.layers.Layer):
             activation=tfc.GDN(name="gdn_1")),
         tfc.SignalConv2D(
             self.num_filters, (5, 5), name="layer_2", corr=True, strides_down=2,
-            padding="same_zeros", use_bias=False,
+            padding="same_zeros", use_bias=True,
+            activation=tfc.GDN(name="gdn_2")),
+        tfc.SignalConv2D(
+            self.num_filters, (5, 5), name="layer_3", corr=True, strides_down=2,
+            padding="same_zeros", use_bias=True,
             activation=None),
     ]
     super(AnalysisTransform, self).build(input_shape)
@@ -187,11 +194,75 @@ class SynthesisTransform(tf.keras.layers.Layer):
             padding="same_zeros", use_bias=True,
             activation=tfc.GDN(name="igdn_1", inverse=True)),
         tfc.SignalConv2D(
-            3, (9, 9), name="layer_2", corr=False, strides_up=4,
+            self.num_filters, (5, 5), name="layer_2", corr=False, strides_up=2,
+            padding="same_zeros", use_bias=True,
+            activation=tfc.GDN(name="igdn_2", inverse=True)),
+        tfc.SignalConv2D(
+            3, (5, 5), name="layer_3", corr=False, strides_up=2,
             padding="same_zeros", use_bias=True,
             activation=None),
     ]
     super(SynthesisTransform, self).build(input_shape)
+
+  def call(self, tensor):
+    for layer in self._layers:
+      tensor = layer(tensor)
+    return tensor
+
+
+class HyperAnalysisTransform(tf.keras.layers.Layer):
+  """The analysis transform for the entropy model parameters."""
+
+  def __init__(self, num_filters, *args, **kwargs):
+    self.num_filters = num_filters
+    super(HyperAnalysisTransform, self).__init__(*args, **kwargs)
+
+  def build(self, input_shape):
+    self._layers = [
+        tfc.SignalConv2D(
+            self.num_filters, (3, 3), name="layer_0", corr=True, strides_down=1,
+            padding="same_zeros", use_bias=True,
+            activation=tf.nn.relu),
+        tfc.SignalConv2D(
+            self.num_filters, (5, 5), name="layer_1", corr=True, strides_down=2,
+            padding="same_zeros", use_bias=True,
+            activation=tf.nn.relu),
+        tfc.SignalConv2D(
+            self.num_filters, (5, 5), name="layer_2", corr=True, strides_down=2,
+            padding="same_zeros", use_bias=False,
+            activation=None),
+    ]
+    super(HyperAnalysisTransform, self).build(input_shape)
+
+  def call(self, tensor):
+    for layer in self._layers:
+      tensor = layer(tensor)
+    return tensor
+
+
+class HyperSynthesisTransform(tf.keras.layers.Layer):
+  """The synthesis transform for the entropy model parameters."""
+
+  def __init__(self, num_filters, *args, **kwargs):
+    self.num_filters = num_filters
+    super(HyperSynthesisTransform, self).__init__(*args, **kwargs)
+
+  def build(self, input_shape):
+    self._layers = [
+        tfc.SignalConv2D(
+            self.num_filters, (5, 5), name="layer_0", corr=False, strides_up=2,
+            padding="same_zeros", use_bias=True, kernel_parameterizer=None,
+            activation=tf.nn.relu),
+        tfc.SignalConv2D(
+            self.num_filters, (5, 5), name="layer_1", corr=False, strides_up=2,
+            padding="same_zeros", use_bias=True, kernel_parameterizer=None,
+            activation=tf.nn.relu),
+        tfc.SignalConv2D(
+            self.num_filters, (3, 3), name="layer_2", corr=False, strides_up=1,
+            padding="same_zeros", use_bias=True, kernel_parameterizer=None,
+            activation=None),
+    ]
+    super(HyperSynthesisTransform, self).build(input_shape)
 
   def call(self, tensor):
     for layer in self._layers:
@@ -227,16 +298,25 @@ def train(args):
 
   # Instantiate model.
   analysis_transform = AnalysisTransform(args.num_filters)
-  entropy_bottleneck = tfc.EntropyBottleneck()
   synthesis_transform = SynthesisTransform(args.num_filters)
+  hyper_analysis_transform = HyperAnalysisTransform(args.num_filters)
+  hyper_synthesis_transform = HyperSynthesisTransform(args.num_filters)
+  entropy_bottleneck = tfc.EntropyBottleneck()
 
-  # Build autoencoder.
+  # Build autoencoder and hyperprior.
   y = analysis_transform(x)
-  y_tilde, likelihoods = entropy_bottleneck(y, training=True)
+  z = hyper_analysis_transform(abs(y))
+  z_tilde, z_likelihoods = entropy_bottleneck(z, training=True)
+  sigma = hyper_synthesis_transform(z_tilde)
+  scale_table = np.exp(np.linspace(
+      np.log(SCALES_MIN), np.log(SCALES_MAX), SCALES_LEVELS))
+  conditional_bottleneck = tfc.GaussianConditional(sigma, scale_table)
+  y_tilde, y_likelihoods = conditional_bottleneck(y, training=True)
   x_tilde = synthesis_transform(y_tilde)
 
   # Total number of bits divided by number of pixels.
-  train_bpp = tf.reduce_sum(tf.log(likelihoods)) / (-np.log(2) * num_pixels)
+  train_bpp = (tf.reduce_sum(tf.log(y_likelihoods)) +
+               tf.reduce_sum(tf.log(z_likelihoods))) / (-np.log(2) * num_pixels)
 
   # Mean squared error across pixels.
   train_mse = tf.reduce_mean(tf.squared_difference(x, x_tilde))
@@ -284,21 +364,31 @@ def compress(args):
 
   # Instantiate model.
   analysis_transform = AnalysisTransform(args.num_filters)
-  entropy_bottleneck = tfc.EntropyBottleneck()
   synthesis_transform = SynthesisTransform(args.num_filters)
+  hyper_analysis_transform = HyperAnalysisTransform(args.num_filters)
+  hyper_synthesis_transform = HyperSynthesisTransform(args.num_filters)
+  entropy_bottleneck = tfc.EntropyBottleneck()
 
   # Transform and compress the image.
   y = analysis_transform(x)
-  string = entropy_bottleneck.compress(y)
+  z = hyper_analysis_transform(abs(y))
+  z_hat, z_likelihoods = entropy_bottleneck(z, training=False)
+  sigma = hyper_synthesis_transform(z_hat)
+  scale_table = np.exp(np.linspace(
+      np.log(SCALES_MIN), np.log(SCALES_MAX), SCALES_LEVELS))
+  conditional_bottleneck = tfc.GaussianConditional(sigma, scale_table)
+  side_string = entropy_bottleneck.compress(z)
+  string = conditional_bottleneck.compress(y)
 
   # Transform the quantized image back (if requested).
-  y_hat, likelihoods = entropy_bottleneck(y, training=False)
+  y_hat, y_likelihoods = conditional_bottleneck(y, training=False)
   x_hat = synthesis_transform(y_hat)
 
   num_pixels = tf.cast(tf.reduce_prod(tf.shape(x)[:-1]), dtype=tf.float32)
 
   # Total number of bits divided by number of pixels.
-  eval_bpp = tf.reduce_sum(tf.log(likelihoods)) / (-np.log(2) * num_pixels)
+  eval_bpp = (tf.reduce_sum(tf.log(y_likelihoods)) +
+              tf.reduce_sum(tf.log(z_likelihoods))) / (-np.log(2) * num_pixels)
 
   # Bring both images back to 0..255 range.
   x *= 255
@@ -314,7 +404,8 @@ def compress(args):
     # shapes.
     latest = tf.train.latest_checkpoint(checkpoint_dir=args.checkpoint_dir)
     tf.train.Saver().restore(sess, save_path=latest)
-    tensors = [string, tf.shape(x)[1:-1], tf.shape(y)[1:-1]]
+    tensors = [string, side_string,
+               tf.shape(x)[1:-1], tf.shape(y)[1:-1], tf.shape(z)[1:-1]]
     arrays = sess.run(tensors)
 
     # Write a binary file with the shape information and the compressed string.
@@ -344,21 +435,31 @@ def decompress(args):
 
   # Read the shape information and compressed string from the binary file.
   string = tf.placeholder(tf.string, [1])
+  side_string = tf.placeholder(tf.string, [1])
   x_shape = tf.placeholder(tf.int32, [2])
   y_shape = tf.placeholder(tf.int32, [2])
+  z_shape = tf.placeholder(tf.int32, [2])
   with open(args.input_file, "rb") as f:
     packed = PackedTensors(f.read())
-  tensors = [string, x_shape, y_shape]
+  tensors = [string, side_string, x_shape, y_shape, z_shape]
   arrays = packed.unpack(tensors)
 
   # Instantiate model.
-  entropy_bottleneck = tfc.EntropyBottleneck(dtype=tf.float32)
   synthesis_transform = SynthesisTransform(args.num_filters)
+  hyper_synthesis_transform = HyperSynthesisTransform(args.num_filters)
+  entropy_bottleneck = tfc.EntropyBottleneck(dtype=tf.float32)
 
   # Decompress and transform the image back.
-  y_shape = tf.concat([y_shape, [args.num_filters]], axis=0)
-  y_hat = entropy_bottleneck.decompress(
-      string, y_shape, channels=args.num_filters)
+  z_shape = tf.concat([z_shape, [args.num_filters]], axis=0)
+  z_hat = entropy_bottleneck.decompress(
+      side_string, z_shape, channels=args.num_filters)
+  sigma = hyper_synthesis_transform(z_hat)
+  sigma = sigma[:, :y_shape[0], :y_shape[1], :]
+  scale_table = np.exp(np.linspace(
+      np.log(SCALES_MIN), np.log(SCALES_MAX), SCALES_LEVELS))
+  conditional_bottleneck = tfc.GaussianConditional(
+      sigma, scale_table, dtype=tf.float32)
+  y_hat = conditional_bottleneck.decompress(string)
   x_hat = synthesis_transform(y_hat)
 
   # Remove batch dimension, and crop away any extraneous padding on the bottom
@@ -385,7 +486,7 @@ def parse_args(argv):
       "--verbose", "-V", action="store_true",
       help="Report bitrate and distortion when training or compressing.")
   parser.add_argument(
-      "--num_filters", type=int, default=128,
+      "--num_filters", type=int, default=192,
       help="Number of filters per layer.")
   parser.add_argument(
       "--checkpoint_dir", default="train",
