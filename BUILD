@@ -12,6 +12,7 @@ py_library(
     deps = [
         "//tensorflow_compression/python/layers",
         "//tensorflow_compression/python/ops",
+        "//tensorflow_compression/python/util",
     ],
 )
 
@@ -34,12 +35,19 @@ py_binary(
         # The following targets are for Python test files.
         "//tensorflow_compression/python/layers:py_src",
         "//tensorflow_compression/python/ops:py_src",
+        "//tensorflow_compression/python/util:py_src",
     ],
 )
 
 py_binary(
     name = "tfci",
     srcs = ["examples/tfci.py"],
+    deps = [":tensorflow_compression"],
+)
+
+py_binary(
+    name = "bls2017",
+    srcs = ["examples/bls2017.py"],
     deps = [":tensorflow_compression"],
 )
 

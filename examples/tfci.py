@@ -37,6 +37,78 @@ URL_PREFIX = "https://storage.googleapis.com/tensorflow_compression/metagraphs"
 METAGRAPH_CACHE = "/tmp/tfc_metagraphs"
 
 
+# TODO(jonycgn): Use tfc.PackedTensors once new binary packages have been built.
+class PackedTensors(object):
+  """Packed representation of compressed tensors."""
+
+  def __init__(self, string=None):
+    self._example = tf.train.Example()
+    if string:
+      self.string = string
+
+  @property
+  def model(self):
+    """Model identifier."""
+    buf = self._example.features.feature["MD"].bytes_list.value[0]
+    return buf.decode("ascii")
+
+  @model.setter
+  def model(self, value):
+    self._example.features.feature["MD"].bytes_list.value[:] = [
+        value.encode("ascii")]
+
+  @model.deleter
+  def model(self):
+    del self._example.features.feature["MD"]
+
+  @property
+  def string(self):
+    """A string representation of this object."""
+    return self._example.SerializeToString()
+
+  @string.setter
+  def string(self, value):
+    self._example.ParseFromString(value)
+
+  def pack(self, tensors, arrays):
+    """Packs Tensor values into this object."""
+    if len(tensors) != len(arrays):
+      raise ValueError("`tensors` and `arrays` must have same length.")
+    i = 1
+    for tensor, array in zip(tensors, arrays):
+      feature = self._example.features.feature[chr(i)]
+      feature.Clear()
+      if array.ndim != 1:
+        raise RuntimeError("Unexpected tensor rank: {}.".format(array.ndim))
+      if tensor.dtype.is_integer:
+        feature.int64_list.value[:] = array
+      elif tensor.dtype == tf.string:
+        feature.bytes_list.value[:] = array
+      else:
+        raise RuntimeError(
+            "Unexpected tensor dtype: '{}'.".format(tensor.dtype))
+      i += 1
+    # Delete any remaining, previously set arrays.
+    while chr(i) in self._example.features.feature:
+      del self._example.features.feature[chr(i)]
+      i += 1
+
+  def unpack(self, tensors):
+    """Unpacks Tensor values from this object."""
+    arrays = []
+    for i, tensor in enumerate(tensors):
+      feature = self._example.features.feature[chr(i + 1)]
+      np_dtype = tensor.dtype.as_numpy_dtype
+      if tensor.dtype.is_integer:
+        arrays.append(np.array(feature.int64_list.value, dtype=np_dtype))
+      elif tensor.dtype == tf.string:
+        arrays.append(np.array(feature.bytes_list.value, dtype=np_dtype))
+      else:
+        raise RuntimeError(
+            "Unexpected tensor dtype: '{}'.".format(tensor.dtype))
+    return arrays
+
+
 def read_png(filename):
   """Creates graph to load a PNG image file."""
   string = tf.io.read_file(filename)
@@ -112,25 +184,13 @@ def compress_image(model, input_image):
 
     # Run encoder.
     with tf.Session() as sess:
-      feed_dict = {inputs: input_image}
-      arrays = sess.run(outputs, feed_dict=feed_dict)
+      arrays = sess.run(outputs, feed_dict={inputs: input_image})
 
-    # Pack data into tf.Example.
-    example = tf.train.Example()
-    example.features.feature["MD"].bytes_list.value[:] = [model.encode("ascii")]
-    for i, (array, tensor) in enumerate(zip(arrays, outputs)):
-      feature = example.features.feature[chr(i + 1)]
-      if array.ndim != 1:
-        raise RuntimeError("Unexpected tensor rank: {}.".format(array.ndim))
-      if tensor.dtype.is_integer:
-        feature.int64_list.value[:] = array
-      elif tensor.dtype == tf.string:
-        feature.bytes_list.value[:] = array
-      else:
-        raise RuntimeError(
-            "Unexpected tensor dtype: '{}'.".format(tensor.dtype))
-
-    return example.SerializeToString()
+    # Pack data into bitstring.
+    packed = PackedTensors()
+    packed.model = model
+    packed.pack(outputs, arrays)
+    return packed.string
 
 
 def compress(model, input_file, output_file, target_bpp=None, bpp_strict=False):
@@ -189,14 +249,12 @@ def decompress(input_file, output_file):
     output_file = input_file + ".png"
 
   with tf.Graph().as_default():
-    # Deserialize tf.Example from disk and determine model.
+    # Unserialize packed data from disk.
     with tf.io.gfile.GFile(input_file, "rb") as f:
-      example = tf.train.Example()
-      example.ParseFromString(f.read())
-    model = example.features.feature["MD"].bytes_list.value[0].decode("ascii")
+      packed = PackedTensors(f.read())
 
     # Load model metagraph.
-    signature_defs = import_metagraph(model)
+    signature_defs = import_metagraph(packed.model)
     inputs, outputs = instantiate_signature(signature_defs["receiver"])
 
     # Multiple input tensors, ordered alphabetically, without names.
@@ -204,23 +262,12 @@ def decompress(input_file, output_file):
     # Just one output operation.
     outputs = write_png(output_file, outputs["output_image"])
 
-    # Unpack data from tf.Example.
-    arrays = []
-    for i, tensor in enumerate(inputs):
-      feature = example.features.feature[chr(i + 1)]
-      np_dtype = tensor.dtype.as_numpy_dtype
-      if tensor.dtype.is_integer:
-        arrays.append(np.array(feature.int64_list.value, dtype=np_dtype))
-      elif tensor.dtype == tf.string:
-        arrays.append(np.array(feature.bytes_list.value, dtype=np_dtype))
-      else:
-        raise RuntimeError(
-            "Unexpected tensor dtype: '{}'.".format(tensor.dtype))
+    # Unpack data.
+    arrays = packed.unpack(inputs)
 
     # Run decoder.
     with tf.Session() as sess:
-      feed_dict = dict(zip(inputs, arrays))
-      sess.run(outputs, feed_dict=feed_dict)
+      sess.run(outputs, feed_dict=dict(zip(inputs, arrays)))
 
 
 def list_models():
@@ -253,6 +300,7 @@ def parse_args(argv):
   # 'compress' subcommand.
   compress_cmd = subparsers.add_parser(
       "compress",
+      formatter_class=argparse.ArgumentDefaultsHelpFormatter,
       description="Reads a PNG file, compresses it using the given model, and "
                   "writes a TFCI file.")
   compress_cmd.add_argument(
@@ -274,6 +322,7 @@ def parse_args(argv):
   # 'decompress' subcommand.
   decompress_cmd = subparsers.add_parser(
       "decompress",
+      formatter_class=argparse.ArgumentDefaultsHelpFormatter,
       description="Reads a TFCI file, reconstructs the image using the model "
                   "it was compressed with, and writes back a PNG file.")
 
@@ -290,6 +339,7 @@ def parse_args(argv):
   # 'models' subcommand.
   subparsers.add_parser(
       "models",
+      formatter_class=argparse.ArgumentDefaultsHelpFormatter,
       description="Lists available trained models. Requires an internet "
                   "connection.")
 

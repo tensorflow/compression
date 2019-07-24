@@ -15,9 +15,10 @@
 # ==============================================================================
 """Basic nonlinear transform coder for RGB images.
 
-This is a close approximation of the image compression model of
-Ballé, Laparra, Simoncelli (2017):
-End-to-end optimized image compression
+This is a close approximation of the image compression model published in:
+J. Ballé, V. Laparra, E.P. Simoncelli (2017):
+"End-to-end Optimized Image Compression"
+Int. Conf. on Learning Representations (ICLR), 2017
 https://arxiv.org/abs/1611.01704
 
 With patches from Victor Xing <victor.t.xing@gmail.com>
@@ -29,15 +30,90 @@ from __future__ import print_function
 
 import argparse
 import glob
+import sys
 
+from absl import app
+from absl.flags import argparse_flags
 import numpy as np
 import tensorflow as tf
+
 import tensorflow_compression as tfc
 
 
-def load_image(filename):
-  """Loads a PNG image file."""
+# TODO(jonycgn): Use tfc.PackedTensors once new binary packages have been built.
+class PackedTensors(object):
+  """Packed representation of compressed tensors."""
 
+  def __init__(self, string=None):
+    self._example = tf.train.Example()
+    if string:
+      self.string = string
+
+  @property
+  def model(self):
+    """Model identifier."""
+    buf = self._example.features.feature["MD"].bytes_list.value[0]
+    return buf.decode("ascii")
+
+  @model.setter
+  def model(self, value):
+    self._example.features.feature["MD"].bytes_list.value[:] = [
+        value.encode("ascii")]
+
+  @model.deleter
+  def model(self):
+    del self._example.features.feature["MD"]
+
+  @property
+  def string(self):
+    """A string representation of this object."""
+    return self._example.SerializeToString()
+
+  @string.setter
+  def string(self, value):
+    self._example.ParseFromString(value)
+
+  def pack(self, tensors, arrays):
+    """Packs Tensor values into this object."""
+    if len(tensors) != len(arrays):
+      raise ValueError("`tensors` and `arrays` must have same length.")
+    i = 1
+    for tensor, array in zip(tensors, arrays):
+      feature = self._example.features.feature[chr(i)]
+      feature.Clear()
+      if array.ndim != 1:
+        raise RuntimeError("Unexpected tensor rank: {}.".format(array.ndim))
+      if tensor.dtype.is_integer:
+        feature.int64_list.value[:] = array
+      elif tensor.dtype == tf.string:
+        feature.bytes_list.value[:] = array
+      else:
+        raise RuntimeError(
+            "Unexpected tensor dtype: '{}'.".format(tensor.dtype))
+      i += 1
+    # Delete any remaining, previously set arrays.
+    while chr(i) in self._example.features.feature:
+      del self._example.features.feature[chr(i)]
+      i += 1
+
+  def unpack(self, tensors):
+    """Unpacks Tensor values from this object."""
+    arrays = []
+    for i, tensor in enumerate(tensors):
+      feature = self._example.features.feature[chr(i + 1)]
+      np_dtype = tensor.dtype.as_numpy_dtype
+      if tensor.dtype.is_integer:
+        arrays.append(np.array(feature.int64_list.value, dtype=np_dtype))
+      elif tensor.dtype == tf.string:
+        arrays.append(np.array(feature.bytes_list.value, dtype=np_dtype))
+      else:
+        raise RuntimeError(
+            "Unexpected tensor dtype: '{}'.".format(tensor.dtype))
+    return arrays
+
+
+def read_png(filename):
+  """Loads a PNG image file."""
   string = tf.read_file(filename)
   image = tf.image.decode_image(string, channels=3)
   image = tf.cast(image, tf.float32)
@@ -51,76 +127,89 @@ def quantize_image(image):
   return image
 
 
-def save_image(filename, image):
+def write_png(filename, image):
   """Saves an image to a PNG file."""
   image = quantize_image(image)
   string = tf.image.encode_png(image)
   return tf.write_file(filename, string)
 
 
-def analysis_transform(tensor, num_filters):
-  """Builds the analysis transform."""
+class AnalysisTransform(tf.keras.layers.Layer):
+  """The analysis transform."""
 
-  with tf.variable_scope("analysis"):
-    with tf.variable_scope("layer_0"):
-      layer = tfc.SignalConv2D(
-          num_filters, (9, 9), corr=True, strides_down=4, padding="same_zeros",
-          use_bias=True, activation=tfc.GDN())
+  def __init__(self, num_filters, *args, **kwargs):
+    self.num_filters = num_filters
+    super(AnalysisTransform, self).__init__(*args, **kwargs)
+
+  def build(self, input_shape):
+    self._layers = [
+        tfc.SignalConv2D(
+            self.num_filters, (9, 9), name="layer_0", corr=True, strides_down=4,
+            padding="same_zeros", use_bias=True,
+            activation=tfc.GDN(name="gdn_0")),
+        tfc.SignalConv2D(
+            self.num_filters, (5, 5), name="layer_1", corr=True, strides_down=2,
+            padding="same_zeros", use_bias=True,
+            activation=tfc.GDN(name="gdn_1")),
+        tfc.SignalConv2D(
+            self.num_filters, (5, 5), name="layer_2", corr=True, strides_down=2,
+            padding="same_zeros", use_bias=False,
+            activation=None),
+    ]
+    super(AnalysisTransform, self).build(input_shape)
+
+  def call(self, tensor):
+    for layer in self._layers:
       tensor = layer(tensor)
-
-    with tf.variable_scope("layer_1"):
-      layer = tfc.SignalConv2D(
-          num_filters, (5, 5), corr=True, strides_down=2, padding="same_zeros",
-          use_bias=True, activation=tfc.GDN())
-      tensor = layer(tensor)
-
-    with tf.variable_scope("layer_2"):
-      layer = tfc.SignalConv2D(
-          num_filters, (5, 5), corr=True, strides_down=2, padding="same_zeros",
-          use_bias=False, activation=None)
-      tensor = layer(tensor)
-
     return tensor
 
 
-def synthesis_transform(tensor, num_filters):
-  """Builds the synthesis transform."""
+class SynthesisTransform(tf.keras.layers.Layer):
+  """The synthesis transform."""
 
-  with tf.variable_scope("synthesis"):
-    with tf.variable_scope("layer_0"):
-      layer = tfc.SignalConv2D(
-          num_filters, (5, 5), corr=False, strides_up=2, padding="same_zeros",
-          use_bias=True, activation=tfc.GDN(inverse=True))
+  def __init__(self, num_filters, *args, **kwargs):
+    self.num_filters = num_filters
+    super(SynthesisTransform, self).__init__(*args, **kwargs)
+
+  def build(self, input_shape):
+    self._layers = [
+        tfc.SignalConv2D(
+            self.num_filters, (5, 5), name="layer_0", corr=False, strides_up=2,
+            padding="same_zeros", use_bias=True,
+            activation=tfc.GDN(name="gdn_0", inverse=True)),
+        tfc.SignalConv2D(
+            self.num_filters, (5, 5), name="layer_1", corr=False, strides_up=2,
+            padding="same_zeros", use_bias=True,
+            activation=tfc.GDN(name="gdn_1", inverse=True)),
+        tfc.SignalConv2D(
+            3, (9, 9), name="layer_2", corr=False, strides_up=4,
+            padding="same_zeros", use_bias=True,
+            activation=None),
+    ]
+    super(SynthesisTransform, self).build(input_shape)
+
+  def call(self, tensor):
+    for layer in self._layers:
       tensor = layer(tensor)
-
-    with tf.variable_scope("layer_1"):
-      layer = tfc.SignalConv2D(
-          num_filters, (5, 5), corr=False, strides_up=2, padding="same_zeros",
-          use_bias=True, activation=tfc.GDN(inverse=True))
-      tensor = layer(tensor)
-
-    with tf.variable_scope("layer_2"):
-      layer = tfc.SignalConv2D(
-          3, (9, 9), corr=False, strides_up=4, padding="same_zeros",
-          use_bias=True, activation=None)
-      tensor = layer(tensor)
-
     return tensor
 
 
-def train():
+def train(args):
   """Trains the model."""
 
   if args.verbose:
     tf.logging.set_verbosity(tf.logging.INFO)
 
   # Create input data pipeline.
-  with tf.device('/cpu:0'):
+  with tf.device("/cpu:0"):
     train_files = glob.glob(args.train_glob)
+    if not train_files:
+      raise RuntimeError(
+          "No training images found with glob '{}'.".format(args.train_glob))
     train_dataset = tf.data.Dataset.from_tensor_slices(train_files)
     train_dataset = train_dataset.shuffle(buffer_size=len(train_files)).repeat()
     train_dataset = train_dataset.map(
-        load_image, num_parallel_calls=args.preprocess_threads)
+        read_png, num_parallel_calls=args.preprocess_threads)
     train_dataset = train_dataset.map(
         lambda x: tf.random_crop(x, (args.patchsize, args.patchsize, 3)))
     train_dataset = train_dataset.batch(args.batchsize)
@@ -131,11 +220,15 @@ def train():
   # Get training patch from dataset.
   x = train_dataset.make_one_shot_iterator().get_next()
 
-  # Build autoencoder.
-  y = analysis_transform(x, args.num_filters)
+  # Instantiate model.
+  analysis_transform = AnalysisTransform(args.num_filters)
   entropy_bottleneck = tfc.EntropyBottleneck()
+  synthesis_transform = SynthesisTransform(args.num_filters)
+
+  # Build autoencoder.
+  y = analysis_transform(x)
   y_tilde, likelihoods = entropy_bottleneck(y, training=True)
-  x_tilde = synthesis_transform(y_tilde, args.num_filters)
+  x_tilde = synthesis_transform(y_tilde)
 
   # Total number of bits divided by number of pixels.
   train_bpp = tf.reduce_sum(tf.log(likelihoods)) / (-np.log(2) * num_pixels)
@@ -176,23 +269,26 @@ def train():
       sess.run(train_op)
 
 
-def compress():
+def compress(args):
   """Compresses an image."""
 
   # Load input image and add batch dimension.
-  x = load_image(args.input)
+  x = read_png(args.input_file)
   x = tf.expand_dims(x, 0)
   x.set_shape([1, None, None, 3])
 
-  # Transform and compress the image, then remove batch dimension.
-  y = analysis_transform(x, args.num_filters)
+  # Instantiate model.
+  analysis_transform = AnalysisTransform(args.num_filters)
   entropy_bottleneck = tfc.EntropyBottleneck()
+  synthesis_transform = SynthesisTransform(args.num_filters)
+
+  # Transform and compress the image.
+  y = analysis_transform(x)
   string = entropy_bottleneck.compress(y)
-  string = tf.squeeze(string, axis=0)
 
   # Transform the quantized image back (if requested).
   y_hat, likelihoods = entropy_bottleneck(y, training=False)
-  x_hat = synthesis_transform(y_hat, args.num_filters)
+  x_hat = synthesis_transform(y_hat)
 
   num_pixels = tf.to_float(tf.reduce_prod(tf.shape(x)[:-1]))
 
@@ -213,13 +309,14 @@ def compress():
     # shapes.
     latest = tf.train.latest_checkpoint(checkpoint_dir=args.checkpoint_dir)
     tf.train.Saver().restore(sess, save_path=latest)
-    string, x_shape, y_shape = sess.run([string, tf.shape(x), tf.shape(y)])
+    tensors = [string, tf.shape(x)[1:-1], tf.shape(y)[1:-1]]
+    arrays = sess.run(tensors)
 
     # Write a binary file with the shape information and the compressed string.
-    with open(args.output, "wb") as f:
-      f.write(np.array(x_shape[1:-1], dtype=np.uint16).tobytes())
-      f.write(np.array(y_shape[1:-1], dtype=np.uint16).tobytes())
-      f.write(string)
+    packed = PackedTensors()
+    packed.pack(tensors, arrays)
+    with open(args.output_file, "wb") as f:
+      f.write(packed.string)
 
     # If requested, transform the quantized image back and measure performance.
     if args.verbose:
@@ -227,7 +324,7 @@ def compress():
           [eval_bpp, mse, psnr, msssim, num_pixels])
 
       # The actual bits per pixel including overhead.
-      bpp = (8 + len(string)) * 8 / num_pixels
+      bpp = len(packed.string) * 8 / num_pixels
 
       print("Mean squared error: {:0.4f}".format(mse))
       print("PSNR (dB): {:0.2f}".format(psnr))
@@ -237,63 +334,50 @@ def compress():
       print("Actual bits per pixel: {:0.4f}".format(bpp))
 
 
-def decompress():
+def decompress(args):
   """Decompresses an image."""
 
   # Read the shape information and compressed string from the binary file.
-  with open(args.input, "rb") as f:
-    x_shape = np.frombuffer(f.read(4), dtype=np.uint16)
-    y_shape = np.frombuffer(f.read(4), dtype=np.uint16)
-    string = f.read()
+  string = tf.placeholder(tf.string, [1])
+  x_shape = tf.placeholder(tf.int32, [2])
+  y_shape = tf.placeholder(tf.int32, [2])
+  with open(args.input_file, "rb") as f:
+    packed = PackedTensors(f.read())
+  tensors = [string, x_shape, y_shape]
+  arrays = packed.unpack(tensors)
 
-  y_shape = [int(s) for s in y_shape] + [args.num_filters]
-
-  # Create a no-op analysis transform so that the name scopes in the checkpoint
-  # match.
-  analysis_transform(
-      tf.placeholder(tf.float32, (1, None, None, 3)), args.num_filters)
-
-  # Add a batch dimension, then decompress and transform the image back.
-  strings = tf.expand_dims(string, 0)
+  # Instantiate model.
   entropy_bottleneck = tfc.EntropyBottleneck(dtype=tf.float32)
+  synthesis_transform = SynthesisTransform(args.num_filters)
+
+  # Decompress and transform the image back.
+  y_shape = tf.concat([y_shape, [args.num_filters]], axis=0)
   y_hat = entropy_bottleneck.decompress(
-      strings, y_shape, channels=args.num_filters)
-  x_hat = synthesis_transform(y_hat, args.num_filters)
+      string, y_shape, channels=args.num_filters)
+  x_hat = synthesis_transform(y_hat)
 
   # Remove batch dimension, and crop away any extraneous padding on the bottom
   # or right boundaries.
-  x_hat = x_hat[0, :int(x_shape[0]), :int(x_shape[1]), :]
+  x_hat = x_hat[0, :x_shape[0], :x_shape[1], :]
 
   # Write reconstructed image out as a PNG file.
-  op = save_image(args.output, x_hat)
+  op = write_png(args.output_file, x_hat)
 
   # Load the latest model checkpoint, and perform the above actions.
   with tf.Session() as sess:
     latest = tf.train.latest_checkpoint(checkpoint_dir=args.checkpoint_dir)
     tf.train.Saver().restore(sess, save_path=latest)
-    sess.run(op)
+    sess.run(op, feed_dict=dict(zip(tensors, arrays)))
 
 
-if __name__ == "__main__":
-  parser = argparse.ArgumentParser(
+def parse_args(argv):
+  """Parses command line arguments."""
+  parser = argparse_flags.ArgumentParser(
       formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
+  # High-level options.
   parser.add_argument(
-      "command", choices=["train", "compress", "decompress"],
-      help="What to do: 'train' loads training data and trains (or continues "
-           "to train) a new model. 'compress' reads an image file (lossless "
-           "PNG format) and writes a compressed binary file. 'decompress' "
-           "reads a binary file and reconstructs the image (in PNG format). "
-           "input and output filenames need to be provided for the latter "
-           "two options.")
-  parser.add_argument(
-      "input", nargs="?",
-      help="Input filename.")
-  parser.add_argument(
-      "output", nargs="?",
-      help="Output filename.")
-  parser.add_argument(
-      "--verbose", "-v", action="store_true",
+      "--verbose", "-V", action="store_true",
       help="Report bitrate and distortion when training or compressing.")
   parser.add_argument(
       "--num_filters", type=int, default=128,
@@ -301,36 +385,85 @@ if __name__ == "__main__":
   parser.add_argument(
       "--checkpoint_dir", default="train",
       help="Directory where to save/load model checkpoints.")
-  parser.add_argument(
+  subparsers = parser.add_subparsers(
+      title="commands", dest="command",
+      help="What to do: 'train' loads training data and trains (or continues "
+           "to train) a new model. 'compress' reads an image file (lossless "
+           "PNG format) and writes a compressed binary file. 'decompress' "
+           "reads a binary file and reconstructs the image (in PNG format). "
+           "input and output filenames need to be provided for the latter "
+           "two options. Invoke '<command> -h' for more information.")
+
+  # 'train' subcommand.
+  train_cmd = subparsers.add_parser(
+      "train",
+      formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+      description="Trains (or continues to train) a new model.")
+  train_cmd.add_argument(
       "--train_glob", default="images/*.png",
       help="Glob pattern identifying training data. This pattern must expand "
            "to a list of RGB images in PNG format.")
-  parser.add_argument(
+  train_cmd.add_argument(
       "--batchsize", type=int, default=8,
       help="Batch size for training.")
-  parser.add_argument(
+  train_cmd.add_argument(
       "--patchsize", type=int, default=256,
       help="Size of image patches for training.")
-  parser.add_argument(
+  train_cmd.add_argument(
       "--lambda", type=float, default=0.01, dest="lmbda",
       help="Lambda for rate-distortion tradeoff.")
-  parser.add_argument(
+  train_cmd.add_argument(
       "--last_step", type=int, default=1000000,
       help="Train up to this number of steps.")
-  parser.add_argument(
+  train_cmd.add_argument(
       "--preprocess_threads", type=int, default=16,
       help="Number of CPU threads to use for parallel decoding of training "
            "images.")
 
-  args = parser.parse_args()
+  # 'compress' subcommand.
+  compress_cmd = subparsers.add_parser(
+      "compress",
+      formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+      description="Reads a PNG file, compresses it, and writes a TFCI file.")
 
+  # 'decompress' subcommand.
+  decompress_cmd = subparsers.add_parser(
+      "decompress",
+      formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+      description="Reads a TFCI file, reconstructs the image, and writes back "
+                  "a PNG file.")
+
+  # Arguments for both 'compress' and 'decompress'.
+  for cmd, ext in ((compress_cmd, ".tfci"), (decompress_cmd, ".png")):
+    cmd.add_argument(
+        "input_file",
+        help="Input filename.")
+    cmd.add_argument(
+        "output_file", nargs="?",
+        help="Output filename (optional). If not provided, appends '{}' to "
+             "the input filename.".format(ext))
+
+  # Parse arguments.
+  args = parser.parse_args(argv[1:])
+  if args.command is None:
+    parser.print_usage()
+    sys.exit(2)
+  return args
+
+
+def main(args):
+  # Invoke subcommand.
   if args.command == "train":
-    train()
+    train(args)
   elif args.command == "compress":
-    if args.input is None or args.output is None:
-      raise ValueError("Need input and output filename for compression.")
-    compress()
+    if not args.output_file:
+      args.output_file = args.input_file + ".tfci"
+    compress(args)
   elif args.command == "decompress":
-    if args.input is None or args.output is None:
-      raise ValueError("Need input and output filename for decompression.")
-    decompress()
+    if not args.output_file:
+      args.output_file = args.input_file + ".png"
+    decompress(args)
+
+
+if __name__ == "__main__":
+  app.run(main, flags_parser=parse_args)
