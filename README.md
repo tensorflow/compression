@@ -74,6 +74,19 @@ python -m tensorflow_compression.python.all_test
 Once the command finishes, you should see a message ```OK (skipped=11)``` or
 similar in the last line.
 
+To use a Docker container (e.g. on Windows), be sure to install Docker
+(e.g., [Docker Desktop](https://www.docker.com/products/docker-desktop),
+use a [TensorFlow Docker image](https://www.tensorflow.org/install/docker),
+and then run the `pip install` command inside the Docker container, not on the
+host. For instance, you can use a command line like this:
+```bash
+docker run tensorflow/tensorflow:latest-py3 bash -c \
+    "pip install tensorflow-compression &&
+     python -m tensorflow_compression.python.all_test"
+```
+This will fetch the latest TensorFlow Docker image, install the `pip` package
+and then run the unit tests to confirm that it works.
+
 ## Usage
 
 We recommend importing the library from your Python code as follows:
@@ -125,7 +138,7 @@ To train the model, you need to supply it with a dataset of RGB training images.
 They should be provided in PNG format. Training can be as simple as the
 following command:
 ```bash
-python bls2017.py -v --train_glob="images/*.png" train
+python bls2017.py --verbose --train_glob="images/*.png" train
 ```
 
 This will use the default settings. The most important parameter is `--lambda`,
@@ -151,8 +164,8 @@ When training has finished, the Python script can be used to compress and
 decompress images as follows. The same model checkpoint must be accessible to
 both commands.
 ```bash
-python bls2017.py [options] compress original.png compressed.bin
-python bls2017.py [options] decompress compressed.bin reconstruction.png
+python bls2017.py [options] compress original.png compressed.tfci
+python bls2017.py [options] decompress compressed.tfci reconstruction.png
 ```
 
 ## Building `pip` packages
@@ -174,11 +187,12 @@ Inside a Docker container from the image, the following steps need to be taken.
 
 ```bash
 sudo docker run -v /tmp/tensorflow_compression:/tmp/tensorflow_compression \
-    tensorflow/tensorflow:nightly-custom-op \
-    bash -c "pip install tensorflow &&
-    git clone https://github.com/tensorflow/compression.git
-    /tensorflow_compression && cd /tensorflow_compression &&
-    bazel run -c opt --copt=-mavx :build_pip_pkg"
+    tensorflow/tensorflow:nightly-custom-op bash -c \
+    "pip install tensorflow &&
+     git clone https://github.com/tensorflow/compression.git
+         /tensorflow_compression && 
+     cd /tensorflow_compression &&
+     bazel run -c opt --copt=-mavx :build_pip_pkg"
 ```
 
 The wheel file is created inside `/tmp/tensorflow_compression`. Optimization
