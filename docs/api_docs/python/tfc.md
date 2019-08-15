@@ -5,17 +5,19 @@
 
 # Module: tfc
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/__init__.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Data compression tools.
-
-
-
-
-<table class="tfo-github-link" align="left">
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/__init__.py">
-  <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
-  View source on GitHub
-</a>
-</table>
 
 <!-- Placeholder for "Used in" -->
 
@@ -42,6 +44,8 @@ Data compression tools.
 
 [`class NonnegativeParameterizer`](./tfc/NonnegativeParameterizer.md): Object encapsulating nonnegative parameterization as needed for GDN.
 
+[`class PackedTensors`](./tfc/PackedTensors.md): Packed representation of compressed tensors.
+
 [`class Parameterizer`](./tfc/Parameterizer.md): Parameterization object (abstract base class).
 
 [`class RDFTParameterizer`](./tfc/RDFTParameterizer.md): Object encapsulating RDFT reparameterization.
@@ -54,7 +58,7 @@ Data compression tools.
 
 [`class StaticParameterizer`](./tfc/StaticParameterizer.md): A parameterizer that returns a non-variable.
 
-[`class SymmetricConditional`](./tfc/SymmetricConditional.md): Symmetric conditional entropy model.
+[`class SymmetricConditional`](./tfc/SymmetricConditional.md): Symmetric conditional entropy model (base class).
 
 ## Functions
 

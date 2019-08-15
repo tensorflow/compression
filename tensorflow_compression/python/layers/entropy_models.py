@@ -21,7 +21,7 @@ from __future__ import print_function
 
 import numpy as np
 import scipy.stats
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 from tensorflow.python.keras.engine import input_spec
 from tensorflow_compression.python.ops import math_ops
@@ -39,54 +39,32 @@ __all__ = [
 
 
 class EntropyModel(tf.keras.layers.Layer):
-  """Entropy model (base class).
-
-  Arguments:
-    tail_mass: Float, between 0 and 1. The bottleneck layer automatically
-      determines the range of input values based on their frequency of
-      occurrence. Values occurring in the tails of the distributions will not be
-      encoded with range coding, but using a Golomb-like code. `tail_mass`
-      determines the amount of probability mass in the tails which will be
-      Golomb-coded. For example, the default value of `2 ** -8` means that on
-      average, one 256th of all values will use the Golomb code.
-    likelihood_bound: Float. If positive, the returned likelihood values are
-      ensured to be greater than or equal to this value. This prevents very
-      large gradients with a typical entropy loss (defaults to 1e-9).
-    range_coder_precision: Integer, between 1 and 16. The precision of the range
-      coder used for compression and decompression. This trades off computation
-      speed with compression efficiency, where 16 is the slowest but most
-      efficient setting. Choosing lower values may increase the average
-      codelength slightly compared to the estimated entropies.
-    data_format: Either `'channels_first'` or `'channels_last'` (default).
-    trainable: Boolean. Whether the layer should be trained.
-    name: String. The name of the layer.
-    dtype: `DType` of the layer's inputs, parameters, returned likelihoods, and
-      outputs during training. Default of `None` means to use the type of the
-      first input.
-
-  Read-only properties:
-    tail_mass: See above.
-    likelihood_bound: See above.
-    range_coder_precision: See above.
-    data_format: See above.
-    name: String. See above.
-    dtype: See above.
-    trainable_variables: List of trainable variables.
-    non_trainable_variables: List of non-trainable variables.
-    variables: List of all variables of this layer, trainable and non-trainable.
-    updates: List of update ops of this layer.
-    losses: List of losses added by this layer.
-
-  Mutable properties:
-    trainable: Boolean. Whether the layer should be trained.
-    input_spec: Optional `InputSpec` object specifying the constraints on inputs
-      that can be accepted by the layer.
-  """
+  """Entropy model (base class)."""
 
   _setattr_tracking = False
 
   def __init__(self, tail_mass=2 ** -8, likelihood_bound=1e-9,
                range_coder_precision=16, **kwargs):
+    """Initializer.
+
+    Arguments:
+      tail_mass: Float, between 0 and 1. The bottleneck layer automatically
+        determines the range of input values based on their frequency of
+        occurrence. Values occurring in the tails of the distributions will not
+        be encoded with range coding, but using a Golomb-like code. `tail_mass`
+        determines the amount of probability mass in the tails which will be
+        Golomb-coded. For example, the default value of `2 ** -8` means that on
+        average, one 256th of all values will use the Golomb code.
+      likelihood_bound: Float. If positive, the returned likelihood values are
+        ensured to be greater than or equal to this value. This prevents very
+        large gradients with a typical entropy loss (defaults to 1e-9).
+      range_coder_precision: Integer, between 1 and 16. The precision of the
+        range coder used for compression and decompression. This trades off
+        computation speed with compression efficiency, where 16 is the slowest
+        but most efficient setting. Choosing lower values may increase the
+        average codelength slightly compared to the estimated entropies.
+      **kwargs: Other keyword arguments passed to superclass (`Layer`).
+    """
     super(EntropyModel, self).__init__(**kwargs)
     self._tail_mass = float(tail_mass)
     if not 0 < self.tail_mass < 1:
@@ -358,64 +336,26 @@ class EntropyBottleneck(EntropyModel):
   which are only significant for compression and decompression. To use the
   compression feature, the auxiliary loss must be minimized during or after
   training. After that, the update op must be executed at least once.
-
-  Arguments:
-    init_scale: Float. A scaling factor determining the initial width of the
-      probability densities. This should be chosen big enough so that the
-      range of values of the layer inputs roughly falls within the interval
-      [`-init_scale`, `init_scale`] at the beginning of training.
-    filters: An iterable of ints, giving the number of filters at each layer of
-      the density model. Generally, the more filters and layers, the more
-      expressive is the density model in terms of modeling more complicated
-      distributions of the layer inputs. For details, refer to the paper
-      referenced above. The default is `[3, 3, 3]`, which should be sufficient
-      for most practical purposes.
-    tail_mass: Float, between 0 and 1. The bottleneck layer automatically
-      determines the range of input values based on their frequency of
-      occurrence. Values occurring in the tails of the distributions will not be
-      encoded with range coding, but using a Golomb-like code. `tail_mass`
-      determines the amount of probability mass in the tails which will be
-      Golomb-coded. For example, the default value of `2 ** -8` means that on
-      average, one 256th of all values will use the Golomb code.
-    likelihood_bound: Float. If positive, the returned likelihood values are
-      ensured to be greater than or equal to this value. This prevents very
-      large gradients with a typical entropy loss (defaults to 1e-9).
-    range_coder_precision: Integer, between 1 and 16. The precision of the range
-      coder used for compression and decompression. This trades off computation
-      speed with compression efficiency, where 16 is the slowest but most
-      efficient setting. Choosing lower values may increase the average
-      codelength slightly compared to the estimated entropies.
-    data_format: Either `'channels_first'` or `'channels_last'` (default).
-    trainable: Boolean. Whether the layer should be trained.
-    name: String. The name of the layer.
-    dtype: `DType` of the layer's inputs, parameters, returned likelihoods, and
-      outputs during training. Default of `None` means to use the type of the
-      first input.
-
-  Read-only properties:
-    init_scale: See above.
-    filters: See above.
-    tail_mass: See above.
-    likelihood_bound: See above.
-    range_coder_precision: See above.
-    data_format: See above.
-    name: String. See above.
-    dtype: See above.
-    trainable_variables: List of trainable variables.
-    non_trainable_variables: List of non-trainable variables.
-    variables: List of all variables of this layer, trainable and non-trainable.
-    updates: List of update ops of this layer.
-    losses: List of losses added by this layer. Always contains exactly one
-      auxiliary loss, which must be added to the training loss.
-
-  Mutable properties:
-    trainable: Boolean. Whether the layer should be trained.
-    input_spec: Optional `InputSpec` object specifying the constraints on inputs
-      that can be accepted by the layer.
   """
 
   def __init__(self, init_scale=10, filters=(3, 3, 3),
                data_format="channels_last", **kwargs):
+    """Initializer.
+
+    Arguments:
+      init_scale: Float. A scaling factor determining the initial width of the
+        probability densities. This should be chosen big enough so that the
+        range of values of the layer inputs roughly falls within the interval
+        [`-init_scale`, `init_scale`] at the beginning of training.
+      filters: An iterable of ints, giving the number of filters at each layer
+        of the density model. Generally, the more filters and layers, the more
+        expressive is the density model in terms of modeling more complicated
+        distributions of the layer inputs. For details, refer to the paper
+        referenced above. The default is `[3, 3, 3]`, which should be sufficient
+        for most practical purposes.
+      data_format: Either `'channels_first'` or `'channels_last'` (default).
+      **kwargs: Other keyword arguments passed to superclass (`EntropyModel`).
+    """
     super(EntropyBottleneck, self).__init__(**kwargs)
     self._init_scale = float(init_scale)
     self._filters = tuple(int(f) for f in filters)
@@ -765,72 +705,31 @@ class EntropyBottleneck(EntropyModel):
 
 
 class SymmetricConditional(EntropyModel):
-  """Symmetric conditional entropy model.
-
-  Arguments:
-    scale: `Tensor`, the scale parameters for the conditional distributions.
-    scale_table: Iterable of positive floats. It's optimal to choose the scales
-      in a logarithmic way. For each predicted scale, the next greater entry in
-      the table is selected during compression.
-    scale_bound: Float. Lower bound for scales. Any values in `scale` smaller
-      than this value are set to this value to prevent non-positive scales. By
-      default (or when set to `None`), uses the smallest value in `scale_table`.
-      To disable, set to 0.
-    mean: `Tensor`, the mean parameters for the conditional distributions. If
-      `None`, the mean is assumed to be zero.
-    indexes: `Tensor` of type `int32` or `None`. Can be used to override the
-      selection of indexes based on `scale`. Only affects compression and
-      decompression.
-    tail_mass: Float, between 0 and 1. Values occurring in the tails of the
-      distributions will not be encoded with range coding, but using a
-      Golomb-like code. `tail_mass` determines the amount of probability mass in
-      the tails which will be Golomb-coded. For example, the default value of
-      `2 ** -8` means that on average, one 256th of all values will use the
-      Golomb code.
-    likelihood_bound: Float. If positive, the returned likelihood values are
-      ensured to be greater than or equal to this value. This prevents very
-      large gradients with a typical entropy loss (defaults to 1e-9).
-    range_coder_precision: Integer, between 1 and 16. The precision of the range
-      coder used for compression and decompression. This trades off computation
-      speed with compression efficiency, where 16 is the slowest but most
-      efficient setting. Choosing lower values may increase the average
-      codelength slightly compared to the estimated entropies.
-    data_format: Either `'channels_first'` or `'channels_last'` (default).
-    trainable: Boolean. Whether the layer should be trained.
-    name: String. The name of the layer.
-    dtype: `DType` of the layer's inputs, parameters, returned likelihoods, and
-      outputs during training. Default of `None` means to use the type of the
-      first input.
-
-  Read-only properties:
-    scale: See above.
-    scale_table: See above.
-    scale_bound: See above.
-    mean: See above.
-    indexes: `Tensor` of type `int32`, giving the indexes into the scale table
-      for each input element. If not overridden in the constructor, they
-      correspond to the table entry with the smallest scale just larger than
-      each predicted scale.
-    tail_mass: See above.
-    likelihood_bound: See above.
-    range_coder_precision: See above.
-    data_format: See above.
-    name: String. See above.
-    dtype: See above.
-    trainable_variables: List of trainable variables.
-    non_trainable_variables: List of non-trainable variables.
-    variables: List of all variables of this layer, trainable and non-trainable.
-    updates: List of update ops of this layer.
-    losses: List of losses added by this layer.
-
-  Mutable properties:
-    trainable: Boolean. Whether the layer should be trained.
-    input_spec: Optional `InputSpec` object specifying the constraints on inputs
-      that can be accepted by the layer.
-  """
+  """Symmetric conditional entropy model (base class)."""
 
   def __init__(self, scale, scale_table,
                scale_bound=None, mean=None, indexes=None, **kwargs):
+    """Initializer.
+
+    Arguments:
+      scale: `Tensor`, the scale parameters for the conditional distributions.
+      scale_table: Iterable of positive floats. For range coding, the scale
+        parameters in `scale` can't be used, because the probability tables need
+        to be constructed statically. Only the values given in this table will
+        actually be used for range coding. For each predicted scale, the next
+        greater entry in the table is selected. It's optimal to choose the
+        scales provided here in a logarithmic way.
+      scale_bound: Float. Lower bound for scales. Any values in `scale` smaller
+        than this value are set to this value to prevent non-positive scales. By
+        default (or when set to `None`), uses the smallest value in
+        `scale_table`. To disable, set to 0.
+      mean: `Tensor`, the mean parameters for the conditional distributions. If
+        `None`, the mean is assumed to be zero.
+      indexes: `Tensor` of type `int32` or `None`. Can be used to override the
+        selection of scale table indexes based on the predicted values in
+        `scale`. Only affects compression and decompression.
+      **kwargs: Other keyword arguments passed to superclass (`EntropyModel`).
+    """
     super(SymmetricConditional, self).__init__(**kwargs)
     self._scale = tf.convert_to_tensor(scale)
     input_shape = self.scale.shape
@@ -1052,7 +951,16 @@ class SymmetricConditional(EntropyModel):
 
 
 class GaussianConditional(SymmetricConditional):
-  """Conditional Gaussian entropy model."""
+  """Conditional Gaussian entropy model.
+
+  The layer implements a conditionally Gaussian probability density model to
+  estimate entropy of its input tensor, which is described in the paper (please
+  cite the paper if you use this code for scientific work):
+
+  > "Variational image compression with a scale hyperprior"<br />
+  > J. Ballé, D. Minnen, S. Singh, S. J. Hwang, N. Johnston<br />
+  > https://arxiv.org/abs/1802.01436
+  """
 
   def _standardized_cumulative(self, inputs):
     half = tf.constant(.5, dtype=self.dtype)
@@ -1065,7 +973,11 @@ class GaussianConditional(SymmetricConditional):
 
 
 class LogisticConditional(SymmetricConditional):
-  """Conditional logistic entropy model."""
+  """Conditional logistic entropy model.
+
+  This is a conditionally Logistic entropy model, analogous to
+  `GaussianConditional`.
+  """
 
   def _standardized_cumulative(self, inputs):
     return tf.math.sigmoid(inputs)
@@ -1075,7 +987,11 @@ class LogisticConditional(SymmetricConditional):
 
 
 class LaplacianConditional(SymmetricConditional):
-  """Conditional Laplacian entropy model."""
+  """Conditional Laplacian entropy model.
+
+  This is a conditionally Laplacian entropy model, analogous to
+  `GaussianConditional`.
+  """
 
   def _standardized_cumulative(self, inputs):
     exp = tf.math.exp(-abs(inputs))

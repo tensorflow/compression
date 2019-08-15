@@ -7,6 +7,18 @@
 
 # tfc.RDFTParameterizer
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/parameterizers.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `RDFTParameterizer`
 
 Object encapsulating RDFT reparameterization.
@@ -15,18 +27,8 @@ Inherits From: [`Parameterizer`](../tfc/Parameterizer.md)
 
 ### Aliases:
 
-* Class `tfc.RDFTParameterizer`
 * Class `tfc.python.layers.parameterizers.RDFTParameterizer`
 
-
-
-
-<table class="tfo-github-link" align="left">
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/parameterizers.py">
-  <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
-  View source on GitHub
-</a>
-</table>
 
 <!-- Placeholder for "Used in" -->
 
@@ -36,12 +38,6 @@ the parameter.
 
 (see https://en.wikipedia.org/wiki/Discrete_Fourier_transform)
 
-#### Args:
-
-
-* <b>`dc`</b>: Boolean. If `False`, the DC component of the kernel RDFTs is not
-  represented, forcing the filters to be highpass. Defaults to `True`.
-
 <h2 id="__init__"><code>__init__</code></h2>
 
 <a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/parameterizers.py">View source</a>
@@ -50,8 +46,14 @@ the parameter.
 __init__(dc=True)
 ```
 
-Initialize self.  See help(type(self)) for accurate signature.
+Initializer.
 
+
+#### Arguments:
+
+
+* <b>`dc`</b>: Boolean. If `False`, the DC component of the kernel RDFTs is not
+  represented, forcing the filters to be highpass. Defaults to `True`.
 
 
 

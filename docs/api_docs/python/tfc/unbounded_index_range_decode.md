@@ -5,12 +5,20 @@
 
 # tfc.unbounded_index_range_decode
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+</table>
+
+Defined in generated file: `python/ops/gen_range_coding_ops.py`
+
+
+
 This is the reverse op of `UnboundedIndexRangeEncode`, and decodes the range
 
 ### Aliases:
 
 * `tfc.python.ops.range_coding_ops.unbounded_index_range_decode`
-* `tfc.unbounded_index_range_decode`
+
 
 ``` python
 tfc.unbounded_index_range_decode(
@@ -27,8 +35,6 @@ tfc.unbounded_index_range_decode(
 ```
 
 
-
-Defined in generated file: `python/ops/gen_range_coding_ops.py`
 
 <!-- Placeholder for "Used in" -->
 

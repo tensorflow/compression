@@ -5,12 +5,20 @@
 
 # tfc.unbounded_index_range_encode
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+</table>
+
+Defined in generated file: `python/ops/gen_range_coding_ops.py`
+
+
+
 Range encodes unbounded integer `data` using an indexed probability table.
 
 ### Aliases:
 
 * `tfc.python.ops.range_coding_ops.unbounded_index_range_encode`
-* `tfc.unbounded_index_range_encode`
+
 
 ``` python
 tfc.unbounded_index_range_encode(
@@ -27,8 +35,6 @@ tfc.unbounded_index_range_encode(
 ```
 
 
-
-Defined in generated file: `python/ops/gen_range_coding_ops.py`
 
 <!-- Placeholder for "Used in" -->
 

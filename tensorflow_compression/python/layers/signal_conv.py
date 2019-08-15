@@ -20,7 +20,7 @@ from __future__ import print_function
 
 import functools
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 from tensorflow_compression.python.layers import parameterizers
 from tensorflow_compression.python.ops import padding_ops
@@ -186,88 +186,6 @@ class _SignalConv(tf.keras.layers.Layer):
     upsampled channel-separable convolutions are currently only implemented for
     `filters == 1`. When using `channel_separable`, prefer using identical
     strides in all dimensions to maximize performance.
-
-  Arguments:
-    filters: Integer. If `not channel_separable`, specifies the total number of
-      filters, which is equal to the number of output channels. Otherwise,
-      specifies the number of filters per channel, which makes the number of
-      output channels equal to `filters` times the number of input channels.
-    kernel_support: An integer or iterable of {rank} integers, specifying the
-      length of the convolution/correlation window in each dimension.
-    corr: Boolean. If True, compute cross correlation. If False, convolution.
-    strides_down: An integer or iterable of {rank} integers, specifying an
-      optional downsampling stride after the convolution/correlation.
-    strides_up: An integer or iterable of {rank} integers, specifying an
-      optional upsampling stride before the convolution/correlation.
-    padding: String. One of the supported padding modes (see above).
-    extra_pad_end: Boolean. When upsampling, use extra skipped samples at the
-      end of each dimension (default). For examples, refer to the discussion
-      of padding modes above.
-    channel_separable: Boolean. If `False` (default), each output channel is
-      computed by summing over all filtered input channels. If `True`, each
-      output channel is computed from only one input channel, and `filters`
-      specifies the number of filters per channel. The output channels are
-      ordered such that the first block of `filters` channels is computed from
-      the first input channel, the second block from the second input channel,
-      etc.
-    data_format: String, one of `channels_last` (default) or `channels_first`.
-      The ordering of the input dimensions. `channels_last` corresponds to
-      input tensors with shape `(batch, ..., channels)`, while `channels_first`
-      corresponds to input tensors with shape `(batch, channels, ...)`.
-    activation: Activation function or `None`.
-    use_bias: Boolean, whether an additive constant will be applied to each
-      output channel.
-    use_explicit: Boolean, whether to use `EXPLICIT` padding mode (supported in
-      TensorFlow >1.14).
-    kernel_initializer: An initializer for the filter kernel.
-    bias_initializer: An initializer for the bias vector.
-    kernel_regularizer: Optional regularizer for the filter kernel.
-    bias_regularizer: Optional regularizer for the bias vector.
-    activity_regularizer: Regularizer function for the output.
-    kernel_parameterizer: Reparameterization applied to filter kernel. If not
-      `None`, must be a `Parameterizer` object. Defaults to `RDFTParameterizer`.
-    bias_parameterizer: Reparameterization applied to bias. If not `None`,
-      must be a `Parameterizer` object. Defaults to `None`.
-    trainable: Boolean. Whether the layer should be trained.
-    name: String. The name of the layer.
-    dtype: `DType` of the layer's inputs (default of `None` means use the type
-      of the first input).
-
-  Read-only properties:
-    filters: See above.
-    kernel_support: See above.
-    corr: See above.
-    strides_down: See above.
-    strides_up: See above.
-    padding: See above.
-    extra_pad_end: See above.
-    channel_separable: See above.
-    data_format: See above.
-    activation: See above.
-    use_bias: See above.
-    kernel_initializer: See above.
-    bias_initializer: See above.
-    kernel_regularizer: See above.
-    bias_regularizer: See above.
-    activity_regularizer: See above.
-    kernel_parameterizer: See above.
-    bias_parameterizer: See above.
-    name: See above.
-    dtype: See above.
-    kernel: `Tensor`-like object. The convolution kernel as applied to the
-      inputs, i.e. after any reparameterizers.
-    bias: `Tensor`-like object. The bias vector as applied to the inputs, i.e.
-      after any reparameterizers.
-    trainable_variables: List of trainable variables.
-    non_trainable_variables: List of non-trainable variables.
-    variables: List of all variables of this layer, trainable and non-trainable.
-    updates: List of update ops of this layer.
-    losses: List of losses added by this layer.
-
-  Mutable properties:
-    trainable: Boolean. Whether the layer should be trained.
-    input_spec: Optional `InputSpec` object specifying the constraints on inputs
-      that can be accepted by the layer.
   """
 
   def __init__(self, filters, kernel_support,
@@ -281,6 +199,52 @@ class _SignalConv(tf.keras.layers.Layer):
                kernel_parameterizer=parameterizers.RDFTParameterizer(),
                bias_parameterizer=None,
                **kwargs):
+    """Initializer.
+
+    Arguments:
+      filters: Integer. If `not channel_separable`, specifies the total number
+        of filters, which is equal to the number of output channels. Otherwise,
+        specifies the number of filters per channel, which makes the number of
+        output channels equal to `filters` times the number of input channels.
+      kernel_support: An integer or iterable of {rank} integers, specifying the
+        length of the convolution/correlation window in each dimension.
+      corr: Boolean. If True, compute cross correlation. If False, convolution.
+      strides_down: An integer or iterable of {rank} integers, specifying an
+        optional downsampling stride after the convolution/correlation.
+      strides_up: An integer or iterable of {rank} integers, specifying an
+        optional upsampling stride before the convolution/correlation.
+      padding: String. One of the supported padding modes (see above).
+      extra_pad_end: Boolean. When upsampling, use extra skipped samples at the
+        end of each dimension (default). For examples, refer to the discussion
+        of padding modes above.
+      channel_separable: Boolean. If `False` (default), each output channel is
+        computed by summing over all filtered input channels. If `True`, each
+        output channel is computed from only one input channel, and `filters`
+        specifies the number of filters per channel. The output channels are
+        ordered such that the first block of `filters` channels is computed from
+        the first input channel, the second block from the second input channel,
+        etc.
+      data_format: String, one of `channels_last` (default) or `channels_first`.
+        The ordering of the input dimensions. `channels_last` corresponds to
+        input tensors with shape `(batch, ..., channels)`, while
+        `channels_first` corresponds to input tensors with shape `(batch,
+        channels, ...)`.
+      activation: Activation function or `None`.
+      use_bias: Boolean, whether an additive constant will be applied to each
+        output channel.
+      use_explicit: Boolean, whether to use `EXPLICIT` padding mode (supported
+        in TensorFlow >1.14).
+      kernel_initializer: An initializer for the filter kernel.
+      bias_initializer: An initializer for the bias vector.
+      kernel_regularizer: Optional regularizer for the filter kernel.
+      bias_regularizer: Optional regularizer for the bias vector.
+      kernel_parameterizer: Reparameterization applied to filter kernel. If not
+        `None`, must be a `Parameterizer` object. Defaults to
+        `RDFTParameterizer`.
+      bias_parameterizer: Reparameterization applied to bias. If not `None`,
+        must be a `Parameterizer` object. Defaults to `None`.
+      **kwargs: Other keyword arguments passed to superclass (`Layer`).
+    """
     super(_SignalConv, self).__init__(**kwargs)
 
     self._filters = int(filters)

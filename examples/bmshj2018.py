@@ -38,7 +38,7 @@ import sys
 from absl import app
 from absl.flags import argparse_flags
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 import tensorflow_compression as tfc
 
@@ -46,78 +46,6 @@ import tensorflow_compression as tfc
 SCALES_MIN = 0.11
 SCALES_MAX = 256
 SCALES_LEVELS = 64
-
-
-# TODO(jonycgn): Use tfc.PackedTensors once new binary packages have been built.
-class PackedTensors(object):
-  """Packed representation of compressed tensors."""
-
-  def __init__(self, string=None):
-    self._example = tf.train.Example()
-    if string:
-      self.string = string
-
-  @property
-  def model(self):
-    """Model identifier."""
-    buf = self._example.features.feature["MD"].bytes_list.value[0]
-    return buf.decode("ascii")
-
-  @model.setter
-  def model(self, value):
-    self._example.features.feature["MD"].bytes_list.value[:] = [
-        value.encode("ascii")]
-
-  @model.deleter
-  def model(self):
-    del self._example.features.feature["MD"]
-
-  @property
-  def string(self):
-    """A string representation of this object."""
-    return self._example.SerializeToString()
-
-  @string.setter
-  def string(self, value):
-    self._example.ParseFromString(value)
-
-  def pack(self, tensors, arrays):
-    """Packs Tensor values into this object."""
-    if len(tensors) != len(arrays):
-      raise ValueError("`tensors` and `arrays` must have same length.")
-    i = 1
-    for tensor, array in zip(tensors, arrays):
-      feature = self._example.features.feature[chr(i)]
-      feature.Clear()
-      if array.ndim != 1:
-        raise RuntimeError("Unexpected tensor rank: {}.".format(array.ndim))
-      if tensor.dtype.is_integer:
-        feature.int64_list.value[:] = array
-      elif tensor.dtype == tf.string:
-        feature.bytes_list.value[:] = array
-      else:
-        raise RuntimeError(
-            "Unexpected tensor dtype: '{}'.".format(tensor.dtype))
-      i += 1
-    # Delete any remaining, previously set arrays.
-    while chr(i) in self._example.features.feature:
-      del self._example.features.feature[chr(i)]
-      i += 1
-
-  def unpack(self, tensors):
-    """Unpacks Tensor values from this object."""
-    arrays = []
-    for i, tensor in enumerate(tensors):
-      feature = self._example.features.feature[chr(i + 1)]
-      np_dtype = tensor.dtype.as_numpy_dtype
-      if tensor.dtype.is_integer:
-        arrays.append(np.array(feature.int64_list.value, dtype=np_dtype))
-      elif tensor.dtype == tf.string:
-        arrays.append(np.array(feature.bytes_list.value, dtype=np_dtype))
-      else:
-        raise RuntimeError(
-            "Unexpected tensor dtype: '{}'.".format(tensor.dtype))
-    return arrays
 
 
 def read_png(filename):
@@ -361,6 +289,7 @@ def compress(args):
   x = read_png(args.input_file)
   x = tf.expand_dims(x, 0)
   x.set_shape([1, None, None, 3])
+  x_shape = tf.shape(x)
 
   # Instantiate model.
   analysis_transform = AnalysisTransform(args.num_filters)
@@ -371,9 +300,11 @@ def compress(args):
 
   # Transform and compress the image.
   y = analysis_transform(x)
+  y_shape = tf.shape(y)
   z = hyper_analysis_transform(abs(y))
   z_hat, z_likelihoods = entropy_bottleneck(z, training=False)
   sigma = hyper_synthesis_transform(z_hat)
+  sigma = sigma[:, :y_shape[1], :y_shape[2], :]
   scale_table = np.exp(np.linspace(
       np.log(SCALES_MIN), np.log(SCALES_MAX), SCALES_LEVELS))
   conditional_bottleneck = tfc.GaussianConditional(sigma, scale_table)
@@ -383,6 +314,7 @@ def compress(args):
   # Transform the quantized image back (if requested).
   y_hat, y_likelihoods = conditional_bottleneck(y, training=False)
   x_hat = synthesis_transform(y_hat)
+  x_hat = x_hat[:, :x_shape[1], :x_shape[2], :]
 
   num_pixels = tf.cast(tf.reduce_prod(tf.shape(x)[:-1]), dtype=tf.float32)
 
@@ -409,7 +341,7 @@ def compress(args):
     arrays = sess.run(tensors)
 
     # Write a binary file with the shape information and the compressed string.
-    packed = PackedTensors()
+    packed = tfc.PackedTensors()
     packed.pack(tensors, arrays)
     with open(args.output_file, "wb") as f:
       f.write(packed.string)
@@ -440,7 +372,7 @@ def decompress(args):
   y_shape = tf.placeholder(tf.int32, [2])
   z_shape = tf.placeholder(tf.int32, [2])
   with open(args.input_file, "rb") as f:
-    packed = PackedTensors(f.read())
+    packed = tfc.PackedTensors(f.read())
   tensors = [string, side_string, x_shape, y_shape, z_shape]
   arrays = packed.unpack(tensors)
 

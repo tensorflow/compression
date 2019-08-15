@@ -53,6 +53,18 @@
 
 # tfc.GDN
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/gdn.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `GDN`
 
 Generalized divisive normalization layer.
@@ -61,18 +73,8 @@ Generalized divisive normalization layer.
 
 ### Aliases:
 
-* Class `tfc.GDN`
 * Class `tfc.python.layers.gdn.GDN`
 
-
-
-
-<table class="tfo-github-link" align="left">
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/gdn.py">
-  <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
-  View source on GitHub
-</a>
-</table>
 
 <!-- Placeholder for "Used in" -->
 
@@ -101,55 +103,6 @@ where `i` and `j` run over channels. This implementation never sums across
 spatial dimensions. It is similar to local response normalization, but much
 more flexible, as `beta` and `gamma` are trainable parameters.
 
-#### Arguments:
-
-
-* <b>`inverse`</b>: Boolean. If `False` (default), compute GDN response. If `True`,
-  compute IGDN response (one step of fixed point iteration to invert GDN;
-  the division is replaced by multiplication).
-* <b>`rectify`</b>: Boolean. If `True`, apply a `relu` nonlinearity to the inputs
-  before calculating GDN response.
-* <b>`gamma_init`</b>: Float. The gamma matrix will be initialized as the identity
-  matrix multiplied with this value. If set to zero, the layer is
-  effectively initialized to the identity operation, since beta is
-  initialized as one. A good default setting is somewhere between 0 and 0.5.
-* <b>`data_format`</b>: Format of input tensor. Currently supports `'channels_first'`
-  and `'channels_last'`.
-* <b>`beta_parameterizer`</b>: `Parameterizer` object for beta parameter. Defaults
-  to `NonnegativeParameterizer` with a minimum value of 1e-6.
-* <b>`gamma_parameterizer`</b>: `Parameterizer` object for gamma parameter.
-  Defaults to `NonnegativeParameterizer` with a minimum value of 0.
-* <b>`activity_regularizer`</b>: Regularizer function for the output.
-* <b>`trainable`</b>: Boolean. Whether the layer should be trained.
-* <b>`name`</b>: String. The name of the layer.
-* <b>`dtype`</b>: `DType` of the layer's inputs (default of `None` means use the type
-  of the first input).
-
-Read-only properties:
-  inverse: Boolean, whether GDN is computed (`True`) or IGDN (`False`).
-  rectify: Boolean, whether to apply `relu` before normalization or not.
-  gamma_init: See above.
-  data_format: See above.
-  activity_regularizer: See above.
-  name: See above.
-  dtype: See above.
-  beta: The beta parameter as defined above (1D `Tensor`).
-  gamma: The gamma parameter as defined above (2D `Tensor`).
-  trainable_variables: List of trainable variables.
-  non_trainable_variables: List of non-trainable variables.
-  variables: List of all variables of this layer, trainable and non-trainable.
-  updates: List of update ops of this layer.
-  losses: List of losses added by this layer.
-
-#### Mutable properties:
-
-
-* <b>`beta_parameterizer`</b>: See above.
-* <b>`gamma_parameterizer`</b>: See above.
-* <b>`trainable`</b>: Boolean. Whether the layer should be trained.
-* <b>`input_spec`</b>: Optional `InputSpec` object specifying the constraints on inputs
-  that can be accepted by the layer.
-
 <h2 id="__init__"><code>__init__</code></h2>
 
 <a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/gdn.py">View source</a>
@@ -166,8 +119,29 @@ __init__(
 )
 ```
 
+Initializer.
 
 
+#### Arguments:
+
+
+* <b>`inverse`</b>: Boolean. If `False` (default), compute GDN response. If `True`,
+  compute IGDN response (one step of fixed point iteration to invert GDN;
+  the division is replaced by multiplication).
+* <b>`rectify`</b>: Boolean. If `True`, apply a `relu` nonlinearity to the inputs
+  before calculating GDN response.
+* <b>`gamma_init`</b>: Float. The gamma matrix will be initialized as the identity
+  matrix multiplied with this value. If set to zero, the layer is
+  effectively initialized to the identity operation, since beta is
+  initialized as one. A good default setting is somewhere between 0 and
+  0.5.
+* <b>`data_format`</b>: Format of input tensor. Currently supports `'channels_first'`
+  and `'channels_last'`.
+* <b>`beta_parameterizer`</b>: `Parameterizer` object for beta parameter. Defaults
+  to `NonnegativeParameterizer` with a minimum value of 1e-6.
+* <b>`gamma_parameterizer`</b>: `Parameterizer` object for gamma parameter.
+  Defaults to `NonnegativeParameterizer` with a minimum value of 0.
+* <b>`**kwargs`</b>: Other keyword arguments passed to superclass (`Layer`).
 
 
 

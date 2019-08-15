@@ -5,12 +5,20 @@
 
 # tfc.range_encode
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+</table>
+
+Defined in generated file: `python/ops/gen_range_coding_ops.py`
+
+
+
 Using the provided cumulative distribution functions (CDF) inside `cdf`, returns
 
 ### Aliases:
 
 * `tfc.python.ops.range_coding_ops.range_encode`
-* `tfc.range_encode`
+
 
 ``` python
 tfc.range_encode(
@@ -23,8 +31,6 @@ tfc.range_encode(
 ```
 
 
-
-Defined in generated file: `python/ops/gen_range_coding_ops.py`
 
 <!-- Placeholder for "Used in" -->
 

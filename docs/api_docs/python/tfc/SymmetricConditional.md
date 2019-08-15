@@ -57,94 +57,31 @@
 
 # tfc.SymmetricConditional
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/entropy_models.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `SymmetricConditional`
 
-Symmetric conditional entropy model.
+Symmetric conditional entropy model (base class).
 
 Inherits From: [`EntropyModel`](../tfc/EntropyModel.md)
 
 ### Aliases:
 
-* Class `tfc.SymmetricConditional`
 * Class `tfc.python.layers.entropy_models.SymmetricConditional`
 
 
-
-
-<table class="tfo-github-link" align="left">
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/entropy_models.py">
-  <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
-  View source on GitHub
-</a>
-</table>
-
 <!-- Placeholder for "Used in" -->
 
-
-#### Arguments:
-
-
-* <b>`scale`</b>: `Tensor`, the scale parameters for the conditional distributions.
-* <b>`scale_table`</b>: Iterable of positive floats. It's optimal to choose the scales
-  in a logarithmic way. For each predicted scale, the next greater entry in
-  the table is selected during compression.
-* <b>`scale_bound`</b>: Float. Lower bound for scales. Any values in `scale` smaller
-  than this value are set to this value to prevent non-positive scales. By
-  default (or when set to `None`), uses the smallest value in `scale_table`.
-  To disable, set to 0.
-* <b>`mean`</b>: `Tensor`, the mean parameters for the conditional distributions. If
-  `None`, the mean is assumed to be zero.
-* <b>`indexes`</b>: `Tensor` of type `int32` or `None`. Can be used to override the
-  selection of indexes based on `scale`. Only affects compression and
-  decompression.
-* <b>`tail_mass`</b>: Float, between 0 and 1. Values occurring in the tails of the
-  distributions will not be encoded with range coding, but using a
-  Golomb-like code. `tail_mass` determines the amount of probability mass in
-  the tails which will be Golomb-coded. For example, the default value of
-  `2 ** -8` means that on average, one 256th of all values will use the
-  Golomb code.
-* <b>`likelihood_bound`</b>: Float. If positive, the returned likelihood values are
-  ensured to be greater than or equal to this value. This prevents very
-  large gradients with a typical entropy loss (defaults to 1e-9).
-* <b>`range_coder_precision`</b>: Integer, between 1 and 16. The precision of the range
-  coder used for compression and decompression. This trades off computation
-  speed with compression efficiency, where 16 is the slowest but most
-  efficient setting. Choosing lower values may increase the average
-  codelength slightly compared to the estimated entropies.
-* <b>`data_format`</b>: Either `'channels_first'` or `'channels_last'` (default).
-* <b>`trainable`</b>: Boolean. Whether the layer should be trained.
-* <b>`name`</b>: String. The name of the layer.
-* <b>`dtype`</b>: `DType` of the layer's inputs, parameters, returned likelihoods, and
-  outputs during training. Default of `None` means to use the type of the
-  first input.
-
-Read-only properties:
-  scale: See above.
-  scale_table: See above.
-  scale_bound: See above.
-  mean: See above.
-  indexes: `Tensor` of type `int32`, giving the indexes into the scale table
-    for each input element. If not overridden in the constructor, they
-    correspond to the table entry with the smallest scale just larger than
-    each predicted scale.
-  tail_mass: See above.
-  likelihood_bound: See above.
-  range_coder_precision: See above.
-  data_format: See above.
-  name: String. See above.
-  dtype: See above.
-  trainable_variables: List of trainable variables.
-  non_trainable_variables: List of non-trainable variables.
-  variables: List of all variables of this layer, trainable and non-trainable.
-  updates: List of update ops of this layer.
-  losses: List of losses added by this layer.
-
-#### Mutable properties:
-
-
-* <b>`trainable`</b>: Boolean. Whether the layer should be trained.
-* <b>`input_spec`</b>: Optional `InputSpec` object specifying the constraints on inputs
-  that can be accepted by the layer.
 
 <h2 id="__init__"><code>__init__</code></h2>
 
@@ -161,8 +98,29 @@ __init__(
 )
 ```
 
+Initializer.
 
 
+#### Arguments:
+
+
+* <b>`scale`</b>: `Tensor`, the scale parameters for the conditional distributions.
+* <b>`scale_table`</b>: Iterable of positive floats. For range coding, the scale
+  parameters in `scale` can't be used, because the probability tables need
+  to be constructed statically. Only the values given in this table will
+  actually be used for range coding. For each predicted scale, the next
+  greater entry in the table is selected. It's optimal to choose the
+  scales provided here in a logarithmic way.
+* <b>`scale_bound`</b>: Float. Lower bound for scales. Any values in `scale` smaller
+  than this value are set to this value to prevent non-positive scales. By
+  default (or when set to `None`), uses the smallest value in
+  `scale_table`. To disable, set to 0.
+* <b>`mean`</b>: `Tensor`, the mean parameters for the conditional distributions. If
+  `None`, the mean is assumed to be zero.
+* <b>`indexes`</b>: `Tensor` of type `int32` or `None`. Can be used to override the
+  selection of scale table indexes based on the predicted values in
+  `scale`. Only affects compression and decompression.
+* <b>`**kwargs`</b>: Other keyword arguments passed to superclass (`EntropyModel`).
 
 
 

@@ -19,7 +19,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 from tensorflow_compression.python.layers import parameterizers
 
@@ -58,51 +58,6 @@ class GDN(tf.keras.layers.Layer):
   where `i` and `j` run over channels. This implementation never sums across
   spatial dimensions. It is similar to local response normalization, but much
   more flexible, as `beta` and `gamma` are trainable parameters.
-
-  Arguments:
-    inverse: Boolean. If `False` (default), compute GDN response. If `True`,
-      compute IGDN response (one step of fixed point iteration to invert GDN;
-      the division is replaced by multiplication).
-    rectify: Boolean. If `True`, apply a `relu` nonlinearity to the inputs
-      before calculating GDN response.
-    gamma_init: Float. The gamma matrix will be initialized as the identity
-      matrix multiplied with this value. If set to zero, the layer is
-      effectively initialized to the identity operation, since beta is
-      initialized as one. A good default setting is somewhere between 0 and 0.5.
-    data_format: Format of input tensor. Currently supports `'channels_first'`
-      and `'channels_last'`.
-    beta_parameterizer: `Parameterizer` object for beta parameter. Defaults
-      to `NonnegativeParameterizer` with a minimum value of 1e-6.
-    gamma_parameterizer: `Parameterizer` object for gamma parameter.
-      Defaults to `NonnegativeParameterizer` with a minimum value of 0.
-    activity_regularizer: Regularizer function for the output.
-    trainable: Boolean. Whether the layer should be trained.
-    name: String. The name of the layer.
-    dtype: `DType` of the layer's inputs (default of `None` means use the type
-      of the first input).
-
-  Read-only properties:
-    inverse: Boolean, whether GDN is computed (`True`) or IGDN (`False`).
-    rectify: Boolean, whether to apply `relu` before normalization or not.
-    gamma_init: See above.
-    data_format: See above.
-    activity_regularizer: See above.
-    name: See above.
-    dtype: See above.
-    beta: The beta parameter as defined above (1D `Tensor`).
-    gamma: The gamma parameter as defined above (2D `Tensor`).
-    trainable_variables: List of trainable variables.
-    non_trainable_variables: List of non-trainable variables.
-    variables: List of all variables of this layer, trainable and non-trainable.
-    updates: List of update ops of this layer.
-    losses: List of losses added by this layer.
-
-  Mutable properties:
-    beta_parameterizer: See above.
-    gamma_parameterizer: See above.
-    trainable: Boolean. Whether the layer should be trained.
-    input_spec: Optional `InputSpec` object specifying the constraints on inputs
-      that can be accepted by the layer.
   """
 
   def __init__(self,
@@ -113,6 +68,27 @@ class GDN(tf.keras.layers.Layer):
                beta_parameterizer=_default_beta_param,
                gamma_parameterizer=_default_gamma_param,
                **kwargs):
+    """Initializer.
+
+    Arguments:
+      inverse: Boolean. If `False` (default), compute GDN response. If `True`,
+        compute IGDN response (one step of fixed point iteration to invert GDN;
+        the division is replaced by multiplication).
+      rectify: Boolean. If `True`, apply a `relu` nonlinearity to the inputs
+        before calculating GDN response.
+      gamma_init: Float. The gamma matrix will be initialized as the identity
+        matrix multiplied with this value. If set to zero, the layer is
+        effectively initialized to the identity operation, since beta is
+        initialized as one. A good default setting is somewhere between 0 and
+        0.5.
+      data_format: Format of input tensor. Currently supports `'channels_first'`
+        and `'channels_last'`.
+      beta_parameterizer: `Parameterizer` object for beta parameter. Defaults
+        to `NonnegativeParameterizer` with a minimum value of 1e-6.
+      gamma_parameterizer: `Parameterizer` object for gamma parameter.
+        Defaults to `NonnegativeParameterizer` with a minimum value of 0.
+      **kwargs: Other keyword arguments passed to superclass (`Layer`).
+    """
     super(GDN, self).__init__(**kwargs)
     self._inverse = bool(inverse)
     self._rectify = bool(rectify)

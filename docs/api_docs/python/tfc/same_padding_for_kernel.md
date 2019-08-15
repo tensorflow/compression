@@ -5,12 +5,24 @@
 
 # tfc.same_padding_for_kernel
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/ops/padding_ops.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Determine correct amount of padding for `same` convolution.
 
 ### Aliases:
 
 * `tfc.python.ops.padding_ops.same_padding_for_kernel`
-* `tfc.same_padding_for_kernel`
+
 
 ``` python
 tfc.same_padding_for_kernel(
@@ -21,14 +33,6 @@ tfc.same_padding_for_kernel(
 ```
 
 
-
-
-<table class="tfo-github-link" align="left">
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/ops/padding_ops.py">
-  <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
-  View source on GitHub
-</a>
-</table>
 
 <!-- Placeholder for "Used in" -->
 

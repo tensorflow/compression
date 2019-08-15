@@ -20,7 +20,7 @@ from __future__ import print_function
 
 import numpy as np
 from scipy import fftpack
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 
 _matrix_cache = {}

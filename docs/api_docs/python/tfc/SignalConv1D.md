@@ -67,6 +67,18 @@
 
 # tfc.SignalConv1D
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/signal_conv.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `SignalConv1D`
 
 1D convolution layer.
@@ -75,18 +87,8 @@
 
 ### Aliases:
 
-* Class `tfc.SignalConv1D`
 * Class `tfc.python.layers.signal_conv.SignalConv1D`
 
-
-
-
-<table class="tfo-github-link" align="left">
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/signal_conv.py">
-  <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
-  View source on GitHub
-</a>
-</table>
 
 <!-- Placeholder for "Used in" -->
 
@@ -243,92 +245,6 @@ will throw a `NotImplementedError` exception.
   `filters == 1`. When using `channel_separable`, prefer using identical
   strides in all dimensions to maximize performance.
 
-#### Arguments:
-
-
-* <b>`filters`</b>: Integer. If `not channel_separable`, specifies the total number of
-  filters, which is equal to the number of output channels. Otherwise,
-  specifies the number of filters per channel, which makes the number of
-  output channels equal to `filters` times the number of input channels.
-* <b>`kernel_support`</b>: An integer or iterable of 1 integers, specifying the
-  length of the convolution/correlation window in each dimension.
-* <b>`corr`</b>: Boolean. If True, compute cross correlation. If False, convolution.
-* <b>`strides_down`</b>: An integer or iterable of 1 integers, specifying an
-  optional downsampling stride after the convolution/correlation.
-* <b>`strides_up`</b>: An integer or iterable of 1 integers, specifying an
-  optional upsampling stride before the convolution/correlation.
-* <b>`padding`</b>: String. One of the supported padding modes (see above).
-* <b>`extra_pad_end`</b>: Boolean. When upsampling, use extra skipped samples at the
-  end of each dimension (default). For examples, refer to the discussion
-  of padding modes above.
-* <b>`channel_separable`</b>: Boolean. If `False` (default), each output channel is
-  computed by summing over all filtered input channels. If `True`, each
-  output channel is computed from only one input channel, and `filters`
-  specifies the number of filters per channel. The output channels are
-  ordered such that the first block of `filters` channels is computed from
-  the first input channel, the second block from the second input channel,
-  etc.
-* <b>`data_format`</b>: String, one of `channels_last` (default) or `channels_first`.
-  The ordering of the input dimensions. `channels_last` corresponds to
-  input tensors with shape `(batch, ..., channels)`, while `channels_first`
-  corresponds to input tensors with shape `(batch, channels, ...)`.
-* <b>`activation`</b>: Activation function or `None`.
-* <b>`use_bias`</b>: Boolean, whether an additive constant will be applied to each
-  output channel.
-* <b>`use_explicit`</b>: Boolean, whether to use `EXPLICIT` padding mode (supported in
-  TensorFlow >1.14).
-* <b>`kernel_initializer`</b>: An initializer for the filter kernel.
-* <b>`bias_initializer`</b>: An initializer for the bias vector.
-* <b>`kernel_regularizer`</b>: Optional regularizer for the filter kernel.
-* <b>`bias_regularizer`</b>: Optional regularizer for the bias vector.
-* <b>`activity_regularizer`</b>: Regularizer function for the output.
-* <b>`kernel_parameterizer`</b>: Reparameterization applied to filter kernel. If not
-  `None`, must be a `Parameterizer` object. Defaults to `RDFTParameterizer`.
-* <b>`bias_parameterizer`</b>: Reparameterization applied to bias. If not `None`,
-  must be a `Parameterizer` object. Defaults to `None`.
-* <b>`trainable`</b>: Boolean. Whether the layer should be trained.
-* <b>`name`</b>: String. The name of the layer.
-* <b>`dtype`</b>: `DType` of the layer's inputs (default of `None` means use the type
-  of the first input).
-
-Read-only properties:
-  filters: See above.
-  kernel_support: See above.
-  corr: See above.
-  strides_down: See above.
-  strides_up: See above.
-  padding: See above.
-  extra_pad_end: See above.
-  channel_separable: See above.
-  data_format: See above.
-  activation: See above.
-  use_bias: See above.
-  kernel_initializer: See above.
-  bias_initializer: See above.
-  kernel_regularizer: See above.
-  bias_regularizer: See above.
-  activity_regularizer: See above.
-  kernel_parameterizer: See above.
-  bias_parameterizer: See above.
-  name: See above.
-  dtype: See above.
-  kernel: `Tensor`-like object. The convolution kernel as applied to the
-    inputs, i.e. after any reparameterizers.
-  bias: `Tensor`-like object. The bias vector as applied to the inputs, i.e.
-    after any reparameterizers.
-  trainable_variables: List of trainable variables.
-  non_trainable_variables: List of non-trainable variables.
-  variables: List of all variables of this layer, trainable and non-trainable.
-  updates: List of update ops of this layer.
-  losses: List of losses added by this layer.
-
-#### Mutable properties:
-
-
-* <b>`trainable`</b>: Boolean. Whether the layer should be trained.
-* <b>`input_spec`</b>: Optional `InputSpec` object specifying the constraints on inputs
-  that can be accepted by the layer.
-
 <h2 id="__init__"><code>__init__</code></h2>
 
 <a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/signal_conv.py">View source</a>
@@ -357,8 +273,54 @@ __init__(
 )
 ```
 
+Initializer.
 
 
+#### Arguments:
+
+
+* <b>`filters`</b>: Integer. If `not channel_separable`, specifies the total number
+  of filters, which is equal to the number of output channels. Otherwise,
+  specifies the number of filters per channel, which makes the number of
+  output channels equal to `filters` times the number of input channels.
+* <b>`kernel_support`</b>: An integer or iterable of {rank} integers, specifying the
+  length of the convolution/correlation window in each dimension.
+* <b>`corr`</b>: Boolean. If True, compute cross correlation. If False, convolution.
+* <b>`strides_down`</b>: An integer or iterable of {rank} integers, specifying an
+  optional downsampling stride after the convolution/correlation.
+* <b>`strides_up`</b>: An integer or iterable of {rank} integers, specifying an
+  optional upsampling stride before the convolution/correlation.
+* <b>`padding`</b>: String. One of the supported padding modes (see above).
+* <b>`extra_pad_end`</b>: Boolean. When upsampling, use extra skipped samples at the
+  end of each dimension (default). For examples, refer to the discussion
+  of padding modes above.
+* <b>`channel_separable`</b>: Boolean. If `False` (default), each output channel is
+  computed by summing over all filtered input channels. If `True`, each
+  output channel is computed from only one input channel, and `filters`
+  specifies the number of filters per channel. The output channels are
+  ordered such that the first block of `filters` channels is computed from
+  the first input channel, the second block from the second input channel,
+  etc.
+* <b>`data_format`</b>: String, one of `channels_last` (default) or `channels_first`.
+  The ordering of the input dimensions. `channels_last` corresponds to
+  input tensors with shape `(batch, ..., channels)`, while
+  `channels_first` corresponds to input tensors with shape `(batch,
+  channels, ...)`.
+* <b>`activation`</b>: Activation function or `None`.
+* <b>`use_bias`</b>: Boolean, whether an additive constant will be applied to each
+  output channel.
+* <b>`use_explicit`</b>: Boolean, whether to use `EXPLICIT` padding mode (supported
+  in TensorFlow >1.14).
+* <b>`kernel_initializer`</b>: An initializer for the filter kernel.
+* <b>`bias_initializer`</b>: An initializer for the bias vector.
+* <b>`kernel_regularizer`</b>: Optional regularizer for the filter kernel.
+* <b>`bias_regularizer`</b>: Optional regularizer for the bias vector.
+* <b>`kernel_parameterizer`</b>: Reparameterization applied to filter kernel. If not
+  `None`, must be a `Parameterizer` object. Defaults to
+  `RDFTParameterizer`.
+* <b>`bias_parameterizer`</b>: Reparameterization applied to bias. If not `None`,
+  must be a `Parameterizer` object. Defaults to `None`.
+* <b>`**kwargs`</b>: Other keyword arguments passed to superclass (`Layer`).
 
 
 

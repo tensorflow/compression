@@ -5,12 +5,24 @@
 
 # tfc.irdft_matrix
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/ops/spectral_ops.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Matrix for implementing kernel reparameterization with `tf.matmul`.
 
 ### Aliases:
 
-* `tfc.irdft_matrix`
 * `tfc.python.ops.spectral_ops.irdft_matrix`
+
 
 ``` python
 tfc.irdft_matrix(
@@ -20,14 +32,6 @@ tfc.irdft_matrix(
 ```
 
 
-
-
-<table class="tfo-github-link" align="left">
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/ops/spectral_ops.py">
-  <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
-  View source on GitHub
-</a>
-</table>
 
 <!-- Placeholder for "Used in" -->
 

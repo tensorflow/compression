@@ -5,12 +5,20 @@
 
 # tfc.range_decode
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+</table>
+
+Defined in generated file: `python/ops/gen_range_coding_ops.py`
+
+
+
 Decodes a range-coded `code` into an int32 tensor of shape `shape`.
 
 ### Aliases:
 
 * `tfc.python.ops.range_coding_ops.range_decode`
-* `tfc.range_decode`
+
 
 ``` python
 tfc.range_decode(
@@ -24,8 +32,6 @@ tfc.range_decode(
 ```
 
 
-
-Defined in generated file: `python/ops/gen_range_coding_ops.py`
 
 <!-- Placeholder for "Used in" -->
 

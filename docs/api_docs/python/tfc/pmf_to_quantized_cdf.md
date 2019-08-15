@@ -5,12 +5,20 @@
 
 # tfc.pmf_to_quantized_cdf
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+</table>
+
+Defined in generated file: `python/ops/gen_range_coding_ops.py`
+
+
+
 Converts PMF to quantized CDF. This op uses floating-point operations
 
 ### Aliases:
 
-* `tfc.pmf_to_quantized_cdf`
 * `tfc.python.ops.range_coding_ops.pmf_to_quantized_cdf`
+
 
 ``` python
 tfc.pmf_to_quantized_cdf(
@@ -21,8 +29,6 @@ tfc.pmf_to_quantized_cdf(
 ```
 
 
-
-Defined in generated file: `python/ops/gen_range_coding_ops.py`
 
 <!-- Placeholder for "Used in" -->
 

@@ -57,6 +57,18 @@
 
 # tfc.GaussianConditional
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/entropy_models.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `GaussianConditional`
 
 Conditional Gaussian entropy model.
@@ -65,21 +77,18 @@ Inherits From: [`SymmetricConditional`](../tfc/SymmetricConditional.md)
 
 ### Aliases:
 
-* Class `tfc.GaussianConditional`
 * Class `tfc.python.layers.entropy_models.GaussianConditional`
 
 
-
-
-<table class="tfo-github-link" align="left">
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/entropy_models.py">
-  <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
-  View source on GitHub
-</a>
-</table>
-
 <!-- Placeholder for "Used in" -->
 
+The layer implements a conditionally Gaussian probability density model to
+estimate entropy of its input tensor, which is described in the paper (please
+cite the paper if you use this code for scientific work):
+
+> "Variational image compression with a scale hyperprior"<br />
+> J. Ballé, D. Minnen, S. Singh, S. J. Hwang, N. Johnston<br />
+> https://arxiv.org/abs/1802.01436
 
 <h2 id="__init__"><code>__init__</code></h2>
 
@@ -96,8 +105,29 @@ __init__(
 )
 ```
 
+Initializer.
 
 
+#### Arguments:
+
+
+* <b>`scale`</b>: `Tensor`, the scale parameters for the conditional distributions.
+* <b>`scale_table`</b>: Iterable of positive floats. For range coding, the scale
+  parameters in `scale` can't be used, because the probability tables need
+  to be constructed statically. Only the values given in this table will
+  actually be used for range coding. For each predicted scale, the next
+  greater entry in the table is selected. It's optimal to choose the
+  scales provided here in a logarithmic way.
+* <b>`scale_bound`</b>: Float. Lower bound for scales. Any values in `scale` smaller
+  than this value are set to this value to prevent non-positive scales. By
+  default (or when set to `None`), uses the smallest value in
+  `scale_table`. To disable, set to 0.
+* <b>`mean`</b>: `Tensor`, the mean parameters for the conditional distributions. If
+  `None`, the mean is assumed to be zero.
+* <b>`indexes`</b>: `Tensor` of type `int32` or `None`. Can be used to override the
+  selection of scale table indexes based on the predicted values in
+  `scale`. Only affects compression and decompression.
+* <b>`**kwargs`</b>: Other keyword arguments passed to superclass (`EntropyModel`).
 
 
 

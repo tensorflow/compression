@@ -55,6 +55,18 @@
 
 # tfc.EntropyBottleneck
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/entropy_models.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `EntropyBottleneck`
 
 Entropy bottleneck layer.
@@ -63,18 +75,8 @@ Inherits From: [`EntropyModel`](../tfc/EntropyModel.md)
 
 ### Aliases:
 
-* Class `tfc.EntropyBottleneck`
 * Class `tfc.python.layers.entropy_models.EntropyBottleneck`
 
-
-
-
-<table class="tfo-github-link" align="left">
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/entropy_models.py">
-  <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
-  View source on GitHub
-</a>
-</table>
 
 <!-- Placeholder for "Used in" -->
 
@@ -117,64 +119,6 @@ which are only significant for compression and decompression. To use the
 compression feature, the auxiliary loss must be minimized during or after
 training. After that, the update op must be executed at least once.
 
-#### Arguments:
-
-
-* <b>`init_scale`</b>: Float. A scaling factor determining the initial width of the
-  probability densities. This should be chosen big enough so that the
-  range of values of the layer inputs roughly falls within the interval
-  [`-init_scale`, `init_scale`] at the beginning of training.
-* <b>`filters`</b>: An iterable of ints, giving the number of filters at each layer of
-  the density model. Generally, the more filters and layers, the more
-  expressive is the density model in terms of modeling more complicated
-  distributions of the layer inputs. For details, refer to the paper
-  referenced above. The default is `[3, 3, 3]`, which should be sufficient
-  for most practical purposes.
-* <b>`tail_mass`</b>: Float, between 0 and 1. The bottleneck layer automatically
-  determines the range of input values based on their frequency of
-  occurrence. Values occurring in the tails of the distributions will not be
-  encoded with range coding, but using a Golomb-like code. `tail_mass`
-  determines the amount of probability mass in the tails which will be
-  Golomb-coded. For example, the default value of `2 ** -8` means that on
-  average, one 256th of all values will use the Golomb code.
-* <b>`likelihood_bound`</b>: Float. If positive, the returned likelihood values are
-  ensured to be greater than or equal to this value. This prevents very
-  large gradients with a typical entropy loss (defaults to 1e-9).
-* <b>`range_coder_precision`</b>: Integer, between 1 and 16. The precision of the range
-  coder used for compression and decompression. This trades off computation
-  speed with compression efficiency, where 16 is the slowest but most
-  efficient setting. Choosing lower values may increase the average
-  codelength slightly compared to the estimated entropies.
-* <b>`data_format`</b>: Either `'channels_first'` or `'channels_last'` (default).
-* <b>`trainable`</b>: Boolean. Whether the layer should be trained.
-* <b>`name`</b>: String. The name of the layer.
-* <b>`dtype`</b>: `DType` of the layer's inputs, parameters, returned likelihoods, and
-  outputs during training. Default of `None` means to use the type of the
-  first input.
-
-Read-only properties:
-  init_scale: See above.
-  filters: See above.
-  tail_mass: See above.
-  likelihood_bound: See above.
-  range_coder_precision: See above.
-  data_format: See above.
-  name: String. See above.
-  dtype: See above.
-  trainable_variables: List of trainable variables.
-  non_trainable_variables: List of non-trainable variables.
-  variables: List of all variables of this layer, trainable and non-trainable.
-  updates: List of update ops of this layer.
-  losses: List of losses added by this layer. Always contains exactly one
-    auxiliary loss, which must be added to the training loss.
-
-#### Mutable properties:
-
-
-* <b>`trainable`</b>: Boolean. Whether the layer should be trained.
-* <b>`input_spec`</b>: Optional `InputSpec` object specifying the constraints on inputs
-  that can be accepted by the layer.
-
 <h2 id="__init__"><code>__init__</code></h2>
 
 <a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/entropy_models.py">View source</a>
@@ -188,8 +132,24 @@ __init__(
 )
 ```
 
+Initializer.
 
 
+#### Arguments:
+
+
+* <b>`init_scale`</b>: Float. A scaling factor determining the initial width of the
+  probability densities. This should be chosen big enough so that the
+  range of values of the layer inputs roughly falls within the interval
+  [`-init_scale`, `init_scale`] at the beginning of training.
+* <b>`filters`</b>: An iterable of ints, giving the number of filters at each layer
+  of the density model. Generally, the more filters and layers, the more
+  expressive is the density model in terms of modeling more complicated
+  distributions of the layer inputs. For details, refer to the paper
+  referenced above. The default is `[3, 3, 3]`, which should be sufficient
+  for most practical purposes.
+* <b>`data_format`</b>: Either `'channels_first'` or `'channels_last'` (default).
+* <b>`**kwargs`</b>: Other keyword arguments passed to superclass (`EntropyModel`).
 
 
 

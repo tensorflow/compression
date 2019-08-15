@@ -19,11 +19,23 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
+
+
+__all__ = [
+    "PackedTensors",
+]
 
 
 class PackedTensors(object):
-  """Packed representation of compressed tensors."""
+  """Packed representation of compressed tensors.
+
+  This class can pack and unpack several tensor values into a single string. It
+  can also optionally store a model identifier.
+
+  The tensors currently must be rank 1 (vectors) and either have integer or
+  string type.
+  """
 
   def __init__(self, string=None):
     self._example = tf.train.Example()
@@ -32,7 +44,7 @@ class PackedTensors(object):
 
   @property
   def model(self):
-    """Model identifier."""
+    """A model identifier."""
     buf = self._example.features.feature["MD"].bytes_list.value[0]
     return buf.decode("ascii")
 
@@ -47,7 +59,7 @@ class PackedTensors(object):
 
   @property
   def string(self):
-    """A string representation of this object."""
+    """The string representation of this object."""
     return self._example.SerializeToString()
 
   @string.setter
@@ -55,7 +67,7 @@ class PackedTensors(object):
     self._example.ParseFromString(value)
 
   def pack(self, tensors, arrays):
-    """Packs Tensor values into this object."""
+    """Packs `Tensor` values into this object."""
     if len(tensors) != len(arrays):
       raise ValueError("`tensors` and `arrays` must have same length.")
     i = 1
@@ -78,7 +90,7 @@ class PackedTensors(object):
       i += 1
 
   def unpack(self, tensors):
-    """Unpacks Tensor values from this object."""
+    """Unpacks `Tensor` values from this object."""
     arrays = []
     for i, tensor in enumerate(tensors):
       feature = self._example.features.feature[chr(i + 1)]

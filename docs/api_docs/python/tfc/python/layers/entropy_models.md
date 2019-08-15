@@ -5,17 +5,19 @@
 
 # Module: tfc.python.layers.entropy_models
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/entropy_models.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Entropy model layers.
-
-
-
-
-<table class="tfo-github-link" align="left">
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/entropy_models.py">
-  <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
-  View source on GitHub
-</a>
-</table>
 
 <!-- Placeholder for "Used in" -->
 
@@ -32,5 +34,5 @@ Entropy model layers.
 
 [`class LogisticConditional`](../../../tfc/LogisticConditional.md): Conditional logistic entropy model.
 
-[`class SymmetricConditional`](../../../tfc/SymmetricConditional.md): Symmetric conditional entropy model.
+[`class SymmetricConditional`](../../../tfc/SymmetricConditional.md): Symmetric conditional entropy model (base class).
 

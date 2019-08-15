@@ -1,15 +1,15 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
-<meta itemprop="name" content="tfc.python.layers.gdn" />
+<meta itemprop="name" content="tfc.python.util" />
 <meta itemprop="path" content="Stable" />
 </div>
 
-# Module: tfc.python.layers.gdn
+# Module: tfc.python.util
 
 
 <table class="tfo-notebook-buttons tfo-api" align="left">
 
 <td>
-  <a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/gdn.py">
+  <a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/util/__init__.py">
     <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
     View source on GitHub
   </a>
@@ -17,12 +17,12 @@
 
 
 
-GDN layer.
+
 
 <!-- Placeholder for "Used in" -->
 
 
-## Classes
+## Modules
 
-[`class GDN`](../../../tfc/GDN.md): Generalized divisive normalization layer.
+[`packed_tensors`](../../tfc/python/util/packed_tensors.md) module: Packed tensors in bit sequences.
 

@@ -39,10 +39,11 @@ and a description of the range coding operators
 
 ## Installation
 
-***Note: Precompiled packages are currently only provided for Linux and Darwin
-(Mac OS). To use these packages on Windows, consider using a [TensorFlow
-Docker image](https://www.tensorflow.org/install/docker) and installing
-tensorflow-compression using pip inside the Docker container.***
+***Note: Precompiled packages are currently only provided for Linux (Python 2.7,
+3.7) and Darwin/Mac OS (Python 2.7, 3.3-3.6). To use these packages on Windows,
+consider using a
+[TensorFlow Docker image](https://www.tensorflow.org/install/docker) and
+installing tensorflow-compression using pip inside the Docker container.***
 
 Set up an environment in which you can install precompiled binary Python
 packages using the `pip` command. Refer to the
@@ -61,7 +62,7 @@ pip install tensorflow
 ```
 for CPU-only.
 
-Then, run the following command to install the tensorflow-compression `pip`
+Then, run the following command to install the tensorflow-compression pip
 package:
 ```bash
 pip install tensorflow-compression
@@ -74,8 +75,10 @@ python -m tensorflow_compression.python.all_test
 Once the command finishes, you should see a message ```OK (skipped=11)``` or
 similar in the last line.
 
+### Docker
+
 To use a Docker container (e.g. on Windows), be sure to install Docker
-(e.g., [Docker Desktop](https://www.docker.com/products/docker-desktop),
+(e.g., [Docker Desktop](https://www.docker.com/products/docker-desktop)),
 use a [TensorFlow Docker image](https://www.tensorflow.org/install/docker),
 and then run the `pip install` command inside the Docker container, not on the
 host. For instance, you can use a command line like this:
@@ -84,8 +87,23 @@ docker run tensorflow/tensorflow:latest-py3 bash -c \
     "pip install tensorflow-compression &&
      python -m tensorflow_compression.python.all_test"
 ```
-This will fetch the latest TensorFlow Docker image, install the `pip` package
+This will fetch the latest TensorFlow Docker image, install the pip package
 and then run the unit tests to confirm that it works.
+
+### Anaconda
+
+It seems that [Anaconda](https://www.anaconda.com/distribution/) ships its own
+binary version of TensorFlow which is incompatible with our pip package. It
+also installs Python 3.7 by default, which we currently don't support on Linux.
+To solve this, make sure to use Python 3.6 on Linux, and always install
+TensorFlow via `pip` rather than `conda`. For example, this creates an Anaconda
+environment with Python 3.6 and CUDA libraries, and then installs TensorFlow
+and tensorflow-compression with GPU support:
+```bash
+conda create --name ENV_NAME python=3.6 cudatoolkit=10.0 cudnn
+conda activate ENV_NAME
+pip install tensorflow-gpu tensorflow-compression
+```
 
 ## Usage
 
@@ -168,20 +186,20 @@ python bls2017.py [options] compress original.png compressed.tfci
 python bls2017.py [options] decompress compressed.tfci reconstruction.png
 ```
 
-## Building `pip` packages
+## Building pip packages
 
-This section describes the necessary steps to build your own `pip` packages of
+This section describes the necessary steps to build your own pip packages of
 tensorflow-compression. This may be necessary to install it on platforms for
 which we don't provide precompiled binaries (currently only Linux and Darwin).
 
 We use the Docker image `tensorflow/tensorflow:nightly-custom-op` for building
-`pip` packages. Note that this is different from `tensorflow/tensorflow:devel`.
-To be compatible with the TensorFlow `pip` package, the GCC version must match,
+pip packages. Note that this is different from `tensorflow/tensorflow:devel`.
+To be compatible with the TensorFlow pip package, the GCC version must match,
 but `tensorflow/tensorflow:devel` has a different GCC version installed.
 
 Inside a Docker container from the image, the following steps need to be taken.
 
-1. Install TensorFlow `pip` package.
+1. Install TensorFlow pip package.
 2. Clone the `tensorflow/compression` repo from GitHub.
 3. Run `:build_pip_pkg` inside the cloned repo:
 
@@ -190,7 +208,7 @@ sudo docker run -v /tmp/tensorflow_compression:/tmp/tensorflow_compression \
     tensorflow/tensorflow:nightly-custom-op bash -c \
     "pip install tensorflow &&
      git clone https://github.com/tensorflow/compression.git
-         /tensorflow_compression && 
+         /tensorflow_compression &&
      cd /tensorflow_compression &&
      bazel run -c opt --copt=-mavx :build_pip_pkg"
 ```
@@ -213,7 +231,7 @@ python -m tensorflow_compression.python.all_test
 popd
 ```
 
-When done, you can uninstall the `pip` package again:
+When done, you can uninstall the pip package again:
 ```bash
 pip uninstall tensorflow-compression
 ```

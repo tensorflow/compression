@@ -18,7 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 from tensorflow_compression.python.ops import math_ops
 from tensorflow_compression.python.ops import spectral_ops
@@ -54,13 +54,16 @@ class StaticParameterizer(Parameterizer):
   No variables are created, and `getter` is ignored. If `value` is a `Tensor`,
   the parameter can depend on some other computation. Otherwise, it never
   changes.
-
-  Args:
-    value: Either a constant or `Tensor` value, or a callable which returns such
-      a thing given a shape and dtype argument (for example, an initializer).
   """
 
   def __init__(self, value):
+    """Initializer.
+
+    Arguments:
+      value: Either a constant or `Tensor` value, or a callable which returns
+        such a thing given a shape and dtype argument (for example, an
+        initializer).
+    """
     self.value = value
 
   def __call__(self, getter, name, shape, dtype, initializer, regularizer=None):
@@ -83,13 +86,15 @@ class RDFTParameterizer(Parameterizer):
   the parameter.
 
   (see https://en.wikipedia.org/wiki/Discrete_Fourier_transform)
-
-  Args:
-    dc: Boolean. If `False`, the DC component of the kernel RDFTs is not
-      represented, forcing the filters to be highpass. Defaults to `True`.
   """
 
   def __init__(self, dc=True):
+    """Initializer.
+
+    Arguments:
+      dc: Boolean. If `False`, the DC component of the kernel RDFTs is not
+        represented, forcing the filters to be highpass. Defaults to `True`.
+    """
     self.dc = bool(dc)
 
   def __call__(self, getter, name, shape, dtype, initializer, regularizer=None):
@@ -144,23 +149,26 @@ class NonnegativeParameterizer(Parameterizer):
 
   The variable is subjected to an invertible transformation that slows down the
   learning rate for small values.
-
-  Args:
-    minimum: Float. Lower bound for parameters (defaults to zero).
-    reparam_offset: Float. Offset added to the reparameterization of beta and
-      gamma. The parameterization of beta and gamma as their square roots lets
-      the training slow down when their values are close to zero, which is
-      desirable as small values in the denominator can lead to a situation where
-      gradient noise on beta/gamma leads to extreme amounts of noise in the GDN
-      activations. However, without the offset, we would get zero gradients if
-      any elements of beta or gamma were exactly zero, and thus the training
-      could get stuck. To prevent this, we add this small constant. The default
-      value was empirically determined as a good starting point. Making it
-      bigger potentially leads to more gradient noise on the activations, making
-      it too small may lead to numerical precision issues.
   """
 
   def __init__(self, minimum=0, reparam_offset=2 ** -18):
+    """Initializer.
+
+    Arguments:
+      minimum: Float. Lower bound for parameters (defaults to zero).
+      reparam_offset: Float. Offset added to the reparameterization of beta and
+        gamma. The parameterization of beta and gamma as their square roots lets
+        the training slow down when their values are close to zero, which is
+        desirable as small values in the denominator can lead to a situation
+        where gradient noise on beta/gamma leads to extreme amounts of noise in
+        the GDN activations. However, without the offset, we would get zero
+        gradients if any elements of beta or gamma were exactly zero, and thus
+        the training could get stuck. To prevent this, we add this small
+        constant. The default value was empirically determined as a good
+        starting point. Making it bigger potentially leads to more gradient
+        noise on the activations, making it too small may lead to numerical
+        precision issues.
+    """
     self.minimum = float(minimum)
     self.reparam_offset = float(reparam_offset)
 

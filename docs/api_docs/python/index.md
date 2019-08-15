@@ -1,5 +1,6 @@
 # All symbols in TensorFlow/compression
 
+## Primary symbols
 *  <a href="./tfc.md"><code>tfc</code></a>
 *  <a href="./tfc/EntropyBottleneck.md"><code>tfc.EntropyBottleneck</code></a>
 *  <a href="./tfc/EntropyModel.md"><code>tfc.EntropyModel</code></a>
@@ -9,6 +10,7 @@
 *  <a href="./tfc/LaplacianConditional.md"><code>tfc.LaplacianConditional</code></a>
 *  <a href="./tfc/LogisticConditional.md"><code>tfc.LogisticConditional</code></a>
 *  <a href="./tfc/NonnegativeParameterizer.md"><code>tfc.NonnegativeParameterizer</code></a>
+*  <a href="./tfc/PackedTensors.md"><code>tfc.PackedTensors</code></a>
 *  <a href="./tfc/Parameterizer.md"><code>tfc.Parameterizer</code></a>
 *  <a href="./tfc/RDFTParameterizer.md"><code>tfc.RDFTParameterizer</code></a>
 *  <a href="./tfc/SignalConv1D.md"><code>tfc.SignalConv1D</code></a>
@@ -55,6 +57,9 @@
 *  <a href="./tfc/unbounded_index_range_encode.md"><code>tfc.python.ops.range_coding_ops.unbounded_index_range_encode</code></a>
 *  <a href="./tfc/python/ops/spectral_ops.md"><code>tfc.python.ops.spectral_ops</code></a>
 *  <a href="./tfc/irdft_matrix.md"><code>tfc.python.ops.spectral_ops.irdft_matrix</code></a>
+*  <a href="./tfc/python/util.md"><code>tfc.python.util</code></a>
+*  <a href="./tfc/python/util/packed_tensors.md"><code>tfc.python.util.packed_tensors</code></a>
+*  <a href="./tfc/PackedTensors.md"><code>tfc.python.util.packed_tensors.PackedTensors</code></a>
 *  <a href="./tfc/range_decode.md"><code>tfc.range_decode</code></a>
 *  <a href="./tfc/range_encode.md"><code>tfc.range_encode</code></a>
 *  <a href="./tfc/same_padding_for_kernel.md"><code>tfc.same_padding_for_kernel</code></a>
