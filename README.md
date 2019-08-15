@@ -40,7 +40,7 @@ and a description of the range coding operators
 ## Installation
 
 ***Note: Precompiled packages are currently only provided for Linux (Python 2.7,
-3.7) and Darwin/Mac OS (Python 2.7, 3.3-3.6). To use these packages on Windows,
+3.3-3.6) and Darwin/Mac OS (Python 2.7, 3.7). To use these packages on Windows,
 consider using a
 [TensorFlow Docker image](https://www.tensorflow.org/install/docker) and
 installing tensorflow-compression using pip inside the Docker container.***
