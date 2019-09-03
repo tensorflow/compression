@@ -156,7 +156,7 @@ To train the model, you need to supply it with a dataset of RGB training images.
 They should be provided in PNG format. Training can be as simple as the
 following command:
 ```bash
-python bls2017.py --verbose --train_glob="images/*.png" train
+python bls2017.py --verbose train --train_glob="images/*.png"
 ```
 
 This will use the default settings. The most important parameter is `--lambda`,
