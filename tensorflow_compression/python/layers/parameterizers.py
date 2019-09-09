@@ -179,6 +179,8 @@ class NonnegativeParameterizer(Parameterizer):
     reparam_name = "reparam_" + name
 
     def reparam_initializer(shape, dtype=None, partition_info=None):
+      # We recreate pedestal to decouple the initializer from the model graph.
+      pedestal = tf.constant(self.reparam_offset ** 2, dtype=dtype)
       init = initializer(shape, dtype=dtype, partition_info=partition_info)
       init = tf.math.sqrt(tf.math.maximum(init + pedestal, pedestal))
       return init
