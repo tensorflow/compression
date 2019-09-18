@@ -23,9 +23,6 @@ from scipy import fftpack
 import tensorflow.compat.v1 as tf
 
 
-_matrix_cache = {}
-
-
 __all__ = [
     "irdft_matrix",
 ]
@@ -60,23 +57,18 @@ def irdft_matrix(shape, dtype=tf.float32):
   """
   shape = tuple(int(s) for s in shape)
   dtype = tf.as_dtype(dtype)
-  key = (tf.get_default_graph(), "irdft", shape, dtype.as_datatype_enum)
-  matrix = _matrix_cache.get(key)
-  if matrix is None:
-    size = np.prod(shape)
-    rank = len(shape)
-    matrix = np.identity(size, dtype=np.float64).reshape((size,) + shape)
-    for axis in range(rank):
-      matrix = fftpack.rfft(matrix, axis=axis + 1)
-      slices = (rank + 1) * [slice(None)]
-      if shape[axis] % 2 == 1:
-        slices[axis + 1] = slice(1, None)
-      else:
-        slices[axis + 1] = slice(1, -1)
-      matrix[tuple(slices)] *= np.sqrt(2)
-    matrix /= np.sqrt(size)
-    matrix = np.reshape(matrix, (size, size))
-    matrix = tf.constant(
-        matrix, dtype=dtype, name="irdft_" + "x".join([str(s) for s in shape]))
-    _matrix_cache[key] = matrix
-  return matrix
+  size = np.prod(shape)
+  rank = len(shape)
+  matrix = np.identity(size, dtype=np.float64).reshape((size,) + shape)
+  for axis in range(rank):
+    matrix = fftpack.rfft(matrix, axis=axis + 1)
+    slices = (rank + 1) * [slice(None)]
+    if shape[axis] % 2 == 1:
+      slices[axis + 1] = slice(1, None)
+    else:
+      slices[axis + 1] = slice(1, -1)
+    matrix[tuple(slices)] *= np.sqrt(2)
+  matrix /= np.sqrt(size)
+  matrix = np.reshape(matrix, (size, size))
+  return tf.constant(
+      matrix, dtype=dtype, name="irdft_" + "x".join([str(s) for s in shape]))
