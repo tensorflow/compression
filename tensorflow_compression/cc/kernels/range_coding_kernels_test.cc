@@ -58,6 +58,7 @@ using tensorflow::Status;
 using tensorflow::Tensor;
 using tensorflow::TensorShape;
 using tensorflow::TensorShapeUtils;
+using tensorflow::tstring;
 using tensorflow::TTypes;
 
 int LogUniform(random::SimplePhilox* gen, uint32 n) {
@@ -470,12 +471,12 @@ TEST_F(RangeCoderOpsTest, EncoderDebug) {
 TEST_F(RangeCoderOpsTest, DecoderDebug) {
   RangeEncoder encoder;
 
-  string encoded_string;
+  tstring encoded_string;
   encoder.Encode(16, 18, 5, &encoded_string);
   encoder.Finalize(&encoded_string);
 
   Tensor encoded(DT_STRING, {});
-  encoded.scalar<string>()().swap(encoded_string);
+  encoded.scalar<tstring>()() = std::move(encoded_string);
 
   Tensor shape(DT_INT32, {0});
 

@@ -30,13 +30,13 @@ limitations under the License.
 
 namespace tensorflow_compression {
 using tensorflow::int32;
-using tensorflow::string;
+using tensorflow::tstring;
 using tensorflow::uint32;
 using tensorflow::uint64;
 using tensorflow::uint8;
 
 void RangeEncoder::Encode(int32 lower, int32 upper, int precision,
-                          string* sink) {
+                          tstring* sink) {
   // Input requirement: 0 < precision < 16.
   DCHECK_GT(precision, 0);
   DCHECK_LE(precision, 16);
@@ -265,7 +265,7 @@ void RangeEncoder::Encode(int32 lower, int32 upper, int precision,
   }
 }
 
-void RangeEncoder::Finalize(string* sink) {
+void RangeEncoder::Finalize(tstring* sink) {
   // Finalize the encode by writing out any number in the interval
   // [base, base + size).
   //
@@ -300,7 +300,7 @@ void RangeEncoder::Finalize(string* sink) {
   delay_ = 0;
 }
 
-RangeDecoder::RangeDecoder(const string& source)
+RangeDecoder::RangeDecoder(const tstring& source)
     : current_(source.begin()), end_(source.end()) {
   Read16BitValue();
   Read16BitValue();

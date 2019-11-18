@@ -49,6 +49,7 @@ using tensorflow::string;
 using tensorflow::Tensor;
 using tensorflow::TensorShape;
 using tensorflow::TensorShapeUtils;
+using tensorflow::tstring;
 using tensorflow::TTypes;
 using tensorflow::uint32;
 using tensorflow::uint64;
@@ -204,7 +205,7 @@ class RangeEncodeOp : public OpKernel {
     Tensor* output_tensor;
     OP_REQUIRES_OK(context,
                    context->allocate_output(0, TensorShape{}, &output_tensor));
-    string* output = &output_tensor->scalar<string>()();
+    tstring* output = &output_tensor->scalar<tstring>()();
 
     switch (data_shape.size()) {
 #define RANGE_ENCODE_CASE(dims)                                           \
@@ -235,7 +236,7 @@ class RangeEncodeOp : public OpKernel {
                                      absl::Span<const int64> data_shape,
                                      TTypes<int32>::ConstMatrix cdf,
                                      absl::Span<const int64> cdf_shape,
-                                     string* output) const {
+                                     tstring* output) const {
     const int64 data_size = data.size();
     const int64 cdf_size = cdf.size();
     const int64 chip_size = cdf.dimension(1);
@@ -313,7 +314,7 @@ class RangeDecodeOp : public OpKernel {
     OP_REQUIRES_OK(
         context, MergeAxes(output_shape, cdf.shape(), &data_shape, &cdf_shape));
 
-    const string& encoded = encoded_tensor.scalar<string>()();
+    const tstring& encoded = encoded_tensor.scalar<tstring>()();
 
     Tensor* output;
     OP_REQUIRES_OK(context, context->allocate_output(0, output_shape, &output));
@@ -347,7 +348,7 @@ class RangeDecodeOp : public OpKernel {
                                      absl::Span<const int64> output_shape,
                                      TTypes<int32>::ConstMatrix cdf,
                                      absl::Span<const int64> cdf_shape,
-                                     const string& encoded) const {
+                                     const tstring& encoded) const {
     BroadcastRange<int16, int32, N> view{output.data(), output_shape,
                                          cdf.data(), cdf_shape};
 

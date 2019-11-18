@@ -68,7 +68,7 @@ void RangeEncodeDecodeTest(int precision, random::SimplePhilox* gen) {
   }
 
   RangeEncoder encoder;
-  string encoded;
+  tensorflow::tstring encoded;
   double ideal_length = 0.0;
   for (uint8 x : data) {
     encoder.Encode(cdf[x], cdf[x + 1], precision, &encoded);
@@ -109,7 +109,7 @@ TEST(RangeCoderTest, Precision12To16) {
 TEST(RangeCoderTest, FinalizeState0) {
   constexpr int kPrecision = 2;
 
-  string output;
+  tensorflow::tstring output;
   RangeEncoder encoder;
   encoder.Encode(0, 2, kPrecision, &output);
   encoder.Finalize(&output);

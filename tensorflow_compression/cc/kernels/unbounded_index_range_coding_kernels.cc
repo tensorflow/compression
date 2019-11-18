@@ -49,6 +49,7 @@ using tensorflow::string;
 using tensorflow::Tensor;
 using tensorflow::TensorShape;
 using tensorflow::TensorShapeUtils;
+using tensorflow::tstring;
 using tensorflow::TTypes;
 using tensorflow::uint32;
 using tensorflow::uint64;
@@ -181,7 +182,7 @@ class UnboundedIndexRangeEncodeOp : public OpKernel {
 
     RangeEncodeImpl(data.flat<int32>(), index.flat<int32>(),
                     cdf.matrix<int32>(), cdf_size.vec<int32>(),
-                    offset.vec<int32>(), &output->flat<string>()(0));
+                    offset.vec<int32>(), &output->flat<tstring>()(0));
   }
 
  private:
@@ -189,7 +190,7 @@ class UnboundedIndexRangeEncodeOp : public OpKernel {
                        TTypes<int32>::ConstFlat index,
                        TTypes<int32>::ConstMatrix cdf,
                        TTypes<int32>::ConstVec cdf_size,
-                       TTypes<int32>::ConstVec offset, string* output) const {
+                       TTypes<int32>::ConstVec offset, tstring* output) const {
     RangeEncoder encoder;
 
     DCHECK_GE(cdf.dimension(1), 2);
@@ -300,7 +301,7 @@ class UnboundedIndexRangeDecodeOp : public OpKernel {
     OP_REQUIRES_OK(
         context, RangeDecodeImpl(output->flat<int32>(), index.flat<int32>(),
                                  cdf.matrix<int32>(), cdf_size.vec<int32>(),
-                                 offset.vec<int32>(), encoded.flat<string>()));
+                                 offset.vec<int32>(), encoded.flat<tstring>()));
   }
 
  private:
@@ -309,7 +310,7 @@ class UnboundedIndexRangeDecodeOp : public OpKernel {
                                      TTypes<int32>::ConstMatrix cdf,
                                      TTypes<int32>::ConstVec cdf_size,
                                      TTypes<int32>::ConstVec offset,
-                                     TTypes<string>::ConstFlat encoded) const {
+                                     TTypes<tstring>::ConstFlat encoded) const {
     RangeDecoder decoder(encoded(0));
 
     DCHECK_GE(cdf.dimension(1), 2);

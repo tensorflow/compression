@@ -45,12 +45,12 @@ class RangeEncoder {
   // REQUIRES: 0 <= lower < upper <= 2^precision.
   // REQUIRES: 0 < precision <= 16.
   void Encode(tensorflow::int32 lower, tensorflow::int32 upper, int precision,
-              tensorflow::string* sink);
+              tensorflow::tstring* sink);
 
   // The encode may contain some under-determined values from previous encoding.
   // After Encode() calls, Finalize() must be called. Otherwise the encoded
   // string may not be decoded.
-  void Finalize(tensorflow::string* sink);
+  void Finalize(tensorflow::tstring* sink);
 
  private:
   tensorflow::uint32 base_ = 0;
@@ -63,7 +63,7 @@ class RangeDecoder {
  public:
   // Holds a reference to `source`. The caller has to make sure that `source`
   // outlives the decoder object.
-  explicit RangeDecoder(const tensorflow::string& source);
+  explicit RangeDecoder(const tensorflow::tstring& source);
 
   // Decodes a character from `source` using CDF. The size of `cdf` should be
   // one more than the number of the character in the alphabet.
@@ -96,8 +96,8 @@ class RangeDecoder {
       std::numeric_limits<tensorflow::uint32>::max();
   tensorflow::uint32 value_ = 0;
 
-  tensorflow::string::const_iterator current_;
-  const tensorflow::string::const_iterator end_;
+  tensorflow::tstring::const_iterator current_;
+  const tensorflow::tstring::const_iterator end_;
 };
 
 }  // namespace tensorflow_compression
