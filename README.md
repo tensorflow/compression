@@ -50,15 +50,17 @@ packages using the `pip` command. Refer to the
 [TensorFlow installation instructions](https://www.tensorflow.org/install/pip)
 for more information on how to set up such a Python environment.
 
-The current version of tensorflow-compression requires TensorFlow 1.14 or
-above. You can install TensorFlow from any source. To install it via `pip`, run
-the following command:
+The current version of tensorflow-compression requires TensorFlow 1.15. For
+TensorFlow 1.14 or earlier, see our
+[previous releases](https://github.com/tensorflow/compression/releases). You can
+install TensorFlow from any source. To install it via `pip`, run the following
+command:
 ```bash
-pip install tensorflow-gpu
+pip install tensorflow-gpu==1.15
 ```
 for GPU support, or
 ```bash
-pip install tensorflow
+pip install tensorflow==1.15
 ```
 for CPU-only.
 
@@ -72,7 +74,7 @@ To test that the installation works correctly, you can run the unit tests with
 ```bash
 python -m tensorflow_compression.python.all_test
 ```
-Once the command finishes, you should see a message ```OK (skipped=11)``` or
+Once the command finishes, you should see a message ```OK (skipped=12)``` or
 similar in the last line.
 
 ### Docker
@@ -102,7 +104,7 @@ and tensorflow-compression with GPU support:
 ```bash
 conda create --name ENV_NAME python=3.6 cudatoolkit=10.0 cudnn
 conda activate ENV_NAME
-pip install tensorflow-gpu tensorflow-compression
+pip install tensorflow-gpu==1.15 tensorflow-compression
 ```
 
 ## Usage

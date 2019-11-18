@@ -192,7 +192,7 @@ class _SignalConv(tf.keras.layers.Layer):
                corr=False, strides_down=1, strides_up=1, padding="valid",
                extra_pad_end=True, channel_separable=False,
                data_format="channels_last",
-               activation=None, use_bias=False, use_explicit=False,
+               activation=None, use_bias=False, use_explicit=True,
                kernel_initializer=tf.initializers.variance_scaling(),
                bias_initializer=tf.initializers.zeros(),
                kernel_regularizer=None, bias_regularizer=None,
