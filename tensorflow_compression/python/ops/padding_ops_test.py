@@ -37,7 +37,7 @@ class PaddingOpsTest(tf.test.TestCase):
             tf.reshape(inputs, (1, 1, -1, 1)),
             tf.reshape(kernel, (1, -1, 1, 1)),
             padding="VALID", data_format="NHWC")
-        with self.test_session() as sess:
+        with self.cached_session() as sess:
           outputs = np.squeeze(sess.run(outputs))
         pos_inp = np.squeeze(np.nonzero(inputs))
         pos_out = np.squeeze(np.nonzero(outputs))
@@ -57,7 +57,7 @@ class PaddingOpsTest(tf.test.TestCase):
             (1, 1, ishape[0] + kshape[0] - 1, 1),
             strides=(1, 1, 1, 1), padding="VALID", data_format="NHWC")
         outputs = outputs[:, :, (kshape[0] - 1):-(kshape[0] - 1), :]
-        with self.test_session() as sess:
+        with self.cached_session() as sess:
           outputs = np.squeeze(sess.run(outputs))
         pos_inp = np.squeeze(np.nonzero(inputs))
         pos_out = np.squeeze(np.nonzero(outputs))

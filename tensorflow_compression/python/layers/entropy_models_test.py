@@ -32,7 +32,7 @@ class EntropyBottleneckTest(tf.test.TestCase):
     inputs = tf.placeholder(tf.float32, (None, 1))
     layer = entropy_models.EntropyBottleneck()
     noisy, _ = layer(inputs, training=True)
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       sess.run(tf.global_variables_initializer())
       values = np.linspace(-50, 50, 100)[:, None]
       noisy, = sess.run([noisy], {inputs: values})
@@ -45,7 +45,7 @@ class EntropyBottleneckTest(tf.test.TestCase):
     inputs = tf.placeholder(tf.float32, (None, 1))
     layer = entropy_models.EntropyBottleneck()
     quantized, _ = layer(inputs, training=False)
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       sess.run(tf.global_variables_initializer())
       values = np.linspace(-50, 50, 100)[:, None]
       quantized, = sess.run([quantized], {inputs: values})
@@ -61,7 +61,7 @@ class EntropyBottleneckTest(tf.test.TestCase):
     opt = tf.train.GradientDescentOptimizer(learning_rate=1)
     self.assertEqual(1, len(layer.losses))
     step = opt.minimize(layer.losses[0])
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       sess.run(tf.global_variables_initializer())
       sess.run(step)
       values = np.linspace(-50, 50, 100)[:, None]
@@ -79,7 +79,7 @@ class EntropyBottleneckTest(tf.test.TestCase):
         data_format="channels_last", init_scale=30)
     bitstrings = layer.compress(inputs)
     decoded = layer.decompress(bitstrings, tf.shape(inputs)[1:])
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       sess.run(tf.global_variables_initializer())
       values = np.linspace(-50, 50, 100)[None, :, None]
       decoded, = sess.run([decoded], {inputs: values})
@@ -98,7 +98,7 @@ class EntropyBottleneckTest(tf.test.TestCase):
     opt = tf.train.GradientDescentOptimizer(learning_rate=1)
     self.assertEqual(1, len(layer.losses))
     step = opt.minimize(layer.losses[0])
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       sess.run(tf.global_variables_initializer())
       sess.run(step)
       self.assertEqual(1, len(layer.updates))
@@ -120,7 +120,7 @@ class EntropyBottleneckTest(tf.test.TestCase):
     quantized, _ = layer(inputs, training=False)
     bitstrings = layer.compress(inputs)
     decoded = layer.decompress(bitstrings, tf.shape(inputs)[1:])
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       sess.run(tf.global_variables_initializer())
       self.assertEqual(1, len(layer.updates))
       sess.run(layer.updates[0])
@@ -141,7 +141,7 @@ class EntropyBottleneckTest(tf.test.TestCase):
     quantized, _ = layer(inputs, training=False)
     bitstrings = layer.compress(inputs)
     decoded = layer.decompress(bitstrings, tf.shape(inputs)[1:])
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       sess.run(tf.global_variables_initializer())
       self.assertEqual(1, len(layer.updates))
       sess.run(layer.updates[0])
@@ -161,7 +161,7 @@ class EntropyBottleneckTest(tf.test.TestCase):
         data_format="channels_first", filters=(), init_scale=2)
     bitstrings = layer.compress(inputs)
     decoded = layer.decompress(bitstrings, tf.shape(inputs)[1:])
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       values = 8 * np.random.uniform(size=(2, 3, 9)) - 4
       sess.run(tf.global_variables_initializer())
       self.assertEqual(1, len(layer.updates))
@@ -213,7 +213,7 @@ class EntropyBottleneckTest(tf.test.TestCase):
     layer._quantized_cdf = quantized_cdf
     layer._cdf_length = cdf_length
     decoded = layer.decompress(bitstrings, input_shape[1:])
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       sess.run(tf.global_variables_initializer())
       decoded, = sess.run([decoded], {
           bitstrings: self.bitstrings, input_shape: self.expected.shape,
@@ -233,7 +233,7 @@ class EntropyBottleneckTest(tf.test.TestCase):
     inputs = tf.placeholder(tf.float32, (None, 1))
     layer = entropy_models.EntropyBottleneck(filters=(2,))
     _, likelihood = layer(inputs, training=True)
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       sess.run(tf.global_variables_initializer())
       x = np.repeat(np.arange(-200, 201), 2000)[:, None]
       likelihood, = sess.run([likelihood], {inputs: x})
@@ -251,7 +251,7 @@ class EntropyBottleneckTest(tf.test.TestCase):
     _, likelihood = layer(inputs, training=False)
     disc_entropy = tf.reduce_sum(tf.log(likelihood)) / -np.log(2)
     bitstrings = layer.compress(inputs)
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       sess.run(tf.global_variables_initializer())
       self.assertEqual(1, len(layer.updates))
       sess.run(layer.updates[0])
@@ -272,7 +272,7 @@ class SymmetricConditionalTest(object):
     scale = tf.placeholder(tf.float32, [None])
     layer = self.subclass(scale, [1])
     noisy, _ = layer(inputs, training=True)
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       sess.run(tf.global_variables_initializer())
       values = np.linspace(-50, 50, 100)
       noisy, = sess.run([noisy], {
@@ -288,7 +288,7 @@ class SymmetricConditionalTest(object):
     scale = tf.placeholder(tf.float32, [None])
     layer = self.subclass(scale, [1], mean=None)
     quantized, _ = layer(inputs, training=False)
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       sess.run(tf.global_variables_initializer())
       values = np.linspace(-50, 50, 100)
       quantized, = sess.run([quantized], {
@@ -305,7 +305,7 @@ class SymmetricConditionalTest(object):
     mean = tf.placeholder(tf.float32, [None])
     layer = self.subclass(scale, [1], mean=mean)
     quantized, _ = layer(inputs, training=False)
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       sess.run(tf.global_variables_initializer())
       values = np.linspace(-50, 50, 100)
       mean_values = np.random.normal(size=values.shape)
@@ -327,7 +327,7 @@ class SymmetricConditionalTest(object):
         scale, [2 ** x for x in range(-10, 10)], mean=None)
     bitstrings = layer.compress(inputs)
     decoded = layer.decompress(bitstrings)
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       sess.run(tf.global_variables_initializer())
       values = np.linspace(-50, 50, 100)[None]
       decoded, = sess.run([decoded], {
@@ -346,7 +346,7 @@ class SymmetricConditionalTest(object):
         scale, [2 ** x for x in range(-10, 10)], mean=mean)
     bitstrings = layer.compress(inputs)
     decoded = layer.decompress(bitstrings)
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       sess.run(tf.global_variables_initializer())
       values = np.linspace(-50, 50, 100)[None]
       mean_values = np.random.normal(size=values.shape)
@@ -369,7 +369,7 @@ class SymmetricConditionalTest(object):
     quantized, _ = layer(inputs, training=False)
     bitstrings = layer.compress(inputs)
     decoded = layer.decompress(bitstrings)
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       sess.run(tf.global_variables_initializer())
       values = 10 * np.random.normal(size=(2, 5, 3, 7))
       noisy, quantized, decoded = sess.run(
@@ -391,7 +391,7 @@ class SymmetricConditionalTest(object):
     layer = self.subclass(scale, scale_table, indexes=indexes)
     bitstrings = layer.compress(inputs)
     decoded = layer.decompress(bitstrings)
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       values = 8 * np.random.uniform(size=shape) - 4
       indexes = np.random.randint(
           0, len(scale_table), size=shape, dtype=np.int32)
@@ -415,7 +415,7 @@ class SymmetricConditionalTest(object):
     layer = self.subclass(
         scale, scale_table, indexes=indexes, dtype=tf.float32)
     decoded = layer.decompress(bitstrings)
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       sess.run(tf.global_variables_initializer())
       decoded, = sess.run([decoded], {
           bitstrings: self.bitstrings,
@@ -437,7 +437,7 @@ class SymmetricConditionalTest(object):
     # Test that quantile function inverts cumulative.
     scale = tf.placeholder(tf.float64, [None])
     layer = self.subclass(scale, [1], dtype=tf.float64)
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       sess.run(tf.global_variables_initializer())
       quantiles = np.array([1e-5, 1e-2, .1, .5, .6, .8])
       locations = layer._standardized_quantile(quantiles)
@@ -452,7 +452,7 @@ class SymmetricConditionalTest(object):
     scale = tf.placeholder(tf.float32, [None, None])
     layer = self.subclass(scale, [1], scale_bound=0, mean=None)
     _, likelihood = layer(inputs, training=False)
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       sess.run(tf.global_variables_initializer())
       values = np.arange(-5, 1)[:, None]  # must be integers due to quantization
       scales = 2 ** np.linspace(-3, 3, 10)[None, :]
@@ -476,7 +476,7 @@ class SymmetricConditionalTest(object):
     disc_entropy = tf.reduce_mean(tf.log(likelihood), axis=1)
     disc_entropy /= -np.log(2)
     bitstrings = layer.compress(inputs)
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       sess.run(tf.global_variables_initializer())
       scales = np.repeat([layer.scale_table], 10000, axis=0).T
       values = self.scipy_class.rvs(scale=scales, size=scales.shape)

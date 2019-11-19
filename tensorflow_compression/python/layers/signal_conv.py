@@ -417,10 +417,10 @@ class _SignalConv(tf.keras.layers.Layer):
 
     kernel_parameterizer = self.kernel_parameterizer
     if kernel_parameterizer is None:
-      getter = self.add_variable
+      getter = self.add_weight
     else:
       getter = functools.partial(
-          kernel_parameterizer, getter=self.add_variable)
+          kernel_parameterizer, getter=self.add_weight)
     self._kernel = getter(
         name="kernel", shape=kernel_shape, dtype=self.dtype,
         initializer=self.kernel_initializer,
@@ -429,10 +429,10 @@ class _SignalConv(tf.keras.layers.Layer):
     if self.use_bias:
       bias_parameterizer = self.bias_parameterizer
       if bias_parameterizer is None:
-        getter = self.add_variable
+        getter = self.add_weight
       else:
         getter = functools.partial(
-            bias_parameterizer, getter=self.add_variable)
+            bias_parameterizer, getter=self.add_weight)
       self._bias = getter(
           name="bias", shape=(output_channels,), dtype=self.dtype,
           initializer=self.bias_initializer, regularizer=self.bias_regularizer)

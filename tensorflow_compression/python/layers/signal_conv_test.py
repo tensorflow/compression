@@ -110,7 +110,7 @@ class SignalTest(tf.test.TestCase):
         activation=activation, use_bias=use_bias,
         kernel_parameterizer=tf_kernel)
     tf_outputs = layer(tf_inputs)
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       sess.run(tf.global_variables_initializer())
       outputs = sess.run(tf_outputs)
 
@@ -160,7 +160,7 @@ class SignalTest(tf.test.TestCase):
         activation=activation, use_bias=use_bias,
         kernel_parameterizer=tf_kernel)
     tf_outputs = layer(tf_inputs)
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       sess.run(tf.global_variables_initializer())
       outputs = sess.run(tf_outputs)
 

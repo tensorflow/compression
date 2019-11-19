@@ -43,7 +43,7 @@ class MathTest(tf.test.TestCase):
       pgrads_expected = [1, 1]
       ngrads_expected = [-1, 0]
 
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       outputs, pgrads, ngrads = sess.run(
           [outputs, pgrads, ngrads], {inputs: inputs_feed})
       self.assertAllEqual(outputs, outputs_expected)
@@ -81,7 +81,7 @@ class MathTest(tf.test.TestCase):
       pgrads_expected = [0, 1]
       ngrads_expected = [-1, -1]
 
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       outputs, pgrads, ngrads = sess.run(
           [outputs, pgrads, ngrads], {inputs: inputs_feed})
       self.assertAllEqual(outputs, outputs_expected)

@@ -31,7 +31,7 @@ class GDNTest(tf.test.TestCase):
     layer = gdn.GDN(
         inverse=inverse, rectify=rectify, data_format=data_format)
     outputs = layer(inputs)
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       tf.global_variables_initializer().run()
       y, = sess.run([outputs], {inputs: x})
     return y

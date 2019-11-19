@@ -158,11 +158,11 @@ class GDN(tf.keras.layers.Layer):
     # pylint:disable=not-callable
     self.beta = self.beta_parameterizer(
         name="beta", shape=[num_channels], dtype=self.dtype,
-        getter=self.add_variable, initializer=tf.initializers.ones())
+        getter=self.add_weight, initializer=tf.initializers.ones())
 
     self.gamma = self.gamma_parameterizer(
         name="gamma", shape=[num_channels, num_channels], dtype=self.dtype,
-        getter=self.add_variable,
+        getter=self.add_weight,
         initializer=tf.initializers.identity(gain=self._gamma_init))
     # pylint:enable=not-callable
 

@@ -32,7 +32,7 @@ class SpectralOpsTest(tf.test.TestCase):
       matrix = spectral_ops.irdft_matrix(shape)
       # Test that the matrix is orthonormal.
       result = tf.matmul(matrix, tf.transpose(matrix))
-      with self.test_session() as sess:
+      with self.cached_session() as sess:
         result, = sess.run([result])
         self.assertAllClose(result, np.identity(size))
 
@@ -42,7 +42,7 @@ class SpectralOpsTest(tf.test.TestCase):
       matrix = spectral_ops.irdft_matrix(shape)
       # Test that the matrix is orthonormal.
       result = tf.matmul(matrix, tf.transpose(matrix))
-      with self.test_session() as sess:
+      with self.cached_session() as sess:
         result, = sess.run([result])
         self.assertAllClose(result, np.identity(size))
 
@@ -52,7 +52,7 @@ class SpectralOpsTest(tf.test.TestCase):
       matrix = spectral_ops.irdft_matrix(shape)
       # Test that the matrix is orthonormal.
       result = tf.matmul(matrix, tf.transpose(matrix))
-      with self.test_session() as sess:
+      with self.cached_session() as sess:
         result, = sess.run([result])
         self.assertAllClose(result, np.identity(size))
 

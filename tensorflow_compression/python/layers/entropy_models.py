@@ -467,21 +467,21 @@ class EntropyBottleneck(EntropyModel):
     self._factors = []
     for i in range(len(self.filters) + 1):
       init = np.log(np.expm1(1 / scale / filters[i + 1]))
-      matrix = self.add_variable(
+      matrix = self.add_weight(
           "matrix_{}".format(i), dtype=self.dtype,
           shape=(channels, filters[i + 1], filters[i]),
           initializer=tf.initializers.constant(init))
       matrix = tf.nn.softplus(matrix)
       self._matrices.append(matrix)
 
-      bias = self.add_variable(
+      bias = self.add_weight(
           "bias_{}".format(i), dtype=self.dtype,
           shape=(channels, filters[i + 1], 1),
           initializer=tf.initializers.random_uniform(-.5, .5))
       self._biases.append(bias)
 
       if i < len(self.filters):
-        factor = self.add_variable(
+        factor = self.add_weight(
             "factor_{}".format(i), dtype=self.dtype,
             shape=(channels, filters[i + 1], 1),
             initializer=tf.initializers.zeros())
@@ -510,7 +510,7 @@ class EntropyBottleneck(EntropyModel):
           [[[-self.init_scale, 0, self.init_scale]]], dtype=dtype)
       return tf.tile(init, (shape[0], 1, 1))
 
-    quantiles = self.add_variable(
+    quantiles = self.add_weight(
         "quantiles", shape=(channels, 1, 3), dtype=self.dtype,
         initializer=quantiles_initializer)
     logits = self._logits_cumulative(quantiles, stop_gradient=True)
@@ -572,13 +572,13 @@ class EntropyBottleneck(EntropyModel):
     # We need to supply an initializer without fully defined static shape
     # here, or the variable will return the wrong dynamic shape later. A
     # placeholder with default gets the trick done (see initializer above).
-    quantized_cdf = self.add_variable(
+    quantized_cdf = self.add_weight(
         "quantized_cdf",
         shape=(channels, None),
         dtype=tf.int32,
         trainable=False,
         initializer=cdf_initializer)
-    cdf_length = self.add_variable(
+    cdf_length = self.add_weight(
         "cdf_length", shape=(channels,), dtype=tf.int32, trainable=False,
         initializer=tf.initializers.constant(3))
     # Works around a weird TF issue with reading variables inside a loop.
@@ -593,7 +593,7 @@ class EntropyBottleneck(EntropyModel):
         cdf_length,
         pmf_length + 2)
     update_op = tf.group(update_cdf, update_length)
-    self.add_update(update_op, inputs=None)
+    self.add_update(update_op)
 
     super(EntropyBottleneck, self).build(input_shape)
 
@@ -853,10 +853,10 @@ class SymmetricConditional(EntropyModel):
           pmf, tail_mass,
           tf.constant(pmf_length, dtype=tf.int32), max_length)
 
-    quantized_cdf = self.add_variable(
+    quantized_cdf = self.add_weight(
         "quantized_cdf", shape=(len(pmf_length), max_length + 2),
         initializer=cdf_initializer, dtype=tf.int32, trainable=False)
-    cdf_length = self.add_variable(
+    cdf_length = self.add_weight(
         "cdf_length", shape=(len(pmf_length),),
         initializer=tf.initializers.constant(pmf_length + 2),
         dtype=tf.int32, trainable=False)

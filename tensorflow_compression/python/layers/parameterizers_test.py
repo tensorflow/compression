@@ -30,7 +30,7 @@ class ParameterizersTest(tf.test.TestCase):
     var = param(
         getter=tf.get_variable, name="test", shape=shape, dtype=tf.float32,
         initializer=init, regularizer=None)
-    with self.test_session() as sess:
+    with self.cached_session() as sess:
       tf.global_variables_initializer().run()
       var, = sess.run([var])
     return var
