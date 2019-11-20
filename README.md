@@ -194,21 +194,23 @@ This section describes the necessary steps to build your own pip packages of
 tensorflow-compression. This may be necessary to install it on platforms for
 which we don't provide precompiled binaries (currently only Linux and Darwin).
 
-We use the Docker image `tensorflow/tensorflow:nightly-custom-op` for building
-pip packages. Note that this is different from `tensorflow/tensorflow:devel`.
-To be compatible with the TensorFlow pip package, the GCC version must match,
-but `tensorflow/tensorflow:devel` has a different GCC version installed.
+We use the Docker image `tensorflow/tensorflow:custom-op-ubuntu16` for building
+pip packages for Linux. Note that this is different from
+`tensorflow/tensorflow:devel`. To be compatible with the TensorFlow pip package,
+the GCC version must match, but `tensorflow/tensorflow:devel` has a different
+GCC version installed.
 
 Inside a Docker container from the image, the following steps need to be taken.
 
-1. Install TensorFlow pip package.
+1. Install the TensorFlow pip package.
 2. Clone the `tensorflow/compression` repo from GitHub.
-3. Run `:build_pip_pkg` inside the cloned repo:
+3. Run `:build_pip_pkg` inside the cloned repo.
 
+For example:
 ```bash
 sudo docker run -v /tmp/tensorflow_compression:/tmp/tensorflow_compression \
-    tensorflow/tensorflow:nightly-custom-op bash -c \
-    "pip install tensorflow &&
+    tensorflow/tensorflow:custom-op-ubuntu16 bash -c \
+    "pip install tensorflow==1.15 &&
      git clone https://github.com/tensorflow/compression.git
          /tensorflow_compression &&
      cd /tensorflow_compression &&
@@ -237,6 +239,9 @@ When done, you can uninstall the pip package again:
 ```bash
 pip uninstall tensorflow-compression
 ```
+
+To build packages for Darwin (and potentially other platforms), you can follow
+the same steps, but the Docker image should not be necessary.
 
 ## Authors
 
