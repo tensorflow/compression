@@ -222,7 +222,7 @@ class SignalTest(tf.test.TestCase):
   def data_formats(self):
     # On CPU, many ops don't support the channels first data format. Hence, if
     # no GPU is available, we skip these tests.
-    if tf.test.is_gpu_available(cuda_only=True):
+    if tf.config.experimental.list_physical_devices("GPU"):
       return ("channels_first", "channels_last")
     else:
       return ("channels_last",)
