@@ -85,12 +85,12 @@ use a [TensorFlow Docker image](https://www.tensorflow.org/install/docker),
 and then run the `pip install` command inside the Docker container, not on the
 host. For instance, you can use a command line like this:
 ```bash
-docker run tensorflow/tensorflow:latest-py3 bash -c \
+docker run tensorflow/tensorflow:1.15.0-py3 bash -c \
     "pip install tensorflow-compression &&
      python -m tensorflow_compression.python.all_test"
 ```
-This will fetch the latest TensorFlow Docker image, install the pip package
-and then run the unit tests to confirm that it works.
+This will fetch the TensorFlow Docker image if it's not already cached, install
+the pip package and then run the unit tests to confirm that it works.
 
 ### Anaconda
 
