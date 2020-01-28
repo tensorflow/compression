@@ -7,6 +7,7 @@ licenses(["notice"])  # Apache 2.0
 py_library(
     name = "util",
     srcs = ["__init__.py"],
+    srcs_version = "PY3",
     deps = [
         ":packed_tensors",
     ],
@@ -15,14 +16,14 @@ py_library(
 py_library(
     name = "packed_tensors",
     srcs = ["packed_tensors.py"],
+    srcs_version = "PY3",
 )
 
 py_test(
     name = "packed_tensors_test",
     srcs = ["packed_tensors_test.py"],
-    deps = [
-        ":packed_tensors",
-    ],
+    python_version = "PY3",
+    deps = [":packed_tensors"],
 )
 
 filegroup(

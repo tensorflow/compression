@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# Lint as: python3
 # Copyright 2019 Google LLC. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,17 +19,13 @@ Use this script to compress images with pre-trained models as published. See the
 'models' subcommand for a list of available models.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import argparse
 import os
 import sys
+import urllib
 
 from absl import app
 from absl.flags import argparse_flags
-from six.moves import urllib
 import tensorflow.compat.v1 as tf
 
 import tensorflow_compression as tfc  # pylint:disable=unused-import

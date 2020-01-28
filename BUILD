@@ -8,6 +8,7 @@ py_library(
         "tensorflow_compression/__init__.py",
         "tensorflow_compression/python/__init__.py",
     ],
+    srcs_version = "PY3",
     visibility = ["//visibility:public"],
     deps = [
         "//tensorflow_compression/python/layers",
@@ -37,28 +38,33 @@ py_binary(
         "//tensorflow_compression/python/ops:py_src",
         "//tensorflow_compression/python/util:py_src",
     ],
+    python_version = "PY3",
 )
 
 py_binary(
     name = "generate_docs",
     srcs = ["tools/generate_docs.py"],
+    python_version = "PY3",
     deps = [":tensorflow_compression"],
 )
 
 py_binary(
     name = "tfci",
     srcs = ["examples/tfci.py"],
+    python_version = "PY3",
     deps = [":tensorflow_compression"],
 )
 
 py_binary(
     name = "bls2017",
     srcs = ["examples/bls2017.py"],
+    python_version = "PY3",
     deps = [":tensorflow_compression"],
 )
 
 py_binary(
     name = "bmshj2018",
     srcs = ["examples/bmshj2018.py"],
+    python_version = "PY3",
     deps = [":tensorflow_compression"],
 )

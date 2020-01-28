@@ -14,10 +14,6 @@
 # ==============================================================================
 """Tests of entropy models."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import numpy as np
 import scipy.stats
 import tensorflow.compat.v1 as tf

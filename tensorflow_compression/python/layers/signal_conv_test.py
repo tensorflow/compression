@@ -1,3 +1,4 @@
+# Lint as: python3
 # Copyright 2018 Google LLC. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,10 +14,6 @@
 # limitations under the License.
 # ==============================================================================
 """Tests of signal processing convolution layers."""
-
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
 import numpy as np
 import scipy.signal
@@ -231,18 +228,15 @@ class SignalTest(tf.test.TestCase):
                   batch, input_support, channels, filters, kernel_support,
                   corr, strides_down, strides_up, padding, extra_pad_end,
                   channel_separable, data_format, activation, use_bias):
-    args = dict(
-        batch=batch, input_support=input_support, channels=channels,
-        filters=filters, kernel_support=kernel_support, corr=corr,
-        strides_down=strides_down, strides_up=strides_up, padding=padding,
-        extra_pad_end=extra_pad_end, channel_separable=channel_separable,
-        data_format=data_format, activation=activation, use_bias=use_bias)
+    args = dict(locals())
+    del args["self"]
+    del args["method"]
     if self.is_implemented(**args):
       try:
         method(**args)
       except:
         msg = []
-        for k in sorted(args.iterkeys()):
+        for k in sorted(args):
           msg.append("{}={}".format(k, args[k]))
         print("Failed when it shouldn't have: " + ", ".join(msg))
         raise
@@ -252,7 +246,7 @@ class SignalTest(tf.test.TestCase):
           method(**args)
       except:
         msg = []
-        for k in sorted(args.iterkeys()):
+        for k in sorted(args):
           msg.append("{}={}".format(k, args[k]))
         print("Did not fail when it should have: " + ", ".join(msg))
         raise

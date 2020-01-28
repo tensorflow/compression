@@ -14,17 +14,13 @@
 # ==============================================================================
 """Data compression tools."""
 
-from __future__ import absolute_import as _absolute_import
-from __future__ import division as _division
-from __future__ import print_function as _print_function
-
 try:
   import tensorflow as _tensorflow
   _tf_version = [int(v) for v in _tensorflow.version.VERSION.split(".")]
-  assert _tf_version[0] == 1 and _tf_version[1] >= 14
+  assert _tf_version[0] == 2 and _tf_version[1] == 1
 except (ImportError, AssertionError):
-  raise RuntimeError("For tensorflow_compression, please install TensorFlow "
-                     "1.14 or above. TensorFlow 2 is not yet supported.")
+  raise RuntimeError(
+      "For tensorflow_compression, please install TensorFlow 2.1.")
 
 
 # pylint: disable=wildcard-import
