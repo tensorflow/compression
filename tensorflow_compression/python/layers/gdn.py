@@ -146,7 +146,7 @@ class GDN(tf.keras.layers.Layer):
   def build(self, input_shape):
     channel_axis = self._channel_axis()
     input_shape = tf.TensorShape(input_shape)
-    num_channels = input_shape[channel_axis].value
+    num_channels = input_shape.as_list()[channel_axis]
     if num_channels is None:
       raise ValueError("The channel dimension of the inputs to `GDN` "
                        "must be defined.")

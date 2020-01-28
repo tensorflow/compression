@@ -403,7 +403,7 @@ class _SignalConv(tf.keras.layers.Layer):
   def build(self, input_shape):
     input_shape = tf.TensorShape(input_shape)
     channel_axis = {"channels_first": 1, "channels_last": -1}[self.data_format]
-    input_channels = input_shape[channel_axis].value
+    input_channels = input_shape.as_list()[channel_axis]
     if input_channels is None:
       raise ValueError("The channel dimension of the inputs must be defined.")
     self.input_spec = tf.keras.layers.InputSpec(
