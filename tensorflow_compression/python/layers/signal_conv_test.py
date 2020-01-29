@@ -19,11 +19,13 @@ import numpy as np
 import scipy.signal
 import tensorflow.compat.v1 as tf
 
+from tensorflow.python.framework import test_util
 from tensorflow_compression.python.layers import initializers
 from tensorflow_compression.python.layers import parameterizers
 from tensorflow_compression.python.layers import signal_conv
 
 
+@test_util.deprecated_graph_mode_only
 class SignalTest(tf.test.TestCase):
 
   def numpy_upsample(self, inputs, strides_up, extra_pad_end):

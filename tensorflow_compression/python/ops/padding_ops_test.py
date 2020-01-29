@@ -17,9 +17,11 @@
 import numpy as np
 import tensorflow.compat.v1 as tf
 
+from tensorflow.python.framework import test_util
 from tensorflow_compression.python.ops import padding_ops
 
 
+@test_util.deprecated_graph_mode_only
 class PaddingOpsTest(tf.test.TestCase):
 
   def test_same_padding_corr(self):

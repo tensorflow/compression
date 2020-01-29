@@ -16,9 +16,11 @@
 
 import tensorflow.compat.v1 as tf
 
+from tensorflow.python.framework import test_util
 from tensorflow_compression.python.ops import math_ops
 
 
+@test_util.deprecated_graph_mode_only
 class MathTest(tf.test.TestCase):
 
   def _test_upper_bound(self, gradient):

@@ -17,9 +17,11 @@
 import numpy as np
 import tensorflow.compat.v1 as tf
 
+from tensorflow.python.framework import test_util
 from tensorflow_compression.python.layers import parameterizers
 
 
+@test_util.deprecated_graph_mode_only
 class ParameterizersTest(tf.test.TestCase):
 
   def _test_parameterizer(self, param, init, shape):

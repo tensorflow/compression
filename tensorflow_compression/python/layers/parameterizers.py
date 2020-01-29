@@ -111,10 +111,10 @@ class RDFTParameterizer(Parameterizer):
 
     def rdft_initializer(shape, dtype=None, partition_info=None):
       """Initializer wrapper."""
+      del partition_info  # Ignored for TF 1/2 compatibility.
       assert tuple(shape) == rdft_shape, shape
       assert dtype == rdft_dtype, dtype
-      init = initializer(
-          var_shape, dtype=var_dtype, partition_info=partition_info)
+      init = initializer(var_shape, dtype=var_dtype)
       init = tf.reshape(init, (-1, rdft_shape[-1]))
       irdft_matrix = spectral_ops.irdft_matrix(var_shape[:-2], dtype=var_dtype)
       if not self.dc:
@@ -175,9 +175,10 @@ class NonnegativeParameterizer(Parameterizer):
     reparam_name = "reparam_" + name
 
     def reparam_initializer(shape, dtype=None, partition_info=None):
+      del partition_info  # Ignored for TF 1/2 compatibility.
       # We recreate pedestal to decouple the initializer from the model graph.
       pedestal = tf.constant(self.reparam_offset ** 2, dtype=dtype)
-      init = initializer(shape, dtype=dtype, partition_info=partition_info)
+      init = initializer(shape, dtype=dtype)
       init = tf.math.sqrt(tf.math.maximum(init + pedestal, pedestal))
       return init
 

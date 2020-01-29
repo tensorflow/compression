@@ -17,9 +17,11 @@
 import numpy as np
 import tensorflow.compat.v1 as tf
 
+from tensorflow.python.framework import test_util
 from tensorflow_compression.python.layers import gdn
 
 
+@test_util.deprecated_graph_mode_only
 class GDNTest(tf.test.TestCase):
 
   def _run_gdn(self, x, shape, inverse, rectify, data_format):

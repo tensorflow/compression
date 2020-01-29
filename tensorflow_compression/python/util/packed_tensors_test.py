@@ -17,9 +17,11 @@
 import numpy as np
 import tensorflow.compat.v1 as tf
 
+from tensorflow.python.framework import test_util
 from tensorflow_compression.python.util import packed_tensors
 
 
+@test_util.deprecated_graph_mode_only
 class PackedTensorsTest(tf.test.TestCase):
 
   def test_pack_unpack(self):

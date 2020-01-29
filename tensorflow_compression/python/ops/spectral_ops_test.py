@@ -17,9 +17,11 @@
 import numpy as np
 import tensorflow.compat.v1 as tf
 
+from tensorflow.python.framework import test_util
 from tensorflow_compression.python.ops import spectral_ops
 
 
+@test_util.deprecated_graph_mode_only
 class SpectralOpsTest(tf.test.TestCase):
 
   def test_irdft1_matrix(self):

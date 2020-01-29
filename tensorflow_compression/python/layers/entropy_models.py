@@ -68,6 +68,10 @@ class EntropyModel(tf.keras.layers.Layer):
           "`tail_mass` must be between 0 and 1, got {}.".format(self.tail_mass))
     self._likelihood_bound = float(likelihood_bound)
     self._range_coder_precision = int(range_coder_precision)
+    if tf.executing_eagerly():
+      raise NotImplementedError(
+          "Keras layer implementations of entropy models are not supported in "
+          "eager mode.")
 
   @property
   def tail_mass(self):
@@ -449,7 +453,7 @@ class EntropyBottleneck(EntropyModel):
     """
     input_shape = tf.TensorShape(input_shape)
     channel_axis = self._channel_axis(input_shape.ndims)
-    channels = input_shape[channel_axis].value
+    channels = input_shape.as_list()[channel_axis]
     if channels is None:
       raise ValueError("The channel dimension of the inputs must be defined.")
     self.input_spec = tf.keras.layers.InputSpec(
@@ -659,7 +663,7 @@ class EntropyBottleneck(EntropyModel):
     if not self.built:
       if not (shape.shape.is_fully_defined() and shape.shape.ndims == 1):
         raise ValueError("`shape` must be a vector with known length.")
-      ndim = shape.shape[0].value + 1
+      ndim = shape.shape.as_list()[0] + 1
       channel_axis = self._channel_axis(ndim)
       input_shape = ndim * [None]
       input_shape[channel_axis] = channels

@@ -18,9 +18,11 @@ import numpy as np
 import scipy.stats
 import tensorflow.compat.v1 as tf
 
+from tensorflow.python.framework import test_util
 from tensorflow_compression.python.layers import entropy_models
 
 
+@test_util.deprecated_graph_mode_only
 class EntropyBottleneckTest(tf.test.TestCase):
 
   def test_noise(self):
@@ -260,6 +262,7 @@ class EntropyBottleneckTest(tf.test.TestCase):
     self.assertGreater(codelength, disc_entropy)
 
 
+@test_util.deprecated_graph_mode_only
 class SymmetricConditionalTest(object):
 
   def test_noise(self):
@@ -487,10 +490,10 @@ class SymmetricConditionalTest(object):
     # standard uniform) instead of -infty. For large scale values, the additive
     # noise is negligible.
     theo_entropy = self.scipy_class.entropy(scale=10) / np.log(2)
-    self.assertAllClose(0, diff_entropy[0], rtol=0, atol=5e-3)
-    self.assertAllClose(theo_entropy, diff_entropy[-1], rtol=5e-3, atol=0)
-    self.assertAllClose(diff_entropy, disc_entropy, rtol=5e-3, atol=5e-3)
-    self.assertAllClose(disc_entropy, codelength, rtol=5e-3, atol=5e-3)
+    self.assertAllClose(0, diff_entropy[0], rtol=1e-2, atol=1e-2)
+    self.assertAllClose(theo_entropy, diff_entropy[-1], rtol=1e-2, atol=1e-2)
+    self.assertAllClose(diff_entropy, disc_entropy, rtol=1e-2, atol=1e-2)
+    self.assertAllClose(disc_entropy, codelength, rtol=1e-2, atol=1e-2)
     # The range coder should have some overhead.
     self.assertTrue(all(codelength > disc_entropy))
 
