@@ -85,7 +85,7 @@ class GDN(tf.keras.layers.Layer):
         Defaults to `NonnegativeParameterizer` with a minimum value of 0.
       **kwargs: Other keyword arguments passed to superclass (`Layer`).
     """
-    super(GDN, self).__init__(**kwargs)
+    super().__init__(**kwargs)
     self._inverse = bool(inverse)
     self._rectify = bool(rectify)
     self._gamma_init = float(gamma_init)
@@ -136,6 +136,14 @@ class GDN(tf.keras.layers.Layer):
           "Can't set `gamma_parameterizer` once layer has been built.")
     self._gamma_parameterizer = val
 
+  @property
+  def beta(self):
+    return self._beta.value()
+
+  @property
+  def gamma(self):
+    return self._gamma.value()
+
   def _channel_axis(self):
     return {"channels_first": 1, "channels_last": -1}[self.data_format]
 
@@ -152,17 +160,17 @@ class GDN(tf.keras.layers.Layer):
 
     # Sorry, lint, but these objects really are callable ...
     # pylint:disable=not-callable
-    self.beta = self.beta_parameterizer(
+    self._beta = self.beta_parameterizer(
         name="beta", shape=[num_channels], dtype=self.dtype,
         getter=self.add_weight, initializer=tf.initializers.ones())
 
-    self.gamma = self.gamma_parameterizer(
+    self._gamma = self.gamma_parameterizer(
         name="gamma", shape=[num_channels, num_channels], dtype=self.dtype,
         getter=self.add_weight,
         initializer=tf.initializers.identity(gain=self._gamma_init))
     # pylint:enable=not-callable
 
-    self.built = True
+    super().build(input_shape)
 
   def call(self, inputs):
     inputs = tf.convert_to_tensor(inputs, dtype=self.dtype)
@@ -175,7 +183,9 @@ class GDN(tf.keras.layers.Layer):
     if ndim == 2:
       norm_pool = tf.linalg.matmul(tf.math.square(inputs), self.gamma)
       norm_pool = tf.nn.bias_add(norm_pool, self.beta)
-    elif self.data_format == "channels_last" and ndim <= 5:
+    elif self.data_format == "channels_last" and ndim <= 4:
+      # TODO(unassigned): This branch should also work for ndim == 5, but
+      # currently triggers a bug in TF.
       shape = self.gamma.shape.as_list()
       gamma = tf.reshape(self.gamma, (ndim - 2) * [1] + shape)
       norm_pool = tf.nn.convolution(tf.math.square(inputs), gamma, "VALID")

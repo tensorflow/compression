@@ -350,11 +350,11 @@ class _SignalConv(tf.keras.layers.Layer):
 
   @property
   def kernel(self):
-    return self._kernel
+    return self._kernel.value()
 
   @property
   def bias(self):
-    return self._bias
+    return self._bias.value()
 
   @property
   def _op_data_format(self):
@@ -432,8 +432,6 @@ class _SignalConv(tf.keras.layers.Layer):
       self._bias = getter(
           name="bias", shape=(output_channels,), dtype=self.dtype,
           initializer=self.bias_initializer, regularizer=self.bias_regularizer)
-    else:
-      self._bias = None
 
     super(_SignalConv, self).build(input_shape)
 
@@ -778,7 +776,7 @@ class _SignalConv(tf.keras.layers.Layer):
       self._raise_notimplemented()
 
     # Now, add bias if requested.
-    if self.bias is not None:
+    if self.use_bias:
       bias = self.bias
       if self.data_format == "channels_first":
         # As of Mar 2017, direct addition is significantly slower than

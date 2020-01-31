@@ -34,6 +34,13 @@ py_library(
     deps = [":parameterizers"],
 )
 
+py_test(
+    name = "gdn_test",
+    srcs = ["gdn_test.py"],
+    python_version = "PY3",
+    deps = [":gdn"],
+)
+
 py_library(
     name = "initializers",
     srcs = ["initializers.py"],
@@ -66,13 +73,6 @@ py_test(
     srcs = ["entropy_models_test.py"],
     python_version = "PY3",
     deps = [":entropy_models"],
-)
-
-py_test(
-    name = "gdn_test",
-    srcs = ["gdn_test.py"],
-    python_version = "PY3",
-    deps = [":gdn"],
 )
 
 py_test(

@@ -21,11 +21,26 @@ from tensorflow_compression.python.ops import spectral_ops
 
 
 __all__ = [
+    "Parameter",
     "Parameterizer",
     "StaticParameterizer",
     "RDFTParameterizer",
     "NonnegativeParameterizer",
 ]
+
+
+class Parameter(object):
+  """Reparameterized `Layer` variable.
+
+  This object represents a parameter of a `tf.keras.layer.Layer` object which
+  isn't directly stored in a `tf.Variable`. Instead, the value is computed
+  on-demand by calling its `value()` method.
+  """
+
+  def __init__(self, value):
+    if not callable(value):
+      raise TypeError("`value` must be callable without arguments.")
+    self.value = value
 
 
 class Parameterizer(object):
@@ -69,9 +84,9 @@ class StaticParameterizer(Parameterizer):
                                 "static parameterizers.")
     if callable(self.value):
       # Treat value as initializer.
-      return self.value(shape, dtype=dtype)
+      return Parameter(lambda: self.value(shape, dtype=dtype))
     else:
-      return self.value
+      return Parameter(lambda: self.value)
 
 
 class RDFTParameterizer(Parameterizer):
@@ -137,7 +152,7 @@ class RDFTParameterizer(Parameterizer):
     rdft = getter(
         name=rdft_name, shape=rdft_shape, dtype=rdft_dtype,
         initializer=rdft_initializer, regularizer=reparam_regularizer)
-    return reparam(rdft)
+    return Parameter(lambda: reparam(rdft))
 
 
 class NonnegativeParameterizer(Parameterizer):
@@ -194,4 +209,4 @@ class NonnegativeParameterizer(Parameterizer):
     var = getter(
         name=reparam_name, shape=shape, dtype=dtype,
         initializer=reparam_initializer, regularizer=reparam_regularizer)
-    return reparam(var)
+    return Parameter(lambda: reparam(var))

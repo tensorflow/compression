@@ -1,3 +1,4 @@
+# Lint as: python3
 # Copyright 2018 Google LLC. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,70 +15,64 @@
 # ==============================================================================
 """Tests of GDN layer."""
 
-import numpy as np
-import tensorflow.compat.v1 as tf
+import tensorflow.compat.v2 as tf
 
-from tensorflow.python.framework import test_util
 from tensorflow_compression.python.layers import gdn
 
 
-@test_util.deprecated_graph_mode_only
 class GDNTest(tf.test.TestCase):
 
-  def _run_gdn(self, x, shape, inverse, rectify, data_format):
-    inputs = tf.placeholder(tf.float32, shape)
-    layer = gdn.GDN(
-        inverse=inverse, rectify=rectify, data_format=data_format)
-    outputs = layer(inputs)
-    with self.cached_session() as sess:
-      tf.global_variables_initializer().run()
-      y, = sess.run([outputs], {inputs: x})
-    return y
-
-  def test_invalid_data_format(self):
-    x = np.random.uniform(size=(1, 2, 3, 4))
+  def test_invalid_data_format_raises_error(self):
+    x = tf.random.uniform((1, 2, 3, 4), dtype=tf.float32)
     with self.assertRaises(ValueError):
-      self._run_gdn(x, x.shape, False, False, "NHWC")
+      gdn.GDN(inverse=False, rectify=False, data_format="NHWC")(x)
 
-  def test_unknown_dim(self):
-    x = np.random.uniform(size=(1, 2, 3, 4))
+  def test_vector_input_raises_error(self):
+    x = tf.random.uniform((3,), dtype=tf.float32)
     with self.assertRaises(ValueError):
-      self._run_gdn(x, 4 * [None], False, False, "channels_last")
+      gdn.GDN(inverse=False, rectify=False, data_format="channels_last")(x)
+    with self.assertRaises(ValueError):
+      gdn.GDN(inverse=True, rectify=True, data_format="channels_first")(x)
 
-  def test_channels_last(self):
+  def test_channels_last_has_correct_output(self):
+    # This tests that the layer produces the correct output for a number of
+    # different input dimensionalities with 'channels_last' data format.
     for ndim in [2, 3, 4, 5, 6]:
-      x = np.random.uniform(size=(1, 2, 3, 4, 5, 6)[:ndim])
-      y = self._run_gdn(x, x.shape, False, False, "channels_last")
+      x = tf.random.uniform((1, 2, 3, 4, 5, 6)[:ndim], dtype=tf.float32)
+      y = gdn.GDN(inverse=False, rectify=False, data_format="channels_last")(x)
       self.assertEqual(x.shape, y.shape)
-      self.assertAllClose(y, x / np.sqrt(1 + .1 * (x ** 2)), rtol=0, atol=1e-6)
+      self.assertAllClose(y, x / tf.sqrt(1 + .1 * (x ** 2)), rtol=0, atol=1e-6)
 
-  def test_channels_first(self):
+  def test_channels_first_has_correct_output(self):
+    # This tests that the layer produces the correct output for a number of
+    # different input dimensionalities with 'channels_first' data format.
     for ndim in [2, 3, 4, 5, 6]:
-      x = np.random.uniform(size=(6, 5, 4, 3, 2, 1)[:ndim])
-      y = self._run_gdn(x, x.shape, False, False, "channels_first")
+      x = tf.random.uniform((6, 5, 4, 3, 2, 1)[:ndim], dtype=tf.float32)
+      y = gdn.GDN(inverse=False, rectify=False, data_format="channels_first")(x)
       self.assertEqual(x.shape, y.shape)
-      self.assertAllClose(
-          y, x / np.sqrt(1 + .1 * (x ** 2)), rtol=0, atol=1e-6)
+      self.assertAllClose(y, x / tf.sqrt(1 + .1 * (x ** 2)), rtol=0, atol=1e-6)
 
-  def test_wrong_dims(self):
-    x = np.random.uniform(size=(3,))
-    with self.assertRaises(ValueError):
-      self._run_gdn(x, x.shape, False, False, "channels_last")
-    with self.assertRaises(ValueError):
-      self._run_gdn(x, x.shape, True, True, "channels_first")
-
-  def test_igdn(self):
-    x = np.random.uniform(size=(1, 2, 3, 4))
-    y = self._run_gdn(x, x.shape, True, False, "channels_last")
+  def test_igdn_has_correct_output(self):
+    x = tf.random.uniform((1, 2, 3, 4), dtype=tf.float32)
+    y = gdn.GDN(inverse=True, rectify=False)(x)
     self.assertEqual(x.shape, y.shape)
-    self.assertAllClose(y, x * np.sqrt(1 + .1 * (x ** 2)), rtol=0, atol=1e-6)
+    self.assertAllClose(y, x * tf.sqrt(1 + .1 * (x ** 2)), rtol=0, atol=1e-6)
 
-  def test_rgdn(self):
-    x = np.random.uniform(-.5, .5, size=(1, 2, 3, 4))
-    y = self._run_gdn(x, x.shape, False, True, "channels_last")
+  def test_rgdn_has_correct_output(self):
+    x = tf.random.uniform((1, 2, 3, 4), -.5, .5, dtype=tf.float32)
+    y = gdn.GDN(inverse=False, rectify=True)(x)
     self.assertEqual(x.shape, y.shape)
-    x = np.maximum(x, 0)
-    self.assertAllClose(y, x / np.sqrt(1 + .1 * (x ** 2)), rtol=0, atol=1e-6)
+    x = tf.maximum(x, 0)
+    self.assertAllClose(y, x / tf.sqrt(1 + .1 * (x ** 2)), rtol=0, atol=1e-6)
+
+  def test_variables_receive_gradients(self):
+    x = tf.random.uniform((1, 2), dtype=tf.float32)
+    layer = gdn.GDN(inverse=False, rectify=True)
+    with tf.GradientTape() as g:
+      y = layer(x)
+    grads = g.gradient(y, layer.trainable_variables)
+    self.assertLen(grads, 2)
+    self.assertNotIn(None, grads)
 
 
 if __name__ == "__main__":
