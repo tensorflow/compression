@@ -78,6 +78,17 @@ class PmfToCdfOp : public OpKernel {
     CHECK_EQ(pmf.dimension(0), cdf.dimension(0));
     CHECK_EQ(pmf.dimension(1) + 1, cdf.dimension(1));
 
+    for (int64 i = 0; i < pmf.dimension(0); ++i) {
+      for (int64 j = 0; j < pmf.dimension(1); ++j) {
+        auto value = pmf(i, j);
+        OP_REQUIRES(
+            context, std::isfinite(value) && value >= 0,
+            InvalidArgument("`pmf` has non-finite or negative element: ", value,
+                            ". Please check for numerical problems in the "
+                            "probability computation."));
+      }
+    }
+
     const double n = pmf.dimension(1);
     const int64 cost_per_unit = static_cast<int64>(50.0 * n * std::log2(n));
     thread::ThreadPool* thread_pool =
