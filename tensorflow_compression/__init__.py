@@ -24,6 +24,9 @@ except (ImportError, AssertionError):
 
 
 # pylint: disable=wildcard-import
+from tensorflow_compression.python.distributions.deep_factorized import *
+from tensorflow_compression.python.distributions.helpers import *
+from tensorflow_compression.python.distributions.uniform_noise import *
 from tensorflow_compression.python.layers.entropy_models import *
 from tensorflow_compression.python.layers.gdn import *
 from tensorflow_compression.python.layers.initializers import *

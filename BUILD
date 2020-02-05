@@ -11,6 +11,7 @@ py_library(
     srcs_version = "PY3",
     visibility = ["//visibility:public"],
     deps = [
+        "//tensorflow_compression/python/distributions",
         "//tensorflow_compression/python/layers",
         "//tensorflow_compression/python/ops",
         "//tensorflow_compression/python/util",
@@ -34,6 +35,7 @@ py_binary(
         ":pip_src",
         ":tensorflow_compression",
         # The following targets are for Python test files.
+        "//tensorflow_compression/python/distributions:py_src",
         "//tensorflow_compression/python/layers:py_src",
         "//tensorflow_compression/python/ops:py_src",
         "//tensorflow_compression/python/util:py_src",
