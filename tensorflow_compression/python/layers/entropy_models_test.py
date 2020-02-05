@@ -259,7 +259,6 @@ class EntropyBottleneckTest(tf.test.TestCase):
     codelength = 8 * sum(len(s) for s in bitstrings)
     self.assertAllClose(diff_entropy, disc_entropy, rtol=5e-3, atol=0)
     self.assertAllClose(disc_entropy, codelength, rtol=5e-3, atol=0)
-    self.assertGreater(codelength, disc_entropy)
 
 
 @test_util.deprecated_graph_mode_only
