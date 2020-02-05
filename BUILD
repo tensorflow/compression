@@ -12,6 +12,7 @@ py_library(
     visibility = ["//visibility:public"],
     deps = [
         "//tensorflow_compression/python/distributions",
+        "//tensorflow_compression/python/entropy_models",
         "//tensorflow_compression/python/layers",
         "//tensorflow_compression/python/ops",
         "//tensorflow_compression/python/util",
@@ -36,6 +37,7 @@ py_binary(
         ":tensorflow_compression",
         # The following targets are for Python test files.
         "//tensorflow_compression/python/distributions:py_src",
+        "//tensorflow_compression/python/entropy_models:py_src",
         "//tensorflow_compression/python/layers:py_src",
         "//tensorflow_compression/python/ops:py_src",
         "//tensorflow_compression/python/util:py_src",
