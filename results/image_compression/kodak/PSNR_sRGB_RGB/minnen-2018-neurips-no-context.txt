@@ -1,0 +1,27 @@
+# Aggregate rate-distortion data for "Minnen 2018 (NeurIPS - No Context)" on kodak.
+# The first column contains bits per pixel (bpp) values.
+# The second column contains PSNR/sRGB/R'G'B' values.
+#
+# This is a hyperprior architecture that predicts mean & scale parameters for
+# the entropy model, unlike (Ballé 2018) that only predicts the scale
+# parameter. This model does NOT include context prediction, and it was
+# re-trained after the paper was published so the rate-distortion numbers do
+# not match the paper (they're slightly better).
+#
+# Notes:
+#  1. Aggregate values were calculated by averaging over a constant
+#     lambda value.
+#
+# If you have questions or corrections, please contact:
+#  David Minnen (dminnen@google.com) or George Toderici (gtoderici@google.com).
+
+0.116419, 27.869507
+0.172233, 28.844869
+0.289868, 31.025364
+0.455688, 33.049656
+0.664587, 34.991868
+0.934780, 36.993942
+1.272558, 39.038383
+1.692898, 40.948441
+2.222060, 42.859464
+2.861839, 44.557811

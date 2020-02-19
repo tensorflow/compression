@@ -1,0 +1,29 @@
+# Aggregate rate-distortion data for "Toderici 2017 (CVPR)" on tecnick.
+# The first column contains bits per pixel (bpp) values.
+# The second column contains MS-SSIM/sRGB/R'G'B' values.
+#
+# Notes:
+#  1. Aggregate values were calculated by averaging over a constant
+#     lambda value.
+#  2. We often graph MS-SSIM values in dB for visual clarity using:
+#     ms_ssim_db = -10 * log10(1 - ms_ssim).
+#
+# If you have questions or corrections, please contact:
+#  David Minnen (dminnen@google.com) or George Toderici (gtoderici@google.com).
+
+0.125000, 0.846800
+0.250000, 0.914520
+0.375000, 0.946760
+0.500000, 0.961180
+0.625000, 0.969770
+0.750000, 0.975420
+0.875000, 0.978870
+1.000000, 0.981090
+1.125000, 0.983340
+1.250000, 0.984590
+1.375000, 0.985880
+1.500000, 0.986580
+1.625000, 0.987210
+1.750000, 0.987620
+1.875000, 0.987620
+2.000000, 0.987800

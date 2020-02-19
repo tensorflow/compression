@@ -1,0 +1,27 @@
+# Aggregate rate-distortion data for "Johnston 2018 (CVPR)" on tecnick.
+# The first column contains bits per pixel (bpp) values.
+# The second column contains PSNR/sRGB/R'G'B' values.
+#
+# Notes:
+#  1. Aggregate values were calculated by averaging over a constant
+#     lambda value.
+#
+# If you have questions or corrections, please contact:
+#  David Minnen (dminnen@google.com) or George Toderici (gtoderici@google.com).
+
+0.085446, 26.314558
+0.195974, 29.496233
+0.321704, 31.824317
+0.446534, 32.916187
+0.567297, 33.869245
+0.692207, 34.623349
+0.813974, 35.609418
+0.938960, 36.157846
+1.061759, 36.704908
+1.186988, 37.159970
+1.310126, 37.610291
+1.435111, 38.146013
+1.558323, 38.496106
+1.681771, 38.656697
+1.803392, 38.787682
+1.923209, 38.881638

@@ -1,0 +1,19 @@
+# Aggregate rate-distortion data for "Minnen 2018 (ICIP)" on tecnick.
+# The first column contains bits per pixel (bpp) values.
+# The second column contains PSNR/sRGB/Y' values.
+#
+# Notes:
+#  1. Aggregate values were calculated by averaging over a constant
+#     lambda value.
+#
+# If you have questions or corrections, please contact:
+#  David Minnen (dminnen@google.com) or George Toderici (gtoderici@google.com).
+
+0.097065, 29.692244
+0.147267, 31.352069
+0.219246, 33.051261
+0.319637, 34.651911
+0.459729, 36.499783
+0.666186, 38.338561
+0.933576, 40.255791
+1.298130, 42.151668

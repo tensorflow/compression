@@ -1,0 +1,46 @@
+# Aggregate rate-distortion data for "JPEG 2000 (OpenJPEG)" on kodak.
+# The first column contains bits per pixel (bpp) values.
+# The second column contains MS-SSIM/sRGB/R'G'B' values.
+#
+# Notes:
+#  1. Aggregate values were calculated by averaging over a constant QP value.
+#  2. We often graph MS-SSIM values in dB for visual clarity using:
+#     ms_ssim_db = -10 * log10(1 - ms_ssim).
+#  3. These results are based on the OpenJPEG implementation of JPEG2000
+#     More information here: https://www.openjpeg.org.
+#
+# If you have questions or corrections, please contact:
+#  David Minnen (dminnen@google.com) or George Toderici (gtoderici@google.com).
+
+0.099912, 0.864516
+0.200165, 0.912034
+0.249945, 0.925119
+0.300170, 0.934147
+0.400012, 0.948107
+0.499803, 0.957545
+0.599782, 0.964332
+0.700121, 0.969526
+0.750070, 0.971646
+0.799270, 0.973724
+0.899998, 0.977021
+0.999610, 0.979359
+1.100226, 0.981689
+1.200713, 0.983491
+1.249957, 0.984231
+1.300304, 0.984927
+1.400688, 0.986307
+1.499341, 0.987546
+1.600190, 0.988540
+1.699513, 0.989420
+1.750212, 0.989828
+1.800014, 0.990199
+1.899858, 0.990912
+1.999802, 0.991533
+2.249946, 0.992760
+2.500251, 0.993836
+2.749595, 0.994614
+3.000416, 0.995394
+3.250183, 0.996125
+3.498930, 0.996648
+3.750190, 0.997062
+3.999123, 0.997421

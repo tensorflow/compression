@@ -1,0 +1,21 @@
+# Aggregate rate-distortion data for "Minnen 2018 (ICIP)" on kodak.
+# The first column contains bits per pixel (bpp) values.
+# The second column contains MS-SSIM/sRGB/Y' values.
+#
+# Notes:
+#  1. Aggregate values were calculated by averaging over a constant
+#     lambda value.
+#  2. We often graph MS-SSIM values in dB for visual clarity using:
+#     ms_ssim_db = -10 * log10(1 - ms_ssim).
+#
+# If you have questions or corrections, please contact:
+#  David Minnen (dminnen@google.com) or George Toderici (gtoderici@google.com).
+
+0.113339, 0.911679
+0.181917, 0.937792
+0.290215, 0.960397
+0.438877, 0.973381
+0.653552, 0.984346
+0.956121, 0.989364
+1.309287, 0.993836
+1.740850, 0.996263

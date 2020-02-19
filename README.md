@@ -243,10 +243,18 @@ pip uninstall tensorflow-compression
 To build packages for Darwin (and potentially other platforms), you can follow
 the same steps, but the Docker image should not be necessary.
 
+## Evaluation
+
+We provide evaluation results for several image compression methods in terms of
+different metrics in different colorspaces. Please see the
+[results subdirectory](https://tensorflow.github.io/compression/results/readme/image_compression/README.md)
+for more information.
+
 ## Authors
 
-Johannes Ballé (github: [jonycgn](https://github.com/jonycgn)), Sung Jin Hwang
-(github: [ssjhv](https://github.com/ssjhv)), and Nick Johnston (github:
-[nmjohn](https://github.com/nmjohn))
+* Johannes Ballé (github: [jonycgn](https://github.com/jonycgn))
+* Sung Jin Hwang (github: [ssjhv](https://github.com/ssjhv))
+* Nick Johnston (github: [nmjohn](https://github.com/nmjohn))
+* David Minnen (github: [minnend](https://github.com/minnend))
 
 Note that this is not an officially supported Google product.

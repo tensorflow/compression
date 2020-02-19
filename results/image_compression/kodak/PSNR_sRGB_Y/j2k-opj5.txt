@@ -1,0 +1,44 @@
+# Aggregate rate-distortion data for "JPEG 2000 (OpenJPEG)" on kodak.
+# The first column contains bits per pixel (bpp) values.
+# The second column contains PSNR/sRGB/Y' values.
+#
+# Notes:
+#  1. Aggregate values were calculated by averaging over a constant QP value.
+#  2. These results are based on the OpenJPEG implementation of JPEG2000
+#     More information here: https://www.openjpeg.org.
+#
+# If you have questions or corrections, please contact:
+#  David Minnen (dminnen@google.com) or George Toderici (gtoderici@google.com).
+
+0.099912, 26.500143
+0.200165, 28.665524
+0.249945, 29.471546
+0.300170, 30.188834
+0.400012, 31.434453
+0.499803, 32.489647
+0.599782, 33.411953
+0.700121, 34.264553
+0.750070, 34.650467
+0.799270, 35.012138
+0.899998, 35.718922
+0.999610, 36.382860
+1.100226, 36.978301
+1.200713, 37.525673
+1.249957, 37.794954
+1.300304, 38.061436
+1.400688, 38.565675
+1.499341, 39.037361
+1.600190, 39.494327
+1.699513, 39.931074
+1.750212, 40.133757
+1.800014, 40.334520
+1.899858, 40.693007
+1.999802, 41.041602
+2.249946, 41.889833
+2.500251, 42.727200
+2.749595, 43.515910
+3.000416, 44.234837
+3.250183, 44.928415
+3.498930, 45.515973
+3.750190, 46.101650
+3.999123, 46.694943

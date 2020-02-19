@@ -1,0 +1,27 @@
+# Aggregate rate-distortion data for "Toderici 2017 (CVPR)" on tecnick.
+# The first column contains bits per pixel (bpp) values.
+# The second column contains PSNR/sRGB/R'G'B' values.
+#
+# Notes:
+#  1. Aggregate values were calculated by averaging over a constant
+#     lambda value.
+#
+# If you have questions or corrections, please contact:
+#  David Minnen (dminnen@google.com) or George Toderici (gtoderici@google.com).
+
+0.125000, 23.463810
+0.250000, 26.873860
+0.375000, 29.043220
+0.500000, 30.441750
+0.625000, 31.547990
+0.750000, 32.386430
+0.875000, 33.056510
+1.000000, 33.660230
+1.125000, 34.237530
+1.250000, 34.690620
+1.375000, 35.059770
+1.500000, 35.378670
+1.625000, 35.637260
+1.750000, 35.849540
+1.875000, 36.024020
+2.000000, 36.152240

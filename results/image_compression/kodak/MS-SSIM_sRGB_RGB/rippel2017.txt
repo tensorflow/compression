@@ -1,0 +1,34 @@
+# Aggregate rate-distortion data for "Rippel 2017 (ICML)" on kodak.
+# The first column contains bits per pixel (bpp) values.
+# The second column contains MS-SSIM/sRGB/R'G'B' values.
+#
+# Notes:
+#  1. Aggregate values were calculated by averaging over a constant
+#     lambda value.
+#  2. We often graph MS-SSIM values in dB for visual clarity using:
+#     ms_ssim_db = -10 * log10(1 - ms_ssim).
+#
+# If you have questions or corrections, please contact:
+#  David Minnen (dminnen@google.com) or George Toderici (gtoderici@google.com).
+
+0.071600, 0.900150
+0.082740, 0.908720
+0.095470, 0.919570
+0.116150, 0.929660
+0.140020, 0.939600
+0.171840, 0.949240
+0.225930, 0.959630
+0.273670, 0.966360
+0.358000, 0.974460
+0.437550, 0.979660
+0.499600, 0.982260
+0.596660, 0.985020
+0.706440, 0.987310
+0.830550, 0.989600
+0.964200, 0.991440
+1.059670, 0.992350
+1.206050, 0.993430
+1.326970, 0.994190
+1.463800, 0.994800
+1.621320, 0.995260
+2.009550, 0.996330

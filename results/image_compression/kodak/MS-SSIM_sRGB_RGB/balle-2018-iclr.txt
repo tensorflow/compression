@@ -1,0 +1,21 @@
+# Aggregate rate-distortion data for "Ballé 2018 (ICLR)" on kodak.
+# The first column contains bits per pixel (bpp) values.
+# The second column contains MS-SSIM/sRGB/R'G'B' values.
+#
+# Notes:
+#  1. Aggregate values were calculated by averaging over a constant
+#     lambda value.
+#  2. We often graph MS-SSIM values in dB for visual clarity using:
+#     ms_ssim_db = -10 * log10(1 - ms_ssim).
+#
+# If you have questions or corrections, please contact:
+#  David Minnen (dminnen@google.com) or George Toderici (gtoderici@google.com).
+
+0.115239, 0.907527
+0.185698, 0.936307
+0.301804, 0.958691
+0.468972, 0.972416
+0.686378, 0.982478
+0.966864, 0.988344
+1.307441, 0.992647
+1.727503, 0.995267

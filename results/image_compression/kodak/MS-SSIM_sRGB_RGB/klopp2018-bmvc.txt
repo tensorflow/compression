@@ -1,0 +1,40 @@
+# Aggregate rate-distortion data for "Klopp 2018 (BMVC)" on kodak.
+# The first column contains bits per pixel (bpp) values.
+# The second column contains MS-SSIM/sRGB/R'G'B' values.
+#
+# Notes:
+#  1. Aggregate values were calculated by averaging over a constant
+#     lambda value.
+#  2. We often graph MS-SSIM values in dB for visual clarity using:
+#     ms_ssim_db = -10 * log10(1 - ms_ssim).
+#
+# If you have questions or corrections, please contact:
+#  David Minnen (dminnen@google.com) or George Toderici (gtoderici@google.com).
+
+0.095628, 0.923610
+0.123170, 0.936850
+0.142300, 0.945580
+0.154540, 0.949920
+0.175960, 0.956100
+0.193550, 0.960180
+0.220330, 0.965180
+0.242510, 0.968420
+0.276940, 0.972390
+0.302950, 0.974770
+0.354970, 0.978210
+0.386340, 0.980090
+0.437600, 0.982720
+0.470490, 0.984170
+0.530160, 0.986430
+0.560770, 0.987420
+0.599780, 0.988470
+0.671690, 0.990020
+0.725250, 0.990970
+0.800220, 0.992030
+0.899670, 0.993100
+0.976170, 0.993710
+1.045800, 0.994180
+1.099300, 0.994480
+1.199600, 0.995000
+1.299000, 0.995430
+1.399200, 0.995810

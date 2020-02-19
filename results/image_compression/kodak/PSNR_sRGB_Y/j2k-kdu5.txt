@@ -1,0 +1,44 @@
+# Aggregate rate-distortion data for "JPEG 2000 (Kakadu)" on kodak.
+# The first column contains bits per pixel (bpp) values.
+# The second column contains PSNR/sRGB/Y' values.
+#
+# Notes:
+#  1. Aggregate values were calculated by averaging over a constant QP value.
+#  2. These results are based on the Kakadu implementation of JPEG2000
+#     More information here: https://kakadusoftware.com.
+#
+# If you have questions or corrections, please contact:
+#  David Minnen (dminnen@google.com) or George Toderici (gtoderici@google.com).
+
+0.100076, 26.645733
+0.199880, 28.465018
+0.249907, 29.093095
+0.300371, 29.614011
+0.399825, 30.546576
+0.499945, 31.474227
+0.600087, 32.309441
+0.700465, 33.095831
+0.750395, 33.384622
+0.800270, 33.768200
+0.900150, 34.462059
+0.999644, 35.032021
+1.099831, 35.650619
+1.200267, 36.102002
+1.250495, 36.354129
+1.299869, 36.622274
+1.399585, 37.142209
+1.499995, 37.537797
+1.600394, 37.937753
+1.699370, 38.344062
+1.750196, 38.559526
+1.800260, 38.752105
+1.899801, 39.148093
+2.000136, 39.501382
+2.250013, 40.420899
+2.499570, 41.227321
+2.749943, 42.142248
+3.000182, 43.064286
+3.249868, 43.943734
+3.499243, 44.738712
+3.750640, 45.651954
+4.000155, 46.656420

@@ -1,0 +1,29 @@
+# Aggregate rate-distortion data for "Johnston 2018 (CVPR)" on tecnick.
+# The first column contains bits per pixel (bpp) values.
+# The second column contains MS-SSIM/sRGB/R'G'B' values.
+#
+# Notes:
+#  1. Aggregate values were calculated by averaging over a constant
+#     lambda value.
+#  2. We often graph MS-SSIM values in dB for visual clarity using:
+#     ms_ssim_db = -10 * log10(1 - ms_ssim).
+#
+# If you have questions or corrections, please contact:
+#  David Minnen (dminnen@google.com) or George Toderici (gtoderici@google.com).
+
+0.085446, 0.921561
+0.195974, 0.960133
+0.321704, 0.974237
+0.446534, 0.980585
+0.567297, 0.985052
+0.692207, 0.987644
+0.813974, 0.989759
+0.938960, 0.991152
+1.061759, 0.992429
+1.186988, 0.993343
+1.310126, 0.994184
+1.435111, 0.994730
+1.558323, 0.995319
+1.681771, 0.995786
+1.803392, 0.996149
+1.923209, 0.996373

@@ -1,0 +1,22 @@
+# Aggregate rate-distortion data for "Minnen 2017 (ICIP)" on kodak.
+# The first column contains bits per pixel (bpp) values.
+# The second column contains PSNR/sRGB/R'G'B' values.
+#
+# Notes:
+#  1. Aggregate values were calculated by averaging over a constant
+#     lambda value.
+#
+# If you have questions or corrections, please contact:
+#  David Minnen (dminnen@google.com) or George Toderici (gtoderici@google.com).
+
+0.250000, 26.825000
+0.375000, 29.041000
+0.500000, 30.418000
+0.625000, 31.495000
+0.750000, 32.380000
+0.875000, 33.136000
+1.000000, 33.796000
+1.125000, 34.304000
+1.250000, 34.715000
+1.375000, 35.054000
+1.500000, 35.297000

@@ -1,0 +1,46 @@
+# Aggregate rate-distortion data for "JPEG 2000 (Kakadu)" on kodak.
+# The first column contains bits per pixel (bpp) values.
+# The second column contains MS-SSIM/sRGB/Y' values.
+#
+# Notes:
+#  1. Aggregate values were calculated by averaging over a constant QP value.
+#  2. We often graph MS-SSIM values in dB for visual clarity using:
+#     ms_ssim_db = -10 * log10(1 - ms_ssim).
+#  3. These results are based on the Kakadu implementation of JPEG2000
+#     More information here: https://kakadusoftware.com.
+#
+# If you have questions or corrections, please contact:
+#  David Minnen (dminnen@google.com) or George Toderici (gtoderici@google.com).
+
+0.100076, 0.892994
+0.199880, 0.938764
+0.249907, 0.950581
+0.300371, 0.958031
+0.399825, 0.968464
+0.499945, 0.975276
+0.600087, 0.979861
+0.700465, 0.982950
+0.750395, 0.984371
+0.800270, 0.985521
+0.900150, 0.987603
+0.999644, 0.989194
+1.099831, 0.990733
+1.200267, 0.991784
+1.250495, 0.992260
+1.299869, 0.992747
+1.399585, 0.993611
+1.499995, 0.994273
+1.600394, 0.994853
+1.699370, 0.995321
+1.750196, 0.995611
+1.800260, 0.995838
+1.899801, 0.996209
+2.000136, 0.996554
+2.250013, 0.997204
+2.499570, 0.997719
+2.749943, 0.998122
+3.000182, 0.998428
+3.249868, 0.998682
+3.499243, 0.998898
+3.750640, 0.999077
+4.000155, 0.999217

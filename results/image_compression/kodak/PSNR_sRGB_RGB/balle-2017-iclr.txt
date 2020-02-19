@@ -1,0 +1,19 @@
+# Aggregate rate-distortion data for "Ballé 2017 (ICLR)" on kodak.
+# The first column contains bits per pixel (bpp) values.
+# The second column contains PSNR/sRGB/R'G'B' values.
+#
+# Notes:
+#  1. Aggregate values were calculated by averaging over a constant
+#     lambda value.
+#
+# If you have questions or corrections, please contact:
+#  David Minnen (dminnen@google.com) or George Toderici (gtoderici@google.com).
+
+0.119752, 26.775134
+0.194591, 28.348719
+0.316000, 30.020793
+0.481060, 31.729556
+0.721303, 33.685797
+1.060841, 35.815864
+1.458681, 38.019954
+1.957564, 40.133996
