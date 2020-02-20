@@ -247,7 +247,7 @@ the same steps, but the Docker image should not be necessary.
 
 We provide evaluation results for several image compression methods in terms of
 different metrics in different colorspaces. Please see the
-[results subdirectory](https://tensorflow.github.io/compression/results/readme/image_compression/README.md)
+[results subdirectory](https://github.com/tensorflow/compression/tree/master/results/image_compression)
 for more information.
 
 ## Authors

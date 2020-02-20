@@ -9,13 +9,11 @@ evaluation data sets are covered.
 
 ### Table of Contents
 
-* [Image Compression Methods](#image_compression_methods)
-* [Quality Metrics](#quality_metrics)
-* [Data Sets for Evaluation](#data_sets_for_evaluation)
+* [Image Compression Methods](#image-compression-methods)
+* [Quality Metrics](#quality-metrics)
+* [Data Sets for Evaluation](#data-sets-for-evaluation)
 
 ## Image Compression Methods
-
---------------------------------------------------------------------------------
 
 ### Standard (Hand-Engineered) Codecs
 
@@ -27,72 +25,59 @@ evaluation data sets are covered.
 
 ### Learning-based Methods
 
-1.   [Context-adaptive Entropy Model for End-to-end Optimized Image Compression]
-    (https://openreview.net/forum?id=HyxKIiAqYQ) \
-    Jooyoung Lee, Seunghyun Cho, and Seung-Kwon Beack \
+1.   [Context-adaptive Entropy Model for End-to-end Optimized Image Compression](https://openreview.net/forum?id=HyxKIiAqYQ)\
+    Jooyoung Lee, Seunghyun Cho, and Seung-Kwon Beack\
     Int. Conf. on Learning Representations (ICLR) 2019
 
 2.  [Joint autoregressive and hierarchical priors for learned image
-    compression]
-    (https://arxiv.org/abs/1809.02736) \
-    David Minnen, Johannes Ballé, and George Toderici \
+    compression](https://arxiv.org/abs/1809.02736)\
+    David Minnen, Johannes Ballé, and George Toderici\
     Advances in Neural Information Processing Systems (NeurIPS) 2018
 
-3.  [Learning a Code-Space Predictor by Exploiting Intra-Image-Dependencies]
-    (http://bmvc2018.org/contents/papers/0491.pdf) \
-    Jan P. Klopp, Yu-Chiang Frank Wang, Shao-Yi Chien, and Liang-Gee Chen \
+3.  [Learning a Code-Space Predictor by Exploiting Intra-Image-Dependencies](http://bmvc2018.org/contents/papers/0491.pdf)\
+    Jan P. Klopp, Yu-Chiang Frank Wang, Shao-Yi Chien, and Liang-Gee Chen\
     British Machine Vision Conference (BMVC) 2018
 
-4.  [Variational Image Compression with a Scale Hyperprior]
-    (https://arxiv.org/abs/1802.01436) \
+4.  [Variational Image Compression with a Scale Hyperprior](https://arxiv.org/abs/1802.01436)\
     Johannes Ballé, David Minnen, Saurabh Singh, Sung Jin Hwang, and Nick
-    Johnston \
+    Johnston\
     Int. Conf. on Learning Representations (ICLR) 2018
 
 5.  [Image-dependent local entropy models for image compression with deep
-    networks]
-    (https://arxiv.org/abs/1805.12295) \
+    networks](https://arxiv.org/abs/1805.12295)\
     David Minnen, George Toderici, Saurabh Singh, Sung Jin Hwang, and Michele
-    Covell \
+    Covell\
     Int. Conf. on Image Processing (ICIP) 2018
 
 6.  [Improved Lossy Image Compression With Priming and Spatially Adaptive Bit
-    Rates for Recurrent Networks]
-    (https://arxiv.org/abs/1703.10114) \
+    Rates for Recurrent Networks](https://arxiv.org/abs/1703.10114)\
     Nick Johnston, Damien Vincent, David Minnen, Michele Covell, Saurabh Singh,
-    Troy Chinen, Sung Jin Hwang, Joel Shor, and George Toderici \
+    Troy Chinen, Sung Jin Hwang, Joel Shor, and George Toderici\
     IEEE Conf. on Computer Vision and Pattern Recognition (CVPR) 2018
 
-7.  [Real-Time Adaptive Image Compression]
-    (https://arxiv.org/abs/1705.05823) \
-    Oren Rippel and Lubomir Bourdev \
+7.  [Real-Time Adaptive Image Compression](https://arxiv.org/abs/1705.05823)\
+    Oren Rippel and Lubomir Bourdev\
     International Conference on Machine Learning (ICML) 2017
 
-8.  [End-to-end Optimized Image Compression]
-    (https://arxiv.org/abs/1611.01704) \
-    Johannes Ballé, Valero Laparra, and Eero P. Simoncelli \
+8.  [End-to-end Optimized Image Compression](https://arxiv.org/abs/1611.01704)\
+    Johannes Ballé, Valero Laparra, and Eero P. Simoncelli\
     Int. Conf. on Learning Representations (ICLR) 2017
 
-9.  [Lossy Image Compression with Compressive Autoencoders]
-    (https://openreview.net/forum?id=rJiNwv9gg) \
-    Lucas Theis, Wenzhe Shi, Andrew Cunningham, and Ferenc Huszár \
+9.  [Lossy Image Compression with Compressive Autoencoders](https://openreview.net/forum?id=rJiNwv9gg)\
+    Lucas Theis, Wenzhe Shi, Andrew Cunningham, and Ferenc Huszár\
     Int. Conf. on Learning Representations (ICLR) 2017
 
-10. [Spatially adaptive image compression using a tiled deep network]
-    (https://arxiv.org/abs/1802.02629) \
+10. [Spatially adaptive image compression using a tiled deep network](https://arxiv.org/abs/1802.02629)\
     David Minnen, George Toderici, Michele Covell, Troy Chinen, Nick Johnston,
-    Joel Shor, Sung Jin Hwang, Damien Vincent, and Saurabh Singh \
+    Joel Shor, Sung Jin Hwang, Damien Vincent, and Saurabh Singh\
     Int. Conference on Image Processing (ICIP) 2017
 
-11. [Full Resolution Image Compression with Recurrent Neural Networks]
-    (https://arxiv.org/abs/1608.05148) \
+11. [Full Resolution Image Compression with Recurrent Neural Networks](https://arxiv.org/abs/1608.05148)\
     George Toderici, Damien Vincent, Nick Johnston, Sung Jin Hwang, David
-    Minnen, Joel Shor, and Michele Covell \
+    Minnen, Joel Shor, and Michele Covell\
     IEEE Conference on Computer Vision and Pattern Recognition (CVPR) 2017
 
 ## Quality Metrics
-
---------------------------------------------------------------------------------
 
 ### Peak Signal-to-Noise Ratio (PSNR)
 
@@ -145,8 +130,6 @@ luminance channel (`Y'` in `Y'CbCr`) or by using a 6:1:1 weighted average over
 
 ## Data Sets for Evaluation
 
---------------------------------------------------------------------------------
-
 ### Kodak
 
 The Kodak data set is a collection of 24 images with resolution 768x512 (or
@@ -154,9 +137,9 @@ The Kodak data set is a collection of 24 images with resolution 768x512 (or
 [http://r0k.us/graphics/kodak](http://r0k.us/graphics/kodak)
 
     @misc{kodak,
-      title="Kodak Lossless True Color Image Suite ({PhotoCD PCD0992})",
-      author="Eastman Kodak",
-      url = {http://r0k.us/graphics/kodak},
+      title = "Kodak Lossless True Color Image Suite ({PhotoCD PCD0992})",
+      author = "Eastman Kodak",
+      url = "http://r0k.us/graphics/kodak",
     }
 
 ### Tecnick
@@ -166,9 +149,9 @@ here (511 MB):
 [https://sourceforge.net/projects/testimages/files/OLD/OLD_SAMPLING/testimages.zip](https://sourceforge.net/projects/testimages/files/OLD/OLD_SAMPLING/testimages.zip)
 
     @inproceedings{tecnick,
-      author = {N. Asuni and A. Giachetti},
-      title = {{TESTIMAGES}: A large-scale archive for testing visual devices and basic image processing algorithms {(SAMPLING 1200 RGB set)}},
-      year = {2014},
-      booktitle = {{STAG}: Smart Tools and Apps for Graphics}
-      url = {https://sourceforge.net/projects/testimages/files/OLD/OLD_SAMPLING/testimages.zip},
+      author = "N. Asuni and A. Giachetti",
+      title = "{TESTIMAGES}: A large-scale archive for testing visual devices and basic image processing algorithms {(SAMPLING 1200 RGB set)}",
+      year = "2014",
+      booktitle = "{STAG}: Smart Tools and Apps for Graphics",
+      url = "https://sourceforge.net/projects/testimages/files/OLD/OLD_SAMPLING/testimages.zip",
     }
