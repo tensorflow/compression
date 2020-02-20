@@ -37,45 +37,78 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
   """
 
   @abc.abstractmethod
-  def __init__(self, distribution, coding_rank,
+  def __init__(self, prior, coding_rank, compression=False,
                likelihood_bound=1e-9, tail_mass=2**-8,
                range_coder_precision=12):
     """Initializer.
 
     Arguments:
-      distribution: A `tfp.distributions.Distribution` object modeling the
-        distribution of the input data including additive uniform noise. For
+      prior: A `tfp.distributions.Distribution` object. A density model fitting
+        the marginal distribution of the bottleneck data with additive uniform
+        noise, which is shared a priori between the sender and the receiver. For
         best results, the distribution should be flexible enough to have a
-        unit-width uniform distribution as a special case.
+        unit-width uniform distribution as a special case, since this is the
+        marginal distribution for bottleneck dimensions that are constant.
       coding_rank: Integer. Number of innermost dimensions considered a coding
         unit. Each coding unit is compressed to its own bit string, and the
         `bits()` method sums over each coding unit.
+      compression: Boolean. If set to `True`, the range coding tables used by
+        `compress()` and `decompress()` will be built on instantiation.
+        Otherwise, some computation can be saved, but these two methods will not
+        be accessible.
       likelihood_bound: Float. Lower bound for likelihood values, to prevent
         training instabilities.
       tail_mass: Float. Approximate probability mass which is range encoded with
         less precision, by using a Golomb-like code.
       range_coder_precision: Integer. Precision passed to the range coding op.
     """
-    if not distribution.is_scalar_event():
-      raise ValueError(
-          "`distribution` must be a (batch of) scalar distribution(s).")
+    if not prior.is_scalar_event():
+      raise ValueError("`prior` must be a (batch of) scalar distribution(s).")
     super().__init__()
-    self._distribution = distribution
+    self._prior = prior
     self._coding_rank = int(coding_rank)
+    self._compression = bool(compression)
     self._likelihood_bound = float(likelihood_bound)
     self._tail_mass = float(tail_mass)
     self._range_coder_precision = int(range_coder_precision)
-    self.update_tables()
+    if self.compression:
+      self._build_tables()
 
   @property
-  def distribution(self):
-    """Distribution modeling data + i.i.d. uniform noise."""
-    return self._distribution
+  def prior(self):
+    """Prior distribution, used for range coding."""
+    return self._prior
+
+  def _check_compression(self):
+    if not self.compression:
+      raise RuntimeError(
+          "To use range coding, the entropy model must be instantiated with "
+          "`compression=True`.")
+
+  @property
+  def cdf(self):
+    self._check_compression()
+    return self._cdf.value()
+
+  @property
+  def cdf_offset(self):
+    self._check_compression()
+    return self._cdf_offset.value()
+
+  @property
+  def cdf_length(self):
+    self._check_compression()
+    return self._cdf_length.value()
 
   @property
   def coding_rank(self):
     """Number of innermost dimensions considered a coding unit."""
     return self._coding_rank
+
+  @property
+  def compression(self):
+    """Whether this entropy model is prepared for compression."""
+    return self._compression
 
   @property
   def likelihood_bound(self):
@@ -94,27 +127,27 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
 
   @property
   def dtype(self):
-    """Data type of this distribution."""
-    return self.distribution.dtype
+    """Data type of this entropy model."""
+    return self.prior.dtype
 
   def quantization_offset(self):
     """Distribution-dependent quantization offset."""
-    return helpers.quantization_offset(self.distribution)
+    return helpers.quantization_offset(self.prior)
 
   def lower_tail(self):
     """Approximate lower tail quantile for range coding."""
-    return helpers.lower_tail(self.distribution, self.tail_mass)
+    return helpers.lower_tail(self.prior, self.tail_mass)
 
   def upper_tail(self):
     """Approximate upper tail quantile for range coding."""
-    return helpers.upper_tail(self.distribution, self.tail_mass)
+    return helpers.upper_tail(self.prior, self.tail_mass)
 
   @tf.custom_gradient
   def _quantize(self, inputs, offset):
     return tf.round(inputs - offset) + offset, lambda x: (x, None)
 
-  def update_tables(self):
-    """Updates integer-valued probability tables used by the range coder.
+  def _build_tables(self):
+    """Computes integer-valued probability tables used by the range coder.
 
     These tables must not be re-generated independently on the sending and
     receiving side, since small numerical discrepancies between both sides can
@@ -126,9 +159,10 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
     > J. Ballé, N. Johnston, D. Minnen<br />
     > https://openreview.net/forum?id=S1zz2i0cY7
 
-    The tables are stored in `tf.Tensor`s as attributes of this object. The
-    recommended way is to train the model, then call this method, and then
-    distribute the model to a sender and a receiver.
+    The tables are stored in `tf.Variable`s as attributes of this object. The
+    recommended way is to train the model, instantiate an entropy model with
+    `compression=True`, and then distribute the model to a sender and a
+    receiver.
     """
     offset = self.quantization_offset()
     lower_tail = self.lower_tail()
@@ -153,19 +187,19 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
     if max_length > 2048:
       logging.warning(
           "Very wide PMF with %d elements may lead to out of memory issues. "
-          "Consider encoding distributions with smaller dispersion or "
-          "increasing `tail_mass` parameter.", int(max_length))
+          "Consider priors with smaller dispersion or increasing `tail_mass` "
+          "parameter.", int(max_length))
     samples = tf.range(tf.cast(max_length, self.dtype), dtype=self.dtype)
     samples = tf.reshape(
-        samples, [-1] + self.distribution.batch_shape.rank * [1])
+        samples, [-1] + self.prior.batch_shape.rank * [1])
     samples += pmf_start
-    pmf = self.distribution.prob(samples)
+    pmf = self.prior.prob(samples)
 
     # Collapse batch dimensions of distribution.
     pmf = tf.reshape(pmf, [max_length, -1])
     pmf = tf.transpose(pmf)
 
-    dist_shape = self.distribution.batch_shape_tensor()
+    dist_shape = self.prior.batch_shape_tensor()
     pmf_length = tf.broadcast_to(pmf_length, dist_shape)
     pmf_length = tf.reshape(pmf_length, [-1])
     cdf_length = pmf_length + 2
@@ -187,4 +221,6 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
       cdf = tf.map_fn(
           loop_body, (pmf, pmf_length), dtype=tf.int32, name="pmf_to_cdf")
 
-    self._cdf, self._cdf_offset, self._cdf_length = cdf, cdf_offset, cdf_length
+    self._cdf = tf.Variable(cdf, trainable=False)
+    self._cdf_offset = tf.Variable(cdf_offset, trainable=False)
+    self._cdf_length = tf.Variable(cdf_length, trainable=False)

@@ -29,7 +29,7 @@ class ContinuousIndexedEntropyModelTest(tf.test.TestCase):
     em = continuous_indexed.ContinuousIndexedEntropyModel(
         uniform_noise.NoisyNormal, 64,
         dict(loc=lambda _: 0, scale=lambda i: tf.exp(i / 8 - 5)), 1)
-    self.assertIsInstance(em.distribution, uniform_noise.NoisyNormal)
+    self.assertIsInstance(em.prior, uniform_noise.NoisyNormal)
     self.assertEqual(em.coding_rank, 1)
     self.assertEqual(em.likelihood_bound, 1e-9)
     self.assertEqual(em.tail_mass, 2**-8)
@@ -50,7 +50,7 @@ class ContinuousIndexedEntropyModelTest(tf.test.TestCase):
         ),
         1,
     )
-    self.assertIsInstance(em.distribution, uniform_noise.NoisyLogisticMixture)
+    self.assertIsInstance(em.prior, uniform_noise.NoisyLogisticMixture)
     self.assertEqual(em.coding_rank, 1)
     self.assertEqual(em.channel_axis, -1)
     self.assertEqual(em.likelihood_bound, 1e-9)
@@ -67,7 +67,7 @@ class LocationScaleIndexedEntropyModelTest(tf.test.TestCase):
   def test_can_instantiate(self):
     em = continuous_indexed.LocationScaleIndexedEntropyModel(
         uniform_noise.NoisyNormal, 64, lambda i: tf.exp(i / 8 - 5), 1)
-    self.assertIsInstance(em.distribution, uniform_noise.NoisyNormal)
+    self.assertIsInstance(em.prior, uniform_noise.NoisyNormal)
     self.assertEqual(em.coding_rank, 1)
     self.assertEqual(em.likelihood_bound, 1e-9)
     self.assertEqual(em.tail_mass, 2**-8)

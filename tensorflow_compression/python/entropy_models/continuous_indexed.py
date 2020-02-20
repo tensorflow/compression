@@ -34,21 +34,22 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
 
   This entropy model handles quantization of a bottleneck tensor and helps with
   training of the parameters of the probability distribution modeling the
-  tensor. It also pre-computes integer probability tables, which can then be
-  used to compress and decompress bottleneck tensors reliably across different
-  platforms.
+  tensor (a shared "prior" between sender and receiver). It also pre-computes
+  integer probability tables, which can then be used to compress and decompress
+  bottleneck tensors reliably across different platforms.
 
   A typical workflow looks like this:
 
-  - Train a model using this entropy model as a bottleneck, passing the
-    bottleneck tensor through `quantize()` while optimizing compressibility of
-    the tensor using `bits()`. `bits(training=True)` computes a differentiable
-    upper bound on the number of bits needed to compress the bottleneck tensor.
+  - Train a model using an instance of this entropy model as a bottleneck,
+    passing the bottleneck tensor through `quantize()` while optimizing
+    compressibility of the tensor using `bits()`. `bits(training=True)` computes
+    a differentiable upper bound on the number of bits needed to compress the
+    bottleneck tensor.
   - For evaluation, get a closer estimate of the number of compressed bits
     using `bits(training=False)`.
-  - Call `update_tables()` to ensure the probability tables for range coding are
-    up-to-date.
-  - Share the model between a sender and a receiver.
+  - Instantiate an entropy model with `compression=True` (and the same
+    parameters as during training), and share the model between a sender and a
+    receiver.
   - On the sender side, compute the bottleneck tensor and call `compress()` on
     it. The output is a compressed string representation of the tensor. Transmit
     the string to the receiver, and call `decompress()` there. The output is the
@@ -66,16 +67,15 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
   If `index_ranges` is a single integer, the index values must be in the range
   `[0, index_ranges)` and `indexes` must have the same shape as the bottleneck
   tensor. This only allows a one-dimensional conditional dependency. To make the
-  distribution conditionally dependent on `n`-dimensional indexes,
-  `index_ranges` must be specified as an iterable of `n` integers. Then,
-  `indexes` must have the same shape as the bottleneck tensor with an additional
-  channel dimension of length `n`. The position of the channel dimension is
-  given by `channel_axis`. The index values in the `n`th channel must be in the
-  range `[0, index_ranges[n])`.
+  distribution conditional on `n`-dimensional indexes, `index_ranges` must be
+  specified as an iterable of `n` integers. Then, `indexes` must have the same
+  shape as the bottleneck tensor with an additional channel dimension of length
+  `n`. The position of the channel dimension is given by `channel_axis`. The
+  index values in the `n`th channel must be in the range `[0, index_ranges[n])`.
 
   The implied distribution for the bottleneck tensor is determined as:
   ```
-  distribution_fn(**{k: f(indexes) for k, f in parameter_fns.items()})
+  prior_fn(**{k: f(indexes) for k, f in parameter_fns.items()})
   ```
 
   A more detailed description (and motivation) of this indexing scheme can be
@@ -91,7 +91,7 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
   To make a parameterized zero-mean normal distribution, one could use:
   ```
   tfc.ContinuousIndexedEntropyModel(
-      distribution_fn=tfc.NoisyNormal,
+      prior_fn=tfc.NoisyNormal,
       index_ranges=64,
       parameter_fns=dict(
           loc=lambda _: 0.,
@@ -107,7 +107,7 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
   To make a parameterized logistic mixture distribution, one could use:
   ```
   tfc.ContinuousIndexedEntropyModel(
-      distribution_fn=tfc.NoisyLogisticMixture,
+      prior_fn=tfc.NoisyLogisticMixture,
       index_ranges=(10, 10, 5),
       parameter_fns=dict(
           loc=lambda i: i[..., 0:2] - 5,
@@ -119,7 +119,7 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
   )
   ```
   Then, the last dimension of `indexes` would consist of triples of elements in
-  the ranges `[0, 10)`, `[0, 10)`, and `[0, 5)`, respectively. Each triples
+  the ranges `[0, 10)`, `[0, 10)`, and `[0, 5)`, respectively. Each triple
   would indicate that the element in `bottleneck` corresponding to the other
   dimensions is distributed with a mixture of two logistic distributions, where
   the components each have one of 10 location parameters between `-5` and `+5`,
@@ -127,20 +127,22 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
   weightings.
   """
 
-  def __init__(self, distribution_fn, index_ranges, parameter_fns, coding_rank,
-               channel_axis=-1, dtype=tf.float32, likelihood_bound=1e-9,
-               tail_mass=2**-8, range_coder_precision=12):
+  def __init__(self, prior_fn, index_ranges, parameter_fns, coding_rank,
+               compression=False, channel_axis=-1, dtype=tf.float32,
+               likelihood_bound=1e-9, tail_mass=2**-8,
+               range_coder_precision=12):
     """Initializer.
 
     Arguments:
-      distribution_fn: A callable returning a `tfp.distributions.Distribution`
-        object, which is used to model the distribution of the bottleneck tensor
-        values including additive uniform noise - typically a `Distribution`
-        class or factory function. The callable will receive keyword arguments
-        as determined by `parameter_fns`. For best results, the distributions
-        should be flexible enough to have a unit-width uniform distribution as a
-        special case, since this is the distribution an element will take on
-        when its bottleneck value is constant (due to the additive noise).
+      prior_fn: A callable returning a `tfp.distributions.Distribution` object,
+        typically a `Distribution` class or factory function. This is a density
+        model fitting the marginal distribution of the bottleneck data with
+        additive uniform noise, which is shared a priori between the sender and
+        the receiver. For best results, the distributions should be flexible
+        enough to have a unit-width uniform distribution as a special case,
+        since this is the marginal distribution for bottleneck dimensions that
+        are constant. The callable will receive keyword arguments as determined
+        by `parameter_fns`.
       index_ranges: Integer or iterable of integers. If a single integer,
         `indexes` must have the same shape as `bottleneck`, and `channel_axis`
         is ignored. Its values must be in the range `[0, index_ranges)`. If an
@@ -150,10 +152,14 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       parameter_fns: Dict of strings to callables. Functions mapping `indexes`
         to each distribution parameter. For each item, `indexes` is passed to
         the callable, and the string key and return value make up one keyword
-        argument to `distribution_fn`.
+        argument to `prior_fn`.
       coding_rank: Integer. Number of innermost dimensions considered a coding
         unit. Each coding unit is compressed to its own bit string, and the
         `bits()` method sums over each coding unit.
+      compression: Boolean. If set to `True`, the range coding tables used by
+        `compress()` and `decompress()` will be built on instantiation.
+        Otherwise, some computation can be saved, but these two methods will not
+        be accessible.
       channel_axis: Integer. For iterable `index_ranges`, determines the
         position of the channel axis in `indexes`. Defaults to the last
         dimension.
@@ -168,13 +174,13 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     if coding_rank <= 0:
       raise ValueError("`coding_rank` must be larger than 0.")
 
-    self._distribution_fn = distribution_fn
-    if not callable(self.distribution_fn):
-      raise TypeError("`distribution_fn` must be a class or factory function.")
+    self._prior_fn = prior_fn
+    if not callable(self.prior_fn):
+      raise TypeError("`prior_fn` must be a class or factory function.")
     try:
       self._index_ranges = int(index_ranges)
     except TypeError:
-      self._index_ranges = tuple(int(r) for r in index_ranges)  # pytype: disable=attribute-error
+      self._index_ranges = tuple(int(r) for r in index_ranges)  # pytype:disable=attribute-error
     self._parameter_fns = dict(parameter_fns)
     for name, fn in self.parameter_fns.items():
       if not isinstance(name, str):
@@ -191,13 +197,12 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       indexes = tf.meshgrid(*indexes, indexing="ij")
       indexes = tf.stack(indexes, axis=self.channel_axis)
     parameters = {k: f(indexes) for k, f in self.parameter_fns.items()}
-    distribution = self.distribution_fn(**parameters)  # pylint:disable=not-callable
-    tf.print(distribution.batch_shape)
-    tf.print(distribution.event_shape)
+    prior = self.prior_fn(**parameters)  # pylint:disable=not-callable
 
     super().__init__(
-        distribution, coding_rank, likelihood_bound=likelihood_bound,
-        tail_mass=tail_mass, range_coder_precision=range_coder_precision)
+        prior, coding_rank, compression=compression,
+        likelihood_bound=likelihood_bound, tail_mass=tail_mass,
+        range_coder_precision=range_coder_precision)
 
   @property
   def index_ranges(self):
@@ -210,19 +215,19 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     return self._parameter_fns
 
   @property
-  def distribution_fn(self):
+  def prior_fn(self):
     """Class or factory function returning a `Distribution` object."""
-    return self._distribution_fn
+    return self._prior_fn
 
   @property
   def channel_axis(self):
     """Position of channel axis in `indexes` tensor."""
     return self._channel_axis
 
-  def _make_distribution(self, indexes):
+  def _make_prior(self, indexes):
     indexes = tf.cast(indexes, self.dtype)
     parameters = {k: f(indexes) for k, f in self.parameter_fns.items()}
-    return self.distribution_fn(**parameters)  # pylint:disable=not-callable
+    return self.prior_fn(**parameters)  # pylint:disable=not-callable
 
   def _normalize_indexes(self, indexes):
     indexes = math_ops.lower_bound(indexes, 0)
@@ -251,7 +256,7 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       indexes: `tf.Tensor` specifying the scalar distribution for each element
         in `bottleneck`. See class docstring for examples.
       training: Boolean. If `False`, computes the Shannon information of
-        `bottleneck` under the distribution computed by `self.distribution_fn`,
+        `bottleneck` under the distribution computed by `self.prior_fn`,
         which is a non-differentiable, tight *lower* bound on the number of bits
         needed to compress `bottleneck` using `compress()`. If `True`, returns a
         somewhat looser, but differentiable *upper* bound on this quantity.
@@ -261,14 +266,14 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       `self.coding_rank` innermost dimensions, containing the number of bits.
     """
     indexes = self._normalize_indexes(indexes)
-    distribution = self._make_distribution(indexes)
+    prior = self._make_prior(indexes)
     if training:
       quantized = bottleneck + tf.random.uniform(
           tf.shape(bottleneck), minval=-.5, maxval=.5, dtype=bottleneck.dtype)
     else:
-      offset = helpers.quantization_offset(distribution)
+      offset = helpers.quantization_offset(prior)
       quantized = self._quantize(bottleneck, offset)
-    probs = distribution.prob(quantized)
+    probs = prior.prob(quantized)
     probs = math_ops.lower_bound(probs, self.likelihood_bound)
     axes = tuple(range(-self.coding_rank, 0))
     bits = tf.reduce_sum(tf.math.log(probs), axis=axes) / -tf.math.log(2.)
@@ -295,7 +300,7 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       A `tf.Tensor` containing the quantized values.
     """
     indexes = self._normalize_indexes(indexes)
-    offset = helpers.quantization_offset(self._make_distribution(indexes))
+    offset = helpers.quantization_offset(self._make_prior(indexes))
     return self._quantize(bottleneck, offset)
 
   def compress(self, bottleneck, indexes):
@@ -329,7 +334,7 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
 
     flat_indexes = tf.reshape(flat_indexes, flat_shape)
 
-    offset = helpers.quantization_offset(self._make_distribution(indexes))
+    offset = helpers.quantization_offset(self._make_prior(indexes))
     symbols = tf.cast(tf.round(bottleneck - offset), tf.int32)
     symbols = tf.reshape(symbols, flat_shape)
 
@@ -338,7 +343,7 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       def loop_body(args):
         return range_coding_ops.unbounded_index_range_encode(
             args[0], args[1],
-            self._cdf, self._cdf_length, self._cdf_offset,
+            self.cdf, self.cdf_length, self.cdf_offset,
             precision=self.range_coder_precision,
             overflow_width=4, debug_level=1)
 
@@ -378,7 +383,7 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       def loop_body(args):
         return range_coding_ops.unbounded_index_range_decode(
             args[0], args[1],
-            self._cdf, self._cdf_length, self._cdf_offset,
+            self.cdf, self.cdf_length, self.cdf_offset,
             precision=self.range_coder_precision,
             overflow_width=4, debug_level=1)
 
@@ -387,7 +392,7 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
           loop_body, (strings, flat_indexes), dtype=tf.int32, name="decompress")
 
     symbols = tf.reshape(symbols, symbols_shape)
-    offset = helpers.quantization_offset(self._make_distribution(indexes))
+    offset = helpers.quantization_offset(self._make_prior(indexes))
     return tf.cast(symbols, self.dtype) + offset
 
 
@@ -402,28 +407,32 @@ class LocationScaleIndexedEntropyModel(ContinuousIndexedEntropyModel):
   not for the log-normal distribution).
   """
 
-  def __init__(self, distribution_fn, num_scales, scale_fn, coding_rank,
-               dtype=tf.float32, likelihood_bound=1e-9, tail_mass=2**-8,
-               range_coder_precision=12):
+  def __init__(self, prior_fn, num_scales, scale_fn, coding_rank,
+               compression=False, dtype=tf.float32, likelihood_bound=1e-9,
+               tail_mass=2**-8, range_coder_precision=12):
     """Initializer.
 
     Arguments:
-      distribution_fn: A callable returning a `tfp.distributions.Distribution`
-        object, which is used to model the distribution of the bottleneck tensor
-        values including additive uniform noise - typically a `Distribution`
-        class or factory function. The callable will receive a `scale` keyword
-        argument as determined by `scale_fn`. For best results, the
-        distributions should be flexible enough to have a unit-width uniform
-        distribution as a special case, since this is the distribution an
-        element will take on when its bottleneck value is constant (due to the
-        additive noise).
+      prior_fn: A callable returning a `tfp.distributions.Distribution` object,
+        typically a `Distribution` class or factory function. This is a density
+        model fitting the marginal distribution of the bottleneck data with
+        additive uniform noise, which is shared a priori between the sender and
+        the receiver. For best results, the distributions should be flexible
+        enough to have a unit-width uniform distribution as a special case,
+        since this is the marginal distribution for bottleneck dimensions that
+        are constant. The callable will receive keyword arguments as determined
+        by `parameter_fns`.
       num_scales: Integer. Values in `indexes` must be in the range
         `[0, num_scales)`.
       scale_fn: Callable. `indexes` is passed to the callable, and the return
-        value is given as `scale` keyword argument to `distribution_fn`.
+        value is given as `scale` keyword argument to `prior_fn`.
       coding_rank: Integer. Number of innermost dimensions considered a coding
         unit. Each coding unit is compressed to its own bit string, and the
         `bits()` method sums over each coding unit.
+      compression: Boolean. If set to `True`, the range coding tables used by
+        `compress()` and `decompress()` will be built on instantiation.
+        Otherwise, some computation can be saved, but these two methods will not
+        be accessible.
       dtype: `tf.dtypes.DType`. The data type of all floating-point
         computations carried out in this class.
       likelihood_bound: Float. Lower bound for likelihood values, to prevent
@@ -434,13 +443,14 @@ class LocationScaleIndexedEntropyModel(ContinuousIndexedEntropyModel):
     """
     num_scales = int(num_scales)
     super().__init__(
-        distribution_fn=distribution_fn,
+        prior_fn=prior_fn,
         index_ranges=num_scales,
         parameter_fns=dict(
             loc=lambda _: 0.,
             scale=scale_fn,
         ),
         coding_rank=coding_rank,
+        compression=compression,
         dtype=dtype,
         likelihood_bound=likelihood_bound,
         tail_mass=tail_mass,
@@ -459,7 +469,7 @@ class LocationScaleIndexedEntropyModel(ContinuousIndexedEntropyModel):
         parameter for each element in `bottleneck`. Must have the same shape as
         `bottleneck`.
       training: Boolean. If `False`, computes the Shannon information of
-        `bottleneck` under the distribution computed by `self.distribution_fn`,
+        `bottleneck` under the distribution computed by `self.prior_fn`,
         which is a non-differentiable, tight *lower* bound on the number of bits
         needed to compress `bottleneck` using `compress()`. If `True`, returns a
         somewhat looser, but differentiable *upper* bound on this quantity.

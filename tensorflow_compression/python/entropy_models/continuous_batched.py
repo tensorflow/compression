@@ -32,21 +32,22 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
 
   This entropy model handles quantization of a bottleneck tensor and helps with
   training of the parameters of the probability distribution modeling the
-  tensor. It also pre-computes integer probability tables, which can then be
-  used to compress and decompress bottleneck tensors reliably across different
-  platforms.
+  tensor (a shared "prior" between sender and receiver). It also pre-computes
+  integer probability tables, which can then be used to compress and decompress
+  bottleneck tensors reliably across different platforms.
 
   A typical workflow looks like this:
 
-  - Train a model using this entropy model as a bottleneck, passing the
-    bottleneck tensor through `quantize()` while optimizing compressibility of
-    the tensor using `bits()`. `bits(training=True)` computes a differentiable
-    upper bound on the number of bits needed to compress the bottleneck tensor.
+  - Train a model using an instance of this entropy model as a bottleneck,
+    passing the bottleneck tensor through `quantize()` while optimizing
+    compressibility of the tensor using `bits()`. `bits(training=True)` computes
+    a differentiable upper bound on the number of bits needed to compress the
+    bottleneck tensor.
   - For evaluation, get a closer estimate of the number of compressed bits
     using `bits(training=False)`.
-  - Call `update_tables()` to ensure the probability tables for range coding are
-    up-to-date.
-  - Share the model between a sender and a receiver.
+  - Instantiate an entropy model with `compression=True` (and the same
+    parameters as during training), and share the model between a sender and a
+    receiver.
   - On the sender side, compute the bottleneck tensor and call `compress()` on
     it. The output is a compressed string representation of the tensor. Transmit
     the string to the receiver, and call `decompress()` there. The output is the
@@ -56,9 +57,9 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
   This class assumes that all scalar elements of the encoded tensor are
   statistically independent, and that the parameters of their scalar
   distributions do not depend on data. The innermost dimensions of the
-  bottleneck tensor must be broadcastable to the batch shape of `distribution`.
-  Any dimensions to the left of the batch shape are assumed to be i.i.d., i.e.
-  the likelihoods are broadcast to the bottleneck tensor accordingly.
+  bottleneck tensor must be broadcastable to the batch shape of `prior`. Any
+  dimensions to the left of the batch shape are assumed to be i.i.d., i.e. the
+  likelihoods are broadcast to the bottleneck tensor accordingly.
 
   A more detailed description (and motivation) of this way of performing
   quantization and range coding can be found in the following paper. Please cite
@@ -69,38 +70,44 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
   > https://openreview.net/forum?id=rJxdQ3jeg
   """
 
-  def __init__(self, distribution, coding_rank,
+  def __init__(self, prior, coding_rank, compression=False,
                likelihood_bound=1e-9, tail_mass=2**-8,
                range_coder_precision=12):
     """Initializer.
 
     Arguments:
-      distribution: A `tfp.distributions.Distribution` object modeling the
-        distribution of the bottleneck tensor values including additive uniform
-        noise. The distribution parameters may not depend on data (they must be
-        trainable variables or constants). For best results, the distribution
-        should be flexible enough to have a unit-width uniform distribution as a
-        special case, since this is the distribution an element will take on
-        when its bottleneck value is constant (due to the additive noise).
+      prior: A `tfp.distributions.Distribution` object. A density model fitting
+        the marginal distribution of the bottleneck data with additive uniform
+        noise, which is shared a priori between the sender and the receiver. For
+        best results, the distribution should be flexible enough to have a
+        unit-width uniform distribution as a special case, since this is the
+        marginal distribution for bottleneck dimensions that are constant. The
+        distribution parameters may not depend on data (they must be either
+        variables or constants).
       coding_rank: Integer. Number of innermost dimensions considered a coding
         unit. Each coding unit is compressed to its own bit string, and the
         `bits()` method sums over each coding unit.
+      compression: Boolean. If set to `True`, the range coding tables
+        used by `compress()` and `decompress()` will be built on instantiation.
+        Otherwise, some computation can be saved, but these two methods will not
+        be accessible.
       likelihood_bound: Float. Lower bound for likelihood values, to prevent
         training instabilities.
       tail_mass: Float. Approximate probability mass which is range encoded with
         less precision, by using a Golomb-like code.
       range_coder_precision: Integer. Precision passed to the range coding op.
     """
-    if coding_rank < distribution.batch_shape.rank:
+    if coding_rank < prior.batch_shape.rank:
       raise ValueError(
-          "`coding_rank` can't be smaller than batch rank of `distribution`.")
+          "`coding_rank` can't be smaller than batch rank of prior.")
     super().__init__(
-        distribution, coding_rank, likelihood_bound=likelihood_bound,
-        tail_mass=tail_mass, range_coder_precision=range_coder_precision)
+        prior, coding_rank, compression=compression,
+        likelihood_bound=likelihood_bound, tail_mass=tail_mass,
+        range_coder_precision=range_coder_precision)
 
   def _compute_indexes(self, broadcast_shape):
     # TODO(jonycgn, ssjhv): Investigate broadcasting in range coding op.
-    dist_shape = self.distribution.batch_shape_tensor()
+    dist_shape = self.prior.batch_shape_tensor()
     indexes = tf.range(tf.reduce_prod(dist_shape), dtype=tf.int32)
     indexes = tf.reshape(indexes, dist_shape)
     indexes = tf.broadcast_to(
@@ -113,9 +120,9 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     Arguments:
       bottleneck: `tf.Tensor` containing the data to be compressed. Must have at
         least `self.coding_rank` dimensions, and the innermost dimensions must
-        be broadcastable to `self.distribution.batch_shape`.
+        be broadcastable to `self.prior.batch_shape`.
       training: Boolean. If `False`, computes the Shannon information of
-        `bottleneck` under the distribution `self.distribution`, which is a
+        `bottleneck` under the distribution `self.prior`, which is a
         non-differentiable, tight *lower* bound on the number of bits needed to
         compress `bottleneck` using `compress()`. If `True`, returns a somewhat
         looser, but differentiable *upper* bound on this quantity.
@@ -129,7 +136,7 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
           tf.shape(bottleneck), minval=-.5, maxval=.5, dtype=bottleneck.dtype)
     else:
       quantized = self.quantize(bottleneck)
-    probs = self.distribution.prob(quantized)
+    probs = self.prior.prob(quantized)
     probs = math_ops.lower_bound(probs, self.likelihood_bound)
     axes = tuple(range(-self.coding_rank, 0))
     bits = tf.reduce_sum(tf.math.log(probs), axis=axes) / -tf.math.log(2.)
@@ -140,7 +147,7 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
 
     To use this entropy model as an information bottleneck during training, pass
     a tensor through this function. The tensor is rounded to integer values
-    modulo `self.quantization_offset`, which depends on `self.distribution`. For
+    modulo `self.quantization_offset`, which depends on `self.prior`. For
     instance, for a Gaussian distribution, the returned values are rounded to
     the location of the mode of the distribution plus or minus an integer.
 
@@ -149,7 +156,7 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
 
     Arguments:
       bottleneck: `tf.Tensor` containing the data to be quantized. The innermost
-        dimensions must be broadcastable to `self.distribution.batch_shape`.
+        dimensions must be broadcastable to `self.prior.batch_shape`.
 
     Returns:
       A `tf.Tensor` containing the quantized values.
@@ -162,7 +169,7 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
 
     Compresses the tensor to bit strings. `bottleneck` is first quantized
     as in `quantize()`, and then compressed using the probability tables derived
-    from `self.distribution`. The quantized tensor can later be recovered by
+    from `self.prior`. The quantized tensor can later be recovered by
     calling `decompress()`.
 
     The innermost `self.coding_rank` dimensions are treated as one coding unit,
@@ -172,7 +179,7 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     Arguments:
       bottleneck: `tf.Tensor` containing the data to be compressed. Must have at
         least `self.coding_rank` dimensions, and the innermost dimensions must
-        be broadcastable to `self.distribution.batch_shape`.
+        be broadcastable to `self.prior.batch_shape`.
 
     Returns:
       A `tf.Tensor` having the same shape as `bottleneck` without the
@@ -184,7 +191,7 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     batch_shape, coding_shape = tf.split(
         input_shape, [input_rank - self.coding_rank, self.coding_rank])
     broadcast_shape = coding_shape[
-        :self.coding_rank - self.distribution.batch_shape.rank]
+        :self.coding_rank - self.prior.batch_shape.rank]
 
     indexes = self._compute_indexes(broadcast_shape)
     offset = self.quantization_offset()
@@ -196,7 +203,7 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       def loop_body(symbols):
         return range_coding_ops.unbounded_index_range_encode(
             symbols, indexes,
-            self._cdf, self._cdf_length, self._cdf_offset,
+            self.cdf, self.cdf_length, self.cdf_offset,
             precision=self.range_coder_precision,
             overflow_width=4, debug_level=1)
 
@@ -217,15 +224,15 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       strings: `tf.Tensor` containing the compressed bit strings.
       broadcast_shape: Iterable of ints. The part of the output tensor shape
         between the shape of `strings` on the left and
-        `self.distribution.batch_shape` on the right. This must match the shape
+        `self.prior.batch_shape` on the right. This must match the shape
         of the input to `compress()`.
 
     Returns:
       A `tf.Tensor` of shape `strings.shape + broadcast_shape +
-      self.distribution.batch_shape`.
+      self.prior.batch_shape`.
     """
     batch_shape = tf.shape(strings)
-    dist_shape = self.distribution.batch_shape_tensor()
+    dist_shape = self.prior.batch_shape_tensor()
     symbols_shape = tf.concat([batch_shape, broadcast_shape, dist_shape], 0)
 
     indexes = self._compute_indexes(broadcast_shape)
@@ -236,7 +243,7 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       def loop_body(string):
         return range_coding_ops.unbounded_index_range_decode(
             string, indexes,
-            self._cdf, self._cdf_length, self._cdf_offset,
+            self.cdf, self.cdf_length, self.cdf_offset,
             precision=self.range_coder_precision,
             overflow_width=4, debug_level=1)
 

@@ -26,7 +26,7 @@ class ContinuousBatchedEntropyModelTest(tf.test.TestCase):
   def test_can_instantiate(self):
     noisy = uniform_noise.NoisyNormal(loc=0., scale=1.)
     em = ContinuousBatchedEntropyModel(noisy, 1)
-    self.assertIs(em.distribution, noisy)
+    self.assertIs(em.prior, noisy)
     self.assertEqual(em.coding_rank, 1)
     self.assertEqual(em.likelihood_bound, 1e-9)
     self.assertEqual(em.tail_mass, 2**-8)
@@ -43,7 +43,7 @@ class ContinuousBatchedEntropyModelTest(tf.test.TestCase):
     with self.assertRaises(ValueError):
       ContinuousBatchedEntropyModel(noisy, 1)
 
-  def test_requires_coding_rank_bigger_than_distribution_batch_rank(self):
+  def test_requires_coding_rank_bigger_than_prior_batch_rank(self):
     noisy = uniform_noise.NoisyLogistic(loc=0, scale=[[1], [2]])
     with self.assertRaises(ValueError):
       ContinuousBatchedEntropyModel(noisy, 0)
@@ -60,9 +60,19 @@ class ContinuousBatchedEntropyModelTest(tf.test.TestCase):
     x_quantized = em.quantize(x_perturbed)
     self.assertAllEqual(x, x_quantized)
 
-  def test_compression_consistent_with_quantization(self):
+  def test_default_kwargs_throw_error_on_compression(self):
     noisy = uniform_noise.NoisyNormal(loc=.25, scale=10.)
     em = ContinuousBatchedEntropyModel(noisy, 1)
+    x = tf.zeros(10)
+    with self.assertRaises(RuntimeError):
+      em.compress(x)
+    s = tf.zeros(10, dtype=tf.string)
+    with self.assertRaises(RuntimeError):
+      em.decompress(s, [10])
+
+  def test_compression_consistent_with_quantization(self):
+    noisy = uniform_noise.NoisyNormal(loc=.25, scale=10.)
+    em = ContinuousBatchedEntropyModel(noisy, 1, compression=True)
     x = noisy.base.sample([100])
     x_quantized = em.quantize(x)
     x_decompressed = em.decompress(em.compress(x), [100])
@@ -76,7 +86,7 @@ class ContinuousBatchedEntropyModelTest(tf.test.TestCase):
     # optimal, and because it operates on quantized probabilities.
     for scale in 2 ** tf.linspace(-2., 7., 10):
       noisy = uniform_noise.NoisyNormal(loc=0., scale=scale)
-      em = ContinuousBatchedEntropyModel(noisy, 1)
+      em = ContinuousBatchedEntropyModel(noisy, 1, compression=True)
       x = noisy.base.sample([10000])
       bits_eval = em.bits(x, training=False)
       bits_training = em.bits(x, training=True)
@@ -88,7 +98,7 @@ class ContinuousBatchedEntropyModelTest(tf.test.TestCase):
     # For low entropy distributions, the training bound should be very loose,
     # and the overhead of range coding manageable.
     noisy = uniform_noise.NoisyNormal(loc=0., scale=.25)
-    em = ContinuousBatchedEntropyModel(noisy, 1)
+    em = ContinuousBatchedEntropyModel(noisy, 1, compression=True)
     x = noisy.base.sample([10000])
     bits_eval = em.bits(x, training=False)
     bits_training = em.bits(x, training=True)
@@ -100,7 +110,7 @@ class ContinuousBatchedEntropyModelTest(tf.test.TestCase):
     # For high entropy distributions, the training bound should be very tight,
     # and the overhead of range coding manageable.
     noisy = uniform_noise.NoisyNormal(loc=0., scale=100.)
-    em = ContinuousBatchedEntropyModel(noisy, 1)
+    em = ContinuousBatchedEntropyModel(noisy, 1, compression=True)
     x = noisy.base.sample([10000])
     bits_eval = em.bits(x, training=False)
     bits_training = em.bits(x, training=True)
