@@ -237,7 +237,7 @@ class EntropyBottleneckTest(tf.test.TestCase):
       likelihood, = sess.run([likelihood], {inputs: x})
     self.assertEqual(x.shape, likelihood.shape)
     integral = np.sum(likelihood) * .0005
-    self.assertAllClose(1, integral, rtol=0, atol=1e-4)
+    self.assertAllClose(1, integral, rtol=0, atol=2e-4)
 
   def test_entropy_estimates(self):
     # Test that entropy estimates match actual range coding.
