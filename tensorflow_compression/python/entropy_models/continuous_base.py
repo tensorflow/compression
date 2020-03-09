@@ -62,7 +62,7 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
         less precision, by using a Golomb-like code.
       range_coder_precision: Integer. Precision passed to the range coding op.
     """
-    if not prior.is_scalar_event():
+    if prior.event_shape.rank:
       raise ValueError("`prior` must be a (batch of) scalar distribution(s).")
     super().__init__()
     self._prior = prior
