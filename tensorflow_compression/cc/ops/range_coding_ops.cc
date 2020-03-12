@@ -136,41 +136,43 @@ REGISTER_OP("UnboundedIndexRangeEncode")
     .Doc(R"doc(
 Range encodes unbounded integer `data` using an indexed probability table.
 
-For each value in `data`, the corresponding value in `index` determines which
-probability model in `cdf` is used to encode it. The data can be arbitrary
-signed integers, where the integer intervals determined by `offset` and
-`cdf_size` are modeled using the cumulative distribution functions (CDF) in
-`cdf`. Everything else is encoded with a variable length code.
+Arguments `data` and `index` should have the same shape. `data` contains the
+values to be encoded. For each value in `data`, the corresponding value in
+`index` determines which row in `cdf` should be used to encode the value in
+`data`. `index` also determines which element in `offset` vector determines the
+integer interval the cdf applies to. Naturally, the elements of `index` should
+be in the half-open interval `[0, cdf.shape[0])`.
 
-The argument `cdf` is a 2-D tensor and its each row contains a CDF. The argument
-`cdf_size` is a 1-D tensor, and its length should be the same as the number of
-rows of `cdf`. The values in `cdf_size` denotes the length of CDF vector in the
-corresponding row of `cdf`.
+The argument `cdf` is a 2-D tensor and each of its rows contains a CDF. The
+argument `cdf_size` is a 1-D tensor, and its length should be the same as the
+number of rows of `cdf`. The values in `cdf_size` denote the length of CDF
+vector in the corresponding row of `cdf`.
 
-For i = 0,1,..., let `m = cdf_size[i]`. Then for j = 0,1,...,m-1,
+For i = 0,1,..., let `m = cdf_size[i] - 1`, i.e., all the "regular" data values
+associated with `index == i` should be in the half-open interval
+`[offset[i], offset[i] + m)`. (More details below about regular and non-regular
+values.) Then
 
 ```
-   cdf[..., 0] / 2^precision = Pr(X < 0) = 0
-   cdf[..., 1] / 2^precision = Pr(X < 1) = Pr(X <= 0)
-   cdf[..., 2] / 2^precision = Pr(X < 2) = Pr(X <= 1)
+   cdf[..., 0] / 2^precision = Pr(0 <= X - offset[i] < 0) = 0
+   cdf[..., 1] / 2^precision = Pr(0 <= X - offset[i] < 1)
+   cdf[..., 2] / 2^precision = Pr(0 <= X - offset[i] < 2)
    ...
-   cdf[..., m-1] / 2^precision = Pr(X < m-1) = Pr(X <= m-2).
+   cdf[..., m-1] / 2^precision = Pr(0 <= X - offset[i] < m-1).
+   cdf[..., m] / 2^precision = 1.
 ```
 
-We require that `1 < m <= cdf.shape[1]` and that all elements of `cdf` be in the
+We require that `1 < m < cdf.shape[-1]` and that all elements of `cdf` be in the
 closed interval `[0, 2^precision]`.
 
-Arguments `data` and `index` should have the same shape. `data` contains the
-values to be encoded. `index` denotes which row in `cdf` should be used to
-encode the corresponding value in `data`, and which element in `offset`
-determines the integer interval the cdf applies to. Naturally, the elements of
-`index` should be in the half-open interval `[0, cdf.shape[0])`.
-
-When a value from `data` is in the interval `[offset[i], offset[i] + m - 2)`,
-then the value is range encoded using the CDF values. The last entry in each
-CDF (the one at `m - 1`) is an overflow code. When a value from `data` is
-outside of the given interval, the overflow value is encoded, followed by a
-variable-length encoding of the actual data value.
+Note that the last CDF entry is the probability that `X - offset[i]` is any
+value, including the events `X - offset[i] < 0` and `m - 1 <= X - offset[i]`.
+When a value from `data` is regular and is in the interval
+`[offset[i], offset[i] + m - 1)`, then the value minus `offset[i]` is range
+encoded using the CDF values. The maximum value in each CDF (`m - 1`) is an
+overflow code. When a value from `data` is outside of the previous interval, the
+overflow code is range encoded, followed by a variable-length encoding of the
+actual data value.
 
 The encoded output contains neither the shape information of the encoded data
 nor a termination symbol. Therefore the shape of the encoded data must be
