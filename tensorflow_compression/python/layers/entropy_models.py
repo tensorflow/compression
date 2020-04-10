@@ -512,7 +512,8 @@ class EntropyBottleneck(EntropyModel):
 
     quantiles = self.add_weight(
         "quantiles", shape=(channels, 1, 3), dtype=self.dtype,
-        initializer=quantiles_initializer)
+        initializer=quantiles_initializer,
+        aggregation=tf.VariableAggregation.ONLY_FIRST_REPLICA)
     logits = self._logits_cumulative(quantiles, stop_gradient=True)
     loss = tf.math.reduce_sum(abs(logits - target))
     self.add_loss(loss, inputs=None)
@@ -577,10 +578,12 @@ class EntropyBottleneck(EntropyModel):
         shape=(channels, None),
         dtype=tf.int32,
         trainable=False,
-        initializer=cdf_initializer)
+        initializer=cdf_initializer,
+        aggregation=tf.VariableAggregation.ONLY_FIRST_REPLICA)
     cdf_length = self.add_weight(
         "cdf_length", shape=(channels,), dtype=tf.int32, trainable=False,
-        initializer=tf.initializers.constant(3))
+        initializer=tf.initializers.constant(3),
+        aggregation=tf.VariableAggregation.ONLY_FIRST_REPLICA)
     # Works around a weird TF issue with reading variables inside a loop.
     self._quantized_cdf = tf.identity(quantized_cdf)
     self._cdf_length = tf.identity(cdf_length)
@@ -855,11 +858,13 @@ class SymmetricConditional(EntropyModel):
 
     quantized_cdf = self.add_weight(
         "quantized_cdf", shape=(len(pmf_length), max_length + 2),
-        initializer=cdf_initializer, dtype=tf.int32, trainable=False)
+        initializer=cdf_initializer, dtype=tf.int32, trainable=False,
+        aggregation=tf.VariableAggregation.ONLY_FIRST_REPLICA)
     cdf_length = self.add_weight(
         "cdf_length", shape=(len(pmf_length),),
         initializer=tf.initializers.constant(pmf_length + 2),
-        dtype=tf.int32, trainable=False)
+        dtype=tf.int32, trainable=False,
+        aggregation=tf.VariableAggregation.ONLY_FIRST_REPLICA)
     # Works around a weird TF issue with reading variables inside a loop.
     self._quantized_cdf = tf.identity(quantized_cdf)
     self._cdf_length = tf.identity(cdf_length)
