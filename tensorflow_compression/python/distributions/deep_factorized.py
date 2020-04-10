@@ -178,13 +178,15 @@ class DeepFactorized(tfp.distributions.Distribution):
     return tf.constant(0, dtype=self.dtype)
 
   def _lower_tail(self, tail_mass):
-    tail = helpers.estimate_tail(
+    tail = helpers.estimate_tails(
         self._logits_cumulative, -tf.math.log(2 / tail_mass - 1),
-        [self.batch_shape.num_elements(), 1, 1], self.dtype)
+        tf.constant([self.batch_shape.num_elements(), 1, 1], tf.int32),
+        self.dtype)
     return tf.reshape(tail, self.batch_shape_tensor())
 
   def _upper_tail(self, tail_mass):
-    tail = helpers.estimate_tail(
+    tail = helpers.estimate_tails(
         self._logits_cumulative, tf.math.log(2 / tail_mass - 1),
-        [self.batch_shape.num_elements(), 1, 1], self.dtype)
+        tf.constant([self.batch_shape.num_elements(), 1, 1], tf.int32),
+        self.dtype)
     return tf.reshape(tail, self.batch_shape_tensor())

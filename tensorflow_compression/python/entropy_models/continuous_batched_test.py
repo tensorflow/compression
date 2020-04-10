@@ -32,9 +32,6 @@ class ContinuousBatchedEntropyModelTest(tf.test.TestCase):
     self.assertEqual(em.tail_mass, 2**-8)
     self.assertEqual(em.range_coder_precision, 12)
     self.assertEqual(em.dtype, noisy.dtype)
-    self.assertEqual(em.quantization_offset(), 0)
-    self.assertEqual(em.upper_tail(), 2.885635)
-    self.assertEqual(em.lower_tail(), -2.885635)
 
   def test_requires_scalar_distributions(self):
     noisy = uniform_noise.UniformNoiseAdapter(
@@ -118,6 +115,33 @@ class ContinuousBatchedEntropyModelTest(tf.test.TestCase):
     self.assertAllClose(bits_training, bits_eval, atol=0, rtol=5e-5)
     self.assertAllClose(bits_compressed, bits_eval, atol=0, rtol=5e-3)
 
+  def test_compression_works_after_serialization(self):
+    noisy = uniform_noise.NoisyNormal(loc=.5, scale=8.)
+    em = ContinuousBatchedEntropyModel(noisy, 1, compression=True)
+    self.assertIsNot(em._quantization_offset, None)
+    json = tf.keras.utils.serialize_keras_object(em)
+    weights = em.get_weights()
+    x = noisy.base.sample([100])
+    x_quantized = em.quantize(x)
+    x_compressed = em.compress(x)
+    em = tf.keras.utils.deserialize_keras_object(json)
+    em.set_weights(weights)
+    self.assertAllEqual(em.compress(x), x_compressed)
+    self.assertAllEqual(em.decompress(x_compressed, [100]), x_quantized)
+
+  def test_compression_works_after_serialization_no_offset(self):
+    noisy = uniform_noise.NoisyNormal(loc=0, scale=5.)
+    em = ContinuousBatchedEntropyModel(noisy, 1, compression=True)
+    self.assertIs(em._quantization_offset, None)
+    json = tf.keras.utils.serialize_keras_object(em)
+    weights = em.get_weights()
+    x = noisy.base.sample([100])
+    x_quantized = em.quantize(x)
+    x_compressed = em.compress(x)
+    em = tf.keras.utils.deserialize_keras_object(json)
+    em.set_weights(weights)
+    self.assertAllEqual(em.compress(x), x_compressed)
+    self.assertAllEqual(em.decompress(x_compressed, [100]), x_quantized)
 
 if __name__ == "__main__":
   tf.test.main()

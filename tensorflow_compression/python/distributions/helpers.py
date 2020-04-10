@@ -19,29 +19,71 @@ import tensorflow.compat.v2 as tf
 
 
 __all__ = [
+    "estimate_tails",
     "quantization_offset",
     "lower_tail",
     "upper_tail",
 ]
 
 
-def estimate_tail(func, target, shape, dtype):
-  """Estimates approximate tail quantiles."""
-  dtype = tf.as_dtype(dtype)
-  shape = tf.convert_to_tensor(shape, tf.int32)
-  target = tf.convert_to_tensor(target, dtype)
-  opt = tf.keras.optimizers.Adam(learning_rate=.1)
-  tails = tf.Variable(
-      tf.zeros(shape, dtype=dtype), trainable=False, name="tails")
-  loss = best_loss = tf.fill(shape, tf.constant(float("inf"), dtype=dtype))
-  while tf.reduce_any(loss == best_loss):
-    with tf.GradientTape(watch_accessed_variables=False) as tape:
-      tape.watch(tails)
-      loss = abs(func(tails) - target)
-    best_loss = tf.minimum(best_loss, loss)
-    gradient = tape.gradient(loss, tails)
-    opt.apply_gradients([(gradient, tails)])
-  return tails.value()
+# TODO(jonycgn): Consider wrapping in tf.function.
+def estimate_tails(func, target, shape, dtype):
+  """Estimates approximate tail quantiles.
+
+  This runs a simple Adam iteration to determine tail quantiles. The
+  objective is to find an `x` such that:
+  ```
+  func(x) == target
+  ```
+  For instance, if `func` is a CDF and the target is a quantile value, this
+  would find the approximate location of that quantile. Note that `func` is
+  assumed to be monotonic. When each tail estimate has passed the optimal value
+  of `x`, the algorithm does 10 additional iterations and then stops.
+
+  This operation is vectorized. The tensor shape of `x` is given by `shape`, and
+  `target` must have a shape that is broadcastable to the output of `func(x)`.
+
+  Arguments:
+    func: A callable that computes cumulative distribution function, survival
+      function, or similar.
+    target: The desired target value.
+    shape: The shape of the `tf.Tensor` representing `x`.
+    dtype: The `tf.dtypes.Dtype` of the computation (and the return value).
+
+  Returns:
+    A `tf.Tensor` representing the solution (`x`).
+  """
+  with tf.name_scope("estimate_tails"):
+    dtype = tf.as_dtype(dtype)
+    shape = tf.convert_to_tensor(shape, tf.int32)
+    target = tf.convert_to_tensor(target, dtype)
+
+    def loop_cond(tails, m, v, count):
+      del tails, m, v  # unused
+      return tf.reduce_min(count) < 10
+
+    def loop_body(tails, m, v, count):
+      with tf.GradientTape(watch_accessed_variables=False) as tape:
+        tape.watch(tails)
+        loss = abs(func(tails) - target)
+      grad = tape.gradient(loss, tails)
+      m = .5 * m + .5 * grad  # Adam mean estimate.
+      v = .9 * v + .1 * tf.square(grad)  # Adam variance estimate.
+      tails -= .5 * m / (tf.sqrt(v) + 1e-7)
+      # Start counting when the gradient flips sign (note that this assumes
+      # `tails` is initialized to zero).
+      count = tf.where(
+          tf.math.logical_or(count > 0, tails * grad > 0),
+          count + 1, count)
+      return tails, m, v, count
+
+    init_tails = tf.zeros(shape, dtype=dtype)
+    init_m = tf.zeros(shape, dtype=dtype)
+    init_v = tf.ones(shape, dtype=dtype)
+    init_count = tf.zeros(shape, dtype=tf.int32)
+    return tf.while_loop(
+        loop_cond, loop_body, (init_tails, init_m, init_v, init_count),
+        back_prop=False)[0]
 
 
 def quantization_offset(distribution):
@@ -113,7 +155,7 @@ def lower_tail(distribution, tail_mass):
       tail = distribution.quantile(tail_mass / 2)
     except NotImplementedError:
       try:
-        tail = estimate_tail(
+        tail = estimate_tails(
             distribution.log_cdf, tf.math.log(tail_mass / 2),
             distribution.batch_shape_tensor(), distribution.dtype)
       except NotImplementedError:
@@ -149,7 +191,7 @@ def upper_tail(distribution, tail_mass):
       tail = distribution.quantile(1 - tail_mass / 2)
     except NotImplementedError:
       try:
-        tail = estimate_tail(
+        tail = estimate_tails(
             distribution.log_survival_function, tf.math.log(tail_mass / 2),
             distribution.batch_shape_tensor(), distribution.dtype)
       except NotImplementedError:

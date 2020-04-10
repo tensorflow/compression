@@ -17,6 +17,7 @@
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_compression.python.distributions import deep_factorized
 from tensorflow_compression.python.distributions import helpers
 
 
@@ -70,6 +71,11 @@ class HelpersTest(tf.test.TestCase):
     dist = tfp.distributions.Normal(loc=3., scale=5.)
     self.assertGreater(
         helpers.upper_tail(dist, 2**-8), helpers.lower_tail(dist, 2**-8))
+
+  def test_deep_factorized_tails_are_in_order(self):
+    dist = deep_factorized.DeepFactorized(batch_shape=[10])
+    self.assertAllGreater(
+        helpers.upper_tail(dist, 2**-8) - helpers.lower_tail(dist, 2**-8), 0)
 
 
 if __name__ == "__main__":

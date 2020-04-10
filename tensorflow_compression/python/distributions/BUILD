@@ -42,7 +42,10 @@ py_test(
     name = "helpers_test",
     srcs = ["helpers_test.py"],
     python_version = "PY3",
-    deps = [":helpers"],
+    deps = [
+        ":deep_factorized",
+        ":helpers",
+    ],
 )
 
 py_library(

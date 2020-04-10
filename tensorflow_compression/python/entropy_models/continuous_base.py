@@ -16,6 +16,7 @@
 """Base class for continuous entropy models."""
 
 import abc
+import functools
 
 from absl import logging
 import tensorflow.compat.v2 as tf
@@ -53,36 +54,51 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
         unit. Each coding unit is compressed to its own bit string, and the
         `bits()` method sums over each coding unit.
       compression: Boolean. If set to `True`, the range coding tables used by
-        `compress()` and `decompress()` will be built on instantiation.
-        Otherwise, some computation can be saved, but these two methods will not
-        be accessible.
+        `compress()` and `decompress()` will be built on instantiation. This
+        assumes eager mode (throws an error if in graph mode or inside a
+        `tf.function` call). If set to `False`, these two methods will not be
+        accessible.
       likelihood_bound: Float. Lower bound for likelihood values, to prevent
         training instabilities.
       tail_mass: Float. Approximate probability mass which is range encoded with
         less precision, by using a Golomb-like code.
       range_coder_precision: Integer. Precision passed to the range coding op.
+
+    Raises:
+      RuntimeError: when attempting to instantiate an entropy model with
+        `compression=True` and not in eager execution mode.
     """
     if prior.event_shape.rank:
       raise ValueError("`prior` must be a (batch of) scalar distribution(s).")
     super().__init__()
-    self._prior = prior
-    self._coding_rank = int(coding_rank)
-    self._compression = bool(compression)
-    self._likelihood_bound = float(likelihood_bound)
-    self._tail_mass = float(tail_mass)
-    self._range_coder_precision = int(range_coder_precision)
-    if self.compression:
-      self._build_tables()
+    with self.name_scope:
+      self._prior = prior
+      self._dtype = tf.as_dtype(prior.dtype)
+      self._prior_shape = tuple(int(s) for s in prior.batch_shape)
+      self._coding_rank = int(coding_rank)
+      self._compression = bool(compression)
+      self._likelihood_bound = float(likelihood_bound)
+      self._tail_mass = float(tail_mass)
+      self._range_coder_precision = int(range_coder_precision)
+      if self.compression:
+        if not tf.executing_eagerly():
+          raise RuntimeError("`compression=True` requires eager execution.")
+        self._build_tables(prior)
 
   @property
   def prior(self):
     """Prior distribution, used for range coding."""
+    if not hasattr(self, "_prior"):
+      raise RuntimeError(
+          "This entropy model doesn't hold a reference to its prior "
+          "distribution. This can happen when it is unserialized, because "
+          "the prior is generally not serializable.")
     return self._prior
 
   def _check_compression(self):
     if not self.compression:
       raise RuntimeError(
-          "To use range coding, the entropy model must be instantiated with "
+          "For range coding, the entropy model must be instantiated with "
           "`compression=True`.")
 
   @property
@@ -99,6 +115,16 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
   def cdf_length(self):
     self._check_compression()
     return self._cdf_length.value()
+
+  @property
+  def dtype(self):
+    """Data type of this entropy model."""
+    return self._dtype
+
+  @property
+  def prior_shape(self):
+    """Batch shape of `prior` (dimensions which are not assumed i.i.d.)."""
+    return self._prior_shape
 
   @property
   def coding_rank(self):
@@ -125,28 +151,22 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
     """Precision passed to range coding op."""
     return self._range_coder_precision
 
-  @property
-  def dtype(self):
-    """Data type of this entropy model."""
-    return self.prior.dtype
-
-  def quantization_offset(self):
-    """Distribution-dependent quantization offset."""
-    return helpers.quantization_offset(self.prior)
-
-  def lower_tail(self):
-    """Approximate lower tail quantile for range coding."""
-    return helpers.lower_tail(self.prior, self.tail_mass)
-
-  def upper_tail(self):
-    """Approximate upper tail quantile for range coding."""
-    return helpers.upper_tail(self.prior, self.tail_mass)
+  @tf.custom_gradient
+  def _quantize_no_offset(self, inputs):
+    return tf.round(inputs), lambda x: x
 
   @tf.custom_gradient
-  def _quantize(self, inputs, offset):
+  def _quantize_offset(self, inputs, offset):
     return tf.round(inputs - offset) + offset, lambda x: (x, None)
 
-  def _build_tables(self):
+  def _quantize(self, inputs, offset=None):
+    if offset is None:
+      outputs = self._quantize_no_offset(inputs)
+    else:
+      outputs = self._quantize_offset(inputs, offset)
+    return outputs
+
+  def _build_tables(self, prior):
     """Computes integer-valued probability tables used by the range coder.
 
     These tables must not be re-generated independently on the sending and
@@ -163,10 +183,13 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
     recommended way is to train the model, instantiate an entropy model with
     `compression=True`, and then distribute the model to a sender and a
     receiver.
+
+    Arguments:
+      prior: The `tfp.distributions.Distribution` object (see initializer).
     """
-    offset = self.quantization_offset()
-    lower_tail = self.lower_tail()
-    upper_tail = self.upper_tail()
+    offset = helpers.quantization_offset(prior)
+    lower_tail = helpers.lower_tail(prior, self.tail_mass)
+    upper_tail = helpers.upper_tail(prior, self.tail_mass)
 
     # Largest distance observed between lower tail and median, and between
     # median and upper tail.
@@ -190,20 +213,18 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
           "Consider priors with smaller dispersion or increasing `tail_mass` "
           "parameter.", int(max_length))
     samples = tf.range(tf.cast(max_length, self.dtype), dtype=self.dtype)
-    samples = tf.reshape(
-        samples, [-1] + self.prior.batch_shape.rank * [1])
+    samples = tf.reshape(samples, [-1] + len(self.prior_shape) * [1])
     samples += pmf_start
-    pmf = self.prior.prob(samples)
+    pmf = prior.prob(samples)
 
     # Collapse batch dimensions of distribution.
     pmf = tf.reshape(pmf, [max_length, -1])
     pmf = tf.transpose(pmf)
 
-    dist_shape = self.prior.batch_shape_tensor()
-    pmf_length = tf.broadcast_to(pmf_length, dist_shape)
+    pmf_length = tf.broadcast_to(pmf_length, self.prior_shape)
     pmf_length = tf.reshape(pmf_length, [-1])
     cdf_length = pmf_length + 2
-    cdf_offset = tf.broadcast_to(-minima, dist_shape)
+    cdf_offset = tf.broadcast_to(-minima, self.prior_shape)
     cdf_offset = tf.reshape(cdf_offset, [-1])
 
     # Prevent tensors from bouncing back and forth between host and GPU.
@@ -221,6 +242,82 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
       cdf = tf.map_fn(
           loop_body, (pmf, pmf_length), dtype=tf.int32, name="pmf_to_cdf")
 
-    self._cdf = tf.Variable(cdf, trainable=False)
-    self._cdf_offset = tf.Variable(cdf_offset, trainable=False)
-    self._cdf_length = tf.Variable(cdf_length, trainable=False)
+    self._cdf = tf.Variable(cdf, trainable=False, name="cdf")
+    self._cdf_offset = tf.Variable(
+        cdf_offset, trainable=False, name="cdf_offset")
+    self._cdf_length = tf.Variable(
+        cdf_length, trainable=False, name="cdf_length")
+
+  @abc.abstractmethod
+  def get_config(self):
+    """Returns the configuration of the entropy model.
+
+    Returns:
+      A JSON-serializable Python dict.
+
+    Raises:
+      NotImplementedError: on attempting to call this method on an entropy model
+        with `compression=False`.
+    """
+    if not self.compression:
+      raise NotImplementedError(
+          "Serializing entropy models with `compression=False` is currently "
+          "not supported.")
+    return dict(
+        dtype=self._dtype.name,
+        prior_shape=self._prior_shape,
+        coding_rank=self._coding_rank,
+        likelihood_bound=self._likelihood_bound,
+        tail_mass=self._tail_mass,
+        range_coder_precision=self._range_coder_precision,
+        cdf_width=self._cdf.shape.as_list()[1],
+    )
+
+  @classmethod
+  @abc.abstractmethod
+  def from_config(cls, config):
+    """Instantiates an entropy model from a configuration dictionary.
+
+    Arguments:
+      config: A `dict`, typically the output of `get_config`.
+
+    Returns:
+      An entropy model.
+    """
+    # Instantiate new object without calling initializers, and call superclass
+    # (tf.Module) initializer manually. Note: `cls` is child class of this one.
+    self = cls.__new__(cls)  # pylint:disable=no-value-for-parameter
+    super().__init__(self)
+
+    # What follows is the alternative initializer.
+    with self.name_scope:
+      # pylint:disable=protected-access
+      self._dtype = tf.as_dtype(config["dtype"])
+      self._prior_shape = tuple(int(s) for s in config["prior_shape"])
+      self._coding_rank = int(config["coding_rank"])
+      self._compression = True
+      self._likelihood_bound = float(config["likelihood_bound"])
+      self._tail_mass = float(config["tail_mass"])
+      self._range_coder_precision = int(config["range_coder_precision"])
+
+      prior_size = functools.reduce(lambda x, y: x * y, self.prior_shape, 1)
+      cdf_width = int(config["cdf_width"])
+      zeros = tf.zeros([prior_size, cdf_width], dtype=tf.int32)
+      self._cdf = tf.Variable(zeros, trainable=False, name="cdf")
+      self._cdf_offset = tf.Variable(
+          zeros[:, 0], trainable=False, name="cdf_offset")
+      self._cdf_length = tf.Variable(
+          zeros[:, 0], trainable=False, name="cdf_length")
+      # pylint:enable=protected-access
+
+    return self
+
+  def get_weights(self):
+    return tf.keras.backend.batch_get_value(self.variables)
+
+  def set_weights(self, weights):
+    if len(weights) != len(self.variables):
+      raise ValueError(
+          "`set_weights` expects a list of {} arrays, received {}."
+          "".format(len(self.variables), len(weights)))
+    tf.keras.backend.batch_set_value(zip(self.variables, weights))

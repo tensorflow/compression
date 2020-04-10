@@ -35,9 +35,6 @@ class ContinuousIndexedEntropyModelTest(tf.test.TestCase):
     self.assertEqual(em.tail_mass, 2**-8)
     self.assertEqual(em.range_coder_precision, 12)
     self.assertEqual(em.dtype, tf.float32)
-    self.assertSequenceEqual(em.quantization_offset().shape, [64])
-    self.assertSequenceEqual(em.upper_tail().shape, [64])
-    self.assertSequenceEqual(em.lower_tail().shape, [64])
 
   def test_can_instantiate_n_dimensional(self):
     em = continuous_indexed.ContinuousIndexedEntropyModel(
@@ -57,9 +54,6 @@ class ContinuousIndexedEntropyModelTest(tf.test.TestCase):
     self.assertEqual(em.tail_mass, 2**-8)
     self.assertEqual(em.range_coder_precision, 12)
     self.assertEqual(em.dtype, tf.float32)
-    self.assertSequenceEqual(em.quantization_offset().shape, [10, 10, 5])
-    self.assertSequenceEqual(em.upper_tail().shape, [10, 10, 5])
-    self.assertSequenceEqual(em.lower_tail().shape, [10, 10, 5])
 
 
 class LocationScaleIndexedEntropyModelTest(tf.test.TestCase):
@@ -73,9 +67,6 @@ class LocationScaleIndexedEntropyModelTest(tf.test.TestCase):
     self.assertEqual(em.tail_mass, 2**-8)
     self.assertEqual(em.range_coder_precision, 12)
     self.assertEqual(em.dtype, tf.float32)
-    self.assertSequenceEqual(em.quantization_offset().shape, [64])
-    self.assertSequenceEqual(em.upper_tail().shape, [64])
-    self.assertSequenceEqual(em.lower_tail().shape, [64])
 
 
 if __name__ == "__main__":

@@ -157,9 +157,10 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         unit. Each coding unit is compressed to its own bit string, and the
         `bits()` method sums over each coding unit.
       compression: Boolean. If set to `True`, the range coding tables used by
-        `compress()` and `decompress()` will be built on instantiation.
-        Otherwise, some computation can be saved, but these two methods will not
-        be accessible.
+        `compress()` and `decompress()` will be built on instantiation. This
+        assumes eager mode (throws an error if in graph mode or inside a
+        `tf.function` call). If set to `False`, these two methods will not be
+        accessible.
       channel_axis: Integer. For iterable `index_ranges`, determines the
         position of the channel axis in `indexes`. Defaults to the last
         dimension.
@@ -170,6 +171,10 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       tail_mass: Float. Approximate probability mass which is range encoded with
         less precision, by using a Golomb-like code.
       range_coder_precision: Integer. Precision passed to the range coding op.
+
+    Raises:
+      RuntimeError: when attempting to instantiate an entropy model with
+        `compression=True` and not in eager execution mode.
     """
     if coding_rank <= 0:
       raise ValueError("`coding_rank` must be larger than 0.")
@@ -248,6 +253,7 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       strides = tf.cumprod(self.index_ranges, exclusive=True, reverse=True)
       return tf.linalg.tensordot(indexes, strides, [[self.channel_axis], [0]])
 
+  @tf.Module.with_name_scope
   def bits(self, bottleneck, indexes, training=True):
     """Estimates the number of bits needed to compress a tensor.
 
@@ -279,6 +285,7 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     bits = tf.reduce_sum(tf.math.log(probs), axis=axes) / -tf.math.log(2.)
     return bits
 
+  @tf.Module.with_name_scope
   def quantize(self, bottleneck, indexes):
     """Quantizes a floating-point tensor.
 
@@ -303,6 +310,7 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     offset = helpers.quantization_offset(self._make_prior(indexes))
     return self._quantize(bottleneck, offset)
 
+  @tf.Module.with_name_scope
   def compress(self, bottleneck, indexes):
     """Compresses a floating-point tensor.
 
@@ -340,10 +348,12 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
 
     # Prevent tensors from bouncing back and forth between host and GPU.
     with tf.device("/cpu:0"):
+      cdf = self.cdf
+      cdf_length = self.cdf_length
+      cdf_offset = self.cdf_offset
       def loop_body(args):
         return range_coding_ops.unbounded_index_range_encode(
-            args[0], args[1],
-            self.cdf, self.cdf_length, self.cdf_offset,
+            args[0], args[1], cdf, cdf_length, cdf_offset,
             precision=self.range_coder_precision,
             overflow_width=4, debug_level=1)
 
@@ -354,6 +364,7 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     strings = tf.reshape(strings, batch_shape)
     return strings
 
+  @tf.Module.with_name_scope
   def decompress(self, strings, indexes):
     """Decompresses a tensor.
 
@@ -380,10 +391,12 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
 
     # Prevent tensors from bouncing back and forth between host and GPU.
     with tf.device("/cpu:0"):
+      cdf = self.cdf
+      cdf_length = self.cdf_length
+      cdf_offset = self.cdf_offset
       def loop_body(args):
         return range_coding_ops.unbounded_index_range_decode(
-            args[0], args[1],
-            self.cdf, self.cdf_length, self.cdf_offset,
+            args[0], args[1], cdf, cdf_length, cdf_offset,
             precision=self.range_coder_precision,
             overflow_width=4, debug_level=1)
 
@@ -394,6 +407,17 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     symbols = tf.reshape(symbols, symbols_shape)
     offset = helpers.quantization_offset(self._make_prior(indexes))
     return tf.cast(symbols, self.dtype) + offset
+
+  def get_config(self):
+    """Returns the configuration of the entropy model."""
+    raise NotImplementedError(
+        "Serializing indexed entropy models is currently not supported.")
+
+  @classmethod
+  def from_config(cls, config):
+    """Instantiates an entropy model from a configuration dictionary."""
+    raise NotImplementedError(
+        "Serializing indexed entropy models is currently not supported.")
 
 
 class LocationScaleIndexedEntropyModel(ContinuousIndexedEntropyModel):
@@ -457,6 +481,7 @@ class LocationScaleIndexedEntropyModel(ContinuousIndexedEntropyModel):
         range_coder_precision=range_coder_precision,
     )
 
+  @tf.Module.with_name_scope
   def bits(self, bottleneck, scale_indexes, loc=None, training=True):
     """Estimates the number of bits needed to compress a tensor.
 
@@ -482,6 +507,7 @@ class LocationScaleIndexedEntropyModel(ContinuousIndexedEntropyModel):
       bottleneck -= loc
     return super().bits(bottleneck, scale_indexes, training=training)
 
+  @tf.Module.with_name_scope
   def quantize(self, bottleneck, scale_indexes, loc=None):
     """Quantizes a floating-point tensor.
 
@@ -511,6 +537,7 @@ class LocationScaleIndexedEntropyModel(ContinuousIndexedEntropyModel):
     else:
       return super().quantize(bottleneck - loc, scale_indexes) + loc
 
+  @tf.Module.with_name_scope
   def compress(self, bottleneck, scale_indexes, loc=None):
     """Compresses a floating-point tensor.
 
@@ -541,6 +568,7 @@ class LocationScaleIndexedEntropyModel(ContinuousIndexedEntropyModel):
       bottleneck -= loc
     return super().compress(bottleneck, scale_indexes)
 
+  @tf.Module.with_name_scope
   def decompress(self, strings, scale_indexes, loc=None):
     """Decompresses a tensor.
 
