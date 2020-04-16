@@ -57,6 +57,17 @@ class ContinuousBatchedEntropyModelTest(tf.test.TestCase):
     x_quantized = em.quantize(x_perturbed)
     self.assertAllEqual(x, x_quantized)
 
+  def test_gradients_are_straight_through(self):
+    noisy = uniform_noise.NoisyNormal(loc=0, scale=1)
+    em = ContinuousBatchedEntropyModel(noisy, 1)
+    x = tf.range(-20., 20.)
+    x_perturbed = x + tf.random.uniform(x.shape, -.49, .49)
+    with tf.GradientTape() as tape:
+      tape.watch(x_perturbed)
+      x_quantized = em.quantize(x_perturbed)
+    gradients = tape.gradient(x_quantized, x_perturbed)
+    self.assertAllEqual(gradients, tf.ones_like(gradients))
+
   def test_default_kwargs_throw_error_on_compression(self):
     noisy = uniform_noise.NoisyNormal(loc=.25, scale=10.)
     em = ContinuousBatchedEntropyModel(noisy, 1)
