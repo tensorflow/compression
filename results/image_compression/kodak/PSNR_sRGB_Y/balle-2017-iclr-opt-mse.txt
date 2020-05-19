@@ -1,4 +1,4 @@
-# Aggregate rate-distortion data for "Ballé 2017 (ICLR)" on tecnick.
+# Aggregate rate-distortion data for "Ballé 2017 (ICLR, opt. MSE)" on kodak.
 # The first column contains bits per pixel (bpp) values.
 # The second column contains PSNR/sRGB/Y' values.
 #
@@ -9,11 +9,11 @@
 # If you have questions or corrections, please contact:
 #  David Minnen (dminnen@google.com) or George Toderici (gtoderici@google.com).
 
-0.115931, 29.729756
-0.174513, 31.382661
-0.261745, 33.087073
-0.380673, 34.724334
-0.550055, 36.551650
-0.793547, 38.382768
-1.111101, 40.405371
-1.547634, 42.341405
+0.119752, 27.121149
+0.194591, 28.713727
+0.316000, 30.431627
+0.481060, 32.190087
+0.721303, 34.241010
+1.060841, 36.496619
+1.458681, 38.906598
+1.957564, 41.240205

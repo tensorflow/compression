@@ -1,4 +1,4 @@
-# Aggregate rate-distortion data for "Ballé 2018 (ICLR)" on tecnick.
+# Aggregate rate-distortion data for "Minnen 2020 (ICIP)" on kodak.
 # The first column contains bits per pixel (bpp) values.
 # The second column contains PSNR/sRGB/R'G'B' values.
 #
@@ -9,11 +9,13 @@
 # If you have questions or corrections, please contact:
 #  David Minnen (dminnen@google.com) or George Toderici (gtoderici@google.com).
 
-0.105457, 29.234396
-0.154802, 30.862438
-0.228370, 32.571271
-0.330983, 34.146224
-0.471083, 35.867773
-0.655272, 37.420290
-0.905265, 39.192136
-1.262145, 40.975431
+0.112942, 28.609292
+0.189197, 30.246944
+0.299300, 31.948906
+0.459559, 33.802145
+0.668633, 35.756475
+0.941531, 37.712819
+1.279007, 39.608699
+1.704720, 41.445196
+2.302723, 43.649106
+3.018105, 45.644330

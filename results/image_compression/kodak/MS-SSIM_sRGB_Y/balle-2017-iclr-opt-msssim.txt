@@ -1,6 +1,6 @@
-# Aggregate rate-distortion data for "Ballé 2017 (ICLR)" on tecnick.
+# Aggregate rate-distortion data for "Ballé 2017 (ICLR, opt. MS-SSIM)" on kodak.
 # The first column contains bits per pixel (bpp) values.
-# The second column contains MS-SSIM/sRGB/R'G'B' values.
+# The second column contains MS-SSIM/sRGB/Y' values.
 #
 # Notes:
 #  1. Aggregate values were calculated by averaging over a constant
@@ -11,11 +11,11 @@
 # If you have questions or corrections, please contact:
 #  David Minnen (dminnen@google.com) or George Toderici (gtoderici@google.com).
 
-0.115931, 0.937430
-0.174513, 0.954175
-0.261745, 0.968157
-0.380673, 0.976136
-0.550055, 0.983301
-0.793547, 0.987275
-1.111101, 0.991833
-1.547634, 0.994729
+0.088965, 0.921848
+0.159174, 0.952119
+0.274751, 0.972189
+0.456740, 0.984918
+0.657944, 0.990717
+1.039564, 0.994777
+1.519391, 0.997142
+2.100730, 0.998423

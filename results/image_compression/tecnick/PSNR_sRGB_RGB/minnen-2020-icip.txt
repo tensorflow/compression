@@ -1,6 +1,6 @@
 # Aggregate rate-distortion data for "Minnen 2020 (ICIP)" on tecnick.
 # The first column contains bits per pixel (bpp) values.
-# The second column contains PSNR/sRGB/Y' values.
+# The second column contains PSNR/sRGB/R'G'B' values.
 #
 # Notes:
 #  1. Aggregate values were calculated by averaging over a constant
@@ -9,13 +9,13 @@
 # If you have questions or corrections, please contact:
 #  David Minnen (dminnen@google.com) or George Toderici (gtoderici@google.com).
 
-0.096514, 31.628286
-0.148632, 33.265607
-0.222172, 34.920533
-0.329241, 36.627327
-0.468026, 38.325688
-0.660635, 40.057978
-0.917032, 41.765257
-1.285604, 43.542740
-1.886344, 45.772857
-2.613850, 47.924666
+0.096514, 30.768091
+0.148632, 32.286996
+0.222172, 33.836108
+0.329241, 35.420478
+0.468026, 36.990152
+0.660635, 38.564633
+0.917032, 40.131405
+1.285604, 41.741072
+1.886344, 43.937265
+2.613850, 45.914066

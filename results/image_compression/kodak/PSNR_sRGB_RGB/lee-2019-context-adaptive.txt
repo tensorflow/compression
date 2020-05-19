@@ -1,0 +1,20 @@
+# Aggregate rate-distortion data for "Lee 2019 (ICLR)" on kodak.
+# The first column contains bits per pixel (bpp) values.
+# The second column contains PSNR/sRGB/R'G'B' values.
+#
+# Notes:
+#  1. Aggregate values were calculated by averaging over a constant
+#     lambda value.
+#
+# If you have questions or corrections, please contact:
+#  David Minnen (dminnen@google.com) or George Toderici (gtoderici@google.com).
+
+0.102128, 27.635956
+0.147518, 28.801123
+0.204255, 29.889887
+0.299291, 31.265169
+0.436879, 32.831459
+0.692199, 35.161797
+0.995745, 37.301125
+1.272340, 38.924721
+1.592908, 40.357304
