@@ -92,10 +92,8 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         unit. Each coding unit is compressed to its own bit string, and the
         `bits()` method sums over each coding unit.
       compression: Boolean. If set to `True`, the range coding tables used by
-        `compress()` and `decompress()` will be built on instantiation. This
-        assumes eager mode (throws an error if in graph mode or inside a
-        `tf.function` call). If set to `False`, these two methods will not be
-        accessible.
+        `compress()` and `decompress()` will be built on instantiation. If set
+        to `False`, these two methods will not be accessible.
       likelihood_bound: Float. Lower bound for likelihood values, to prevent
         training instabilities.
       tail_mass: Float. Approximate probability mass which is range encoded with
@@ -119,7 +117,10 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       # Optimization: if the quantization offset is zero, we don't need to
       # subtract/add it when quantizing, and we don't need to serialize its
       # value. Note that this code will only work in eager mode.
-      if tf.reduce_all(tf.equal(quantization_offset, 0.)):
+      # TODO(jonycgn): Reconsider if this optimization is worth keeping once
+      # the implementation is stable.
+      if tf.executing_eagerly() and tf.reduce_all(
+          tf.equal(quantization_offset, 0.)):
         quantization_offset = None
       else:
         quantization_offset = tf.broadcast_to(
@@ -260,6 +261,8 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       A `tf.Tensor` of shape `strings.shape + broadcast_shape +
       self.prior_shape`.
     """
+    strings = tf.convert_to_tensor(strings, dtype=tf.string)
+    broadcast_shape = tf.convert_to_tensor(broadcast_shape, dtype=tf.int32)
     batch_shape = tf.shape(strings)
     symbols_shape = tf.concat(
         [batch_shape, broadcast_shape, self.prior_shape], 0)

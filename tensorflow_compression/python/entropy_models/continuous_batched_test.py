@@ -154,5 +154,28 @@ class ContinuousBatchedEntropyModelTest(tf.test.TestCase):
     self.assertAllEqual(em.compress(x), x_compressed)
     self.assertAllEqual(em.decompress(x_compressed, [100]), x_quantized)
 
+  def test_compression_works_in_tf_function(self):
+    noisy = uniform_noise.NoisyNormal(loc=0, scale=5.)
+    sample = noisy.base.sample([100])
+
+    # Since tf.function traces each function twice, and only allows variable
+    # creation in the first call, we need to have a stateful object in which we
+    # create the entropy model only the first time the function is called, and
+    # store it for the second time.
+
+    class Compressor(object):
+
+      def compress(self, values):
+        if not hasattr(self, "em"):
+          self.em = ContinuousBatchedEntropyModel(noisy, 1, compression=True)
+        compressed = self.em.compress(values)
+        decompressed = self.em.decompress(compressed, [])
+        return decompressed
+
+    values_eager = Compressor().compress(sample)
+    values_function = tf.function(Compressor().compress)(sample)
+    self.assertAllEqual(values_eager, values_function)
+
+
 if __name__ == "__main__":
   tf.test.main()

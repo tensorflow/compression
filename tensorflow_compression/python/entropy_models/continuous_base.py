@@ -54,10 +54,8 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
         unit. Each coding unit is compressed to its own bit string, and the
         `bits()` method sums over each coding unit.
       compression: Boolean. If set to `True`, the range coding tables used by
-        `compress()` and `decompress()` will be built on instantiation. This
-        assumes eager mode (throws an error if in graph mode or inside a
-        `tf.function` call). If set to `False`, these two methods will not be
-        accessible.
+        `compress()` and `decompress()` will be built on instantiation. If set
+        to `False`, these two methods will not be accessible.
       likelihood_bound: Float. Lower bound for likelihood values, to prevent
         training instabilities.
       tail_mass: Float. Approximate probability mass which is range encoded with
@@ -81,8 +79,6 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
       self._tail_mass = float(tail_mass)
       self._range_coder_precision = int(range_coder_precision)
       if self.compression:
-        if not tf.executing_eagerly():
-          raise RuntimeError("`compression=True` requires eager execution.")
         self._build_tables(prior)
 
   @property
@@ -207,7 +203,7 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
     # Sample the densities in the computed ranges, possibly computing more
     # samples than necessary at the upper end.
     max_length = tf.math.reduce_max(pmf_length)
-    if max_length > 2048:
+    if tf.executing_eagerly() and max_length > 2048:
       logging.warning(
           "Very wide PMF with %d elements may lead to out of memory issues. "
           "Consider priors with smaller dispersion or increasing `tail_mass` "
