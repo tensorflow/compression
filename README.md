@@ -119,7 +119,7 @@ import tensorflow_compression as tfc
 ### Using a pre-trained model to compress an image
 
 In the
-[examples directory](https://github.com/tensorflow/compression/tree/master/examples),
+[models directory](https://github.com/tensorflow/compression/tree/master/models),
 you'll find a python script `tfci.py`. Download the file and run:
 ```bash
 python tfci.py -h
@@ -142,7 +142,7 @@ appended (any existing extensions will not be removed).
 ### Training your own model
 
 The
-[examples directory](https://github.com/tensorflow/compression/tree/master/examples)
+[models directory](https://github.com/tensorflow/compression/tree/master/models)
 contains an implementation of the image compression model described in:
 
 > "End-to-end optimized image compression"<br />

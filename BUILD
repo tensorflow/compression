@@ -54,21 +54,21 @@ py_binary(
 
 py_binary(
     name = "tfci",
-    srcs = ["examples/tfci.py"],
+    srcs = ["models/tfci.py"],
     python_version = "PY3",
     deps = [":tensorflow_compression"],
 )
 
 py_binary(
     name = "bls2017",
-    srcs = ["examples/bls2017.py"],
+    srcs = ["models/bls2017.py"],
     python_version = "PY3",
     deps = [":tensorflow_compression"],
 )
 
 py_binary(
     name = "bmshj2018",
-    srcs = ["examples/bmshj2018.py"],
+    srcs = ["models/bmshj2018.py"],
     python_version = "PY3",
     deps = [":tensorflow_compression"],
 )
