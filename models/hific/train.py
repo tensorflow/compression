@@ -21,9 +21,9 @@ from absl import app
 
 import tensorflow.compat.v1 as tf
 
-import .configs
-import .helpers
-import .model
+from . import configs
+from . import helpers
+from . import model
 
 
 SAVE_CHECKPOINT_STEPS = 100

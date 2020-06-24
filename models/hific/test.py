@@ -20,10 +20,10 @@ import tempfile
 
 import tensorflow.compat.v1 as tf
 
-import .configs
-import .helpers
-import .model
-import .train
+from . import configs
+from . import helpers
+from . import model
+from . import train
 
 
 class HiFiCTest(tf.test.TestCase):
