@@ -26,9 +26,9 @@ import sys
 import tensorflow.compat.v1 as tf
 from PIL import Image
 
-from . import configs
-from . import helpers
-from . import model
+import configs
+import helpers
+import model
 
 
 def eval_trained_model(config_name, ckpt_dir, out_dir,

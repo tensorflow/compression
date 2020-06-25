@@ -21,9 +21,9 @@ import sys
 
 import tensorflow.compat.v1 as tf
 
-from . import configs
-from . import helpers
-from . import model
+import configs
+import helpers
+import model
 
 # Show custom tf.logging calls.
 logging.getLogger("tensorflow").setLevel('INFO')
