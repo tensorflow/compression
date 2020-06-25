@@ -28,7 +28,7 @@ import tensorflow.compat.v1 as tf
 
 import tensorflow_compression as tfc
 
-from .helpers import ModelMode
+from helpers import ModelMode
 
 
 SCALES_MIN = 0.11
@@ -327,7 +327,13 @@ class _PatchDiscriminatorCompareGANImpl(abstract_arch.AbstractDiscriminator):
     self._num_layers = num_layers
     self._num_filters_base = num_filters_base
 
+  def __call__(self, x):
+    """Overwriting compare_gan's __call__ as we only need `x`."""
+    with tf.variable_scope(self.name, reuse=tf.AUTO_REUSE):
+      return self.apply(x)
+
   def apply(self, x):
+    """Overwriting compare_gan's apply as we only need `x`."""
     if not isinstance(x, tuple) or len(x) != 2:
       raise ValueError("Expected 2-tuple, got {}".format(x))
     x, latent = x
@@ -398,18 +404,8 @@ class _CompareGANLayer(tf.keras.layers.Layer):
     self._name = name
     self._model = compare_gan_cls(**compare_gan_kwargs)
 
-  def call(self, x, training):
-    # compare_gan code distinguishes between training and evaluation using
-    # two entry points: __call__ for training, inference for evaluation.
-    # Depending on the mode, different norm modes are set.
-    # We switch depending on the training flag.
-    if training:
-      return self._model(x)
-    else:
-      return self._model.inference(x)
-
-  def apply_directly(self, x):
-    return self._model.apply(x)
+  def call(self, x):
+    return self._model(x)
 
   @property
   def trainable_variables(self):
@@ -418,7 +414,7 @@ class _CompareGANLayer(tf.keras.layers.Layer):
     # don't have training as a flag to the constructor, so we always return.
     # However, we only call trainable_variables when we are training.
     return tf.get_collection(
-        tf.GraphKeys.TRAINABLE_VARIABLES, scope=self._name)
+        tf.GraphKeys.TRAINABLE_VARIABLES, scope=self._model.name)
 
 
 class Discriminator(_CompareGANLayer):
@@ -433,13 +429,11 @@ class Hyperprior(tf.keras.layers.Layer):
   """Hyperprior architecture (probability model)."""
 
   def __init__(self,
-               round_latents_for_training=True,
                num_chan_bottleneck=220,
                num_filters=320,
                name="Hyperprior"):
     super(Hyperprior, self).__init__(name=name)
 
-    self._round_latents_for_training = round_latents_for_training
     self._num_chan_bottleneck = num_chan_bottleneck
     self._num_filters = num_filters
     self._analysis = tf.keras.Sequential([
@@ -537,9 +531,7 @@ class Hyperprior(tf.keras.layers.Layer):
 
     compressed = None
     if training:
-      latents_decoded = (entropy_info.quantized
-                         if self._round_latents_for_training else
-                         entropy_info.noisy)
+      latents_decoded = _quantize(latents, latent_means)
     elif validation:
       latents_decoded = entropy_info.quantized
     else:
@@ -563,6 +555,16 @@ class Hyperprior(tf.keras.layers.Layer):
     tf.summary.scalar("bpp/total/quantized", info.total_qbpp)
 
     return info
+
+
+def _quantize(inputs, mean):
+  half = tf.constant(.5, dtype=tf.float32)
+  outputs = inputs
+  outputs -= mean
+  # Rounding latents for the forward pass (straight-through).
+  outputs = outputs + tf.stop_gradient(tf.math.floor(outputs + half) - outputs)
+  outputs += mean
+  return outputs
 
 
 class FactorizedPriorLayer(tf.keras.layers.Layer):

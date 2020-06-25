@@ -1,3 +1,0 @@
--e git+https://github.com/google/compare_gan#egg=elasticutils
-tensorflow~=1.15.2
-tensorflow-compression==1.3

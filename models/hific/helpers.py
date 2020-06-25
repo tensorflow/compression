@@ -16,6 +16,7 @@
 """Some helper enums and classes, as well as LPIPS downloader."""
 
 
+import collections
 import enum
 import os
 import pprint
@@ -23,6 +24,11 @@ import urllib.request
 
 
 _LPIPS_URL = "http://rail.eecs.berkeley.edu/models/lpips/net-lin_alex_v0.1.pb"
+
+
+TFDSArguments = collections.namedtuple(
+    "TFDSArguments",
+    ["dataset_name", "features_key", "downloads_dir"])
 
 
 class ModelType(enum.Enum):
@@ -66,3 +72,19 @@ def ensure_lpips_weights_exist(weight_path_out):
   if not os.path.isfile(weight_path_out):
     raise ValueError(f"Failed to download LPIPS weights from {_LPIPS_URL} "
                      f"to {weight_path_out}. Please manually download!")
+
+
+def add_tfds_arguments(parser):
+  parser.add_argument('--tfds_dataset_name', default='coco2014',
+                      help='TFDS dataset name.')
+  parser.add_argument('--tfds_downloads_dir', default=None,
+                      help=('Where TFDS stores data.'
+                            'Defaults to ~/tensorflow_datasets.'))
+  parser.add_argument('--tfds_features_key', default='image',
+                      help='Name of the TFDS feature to use.')
+
+
+def parse_tfds_arguments(args) -> TFDSArguments:
+  return TFDSArguments(args.tfds_dataset_name,
+                       args.tfds_features_key,
+                       args.tfds_downloads_dir)

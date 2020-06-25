@@ -1,5 +1,7 @@
 # High-Fidelity Generative Image Compression
 
+## PRE-RELEASE
+
 <div align="center">
   <a href='https://hific.github.io'>
   <img src='https://hific.github.io/social/thumb.jpg' width="80%"/>
@@ -30,61 +32,119 @@ use more than 2&times; the bitrate.
 We show some images on the [demo page](https://hific.github.io) and we
 release a
 [colab](https://colab.research.google.com/github/tensorflow/compression/blob/master/models/hific/colab.ipynb)
-update for interactively using our models on your own images.
+for interactively using our models on your own images.
 
-## Using the code
-
-In addition to `tensorflow_compression`, you need to install [`compare_gan`](https://github.com/google/compare_gan)
-and TensorFlow 1.15:
-
-```bash
-pip install -r requirements.txt
-```
-
-## Running our models locally
+## Running models trained by us locally
 
 Use `tfci.py` for locally running our models to encode and decode images:
 
-```python
+```bash
+git clone https://github.com/tensorflow/compression .
+cd compression/models
 python tfci.py compress <model> <PNG file>
 ```
 
 where `model` can be one of `"hific-lo", "hific-mi", "hific-hi"`.
 
-## Code
+**NOTE**: This is also directly available in the 
+[colab](https://colab.research.google.com/github/tensorflow/compression/blob/master/models/hific/colab.ipynb)!
 
-The architecture is defined in `arch.py` , which is used to build the model in
-`model.py`. Our configurations are in `configs.py`.
+## Using the code
+
+
+To use the code, create a conda environment using Python 3.6 
+(newer is not supported at the moment), and the following packages.
+
+**NOTE**: We only support CUDA 10.0, Python 3.6, and TensorFlow 1.15. 
+TensorFlow must be installed via pip, not conda. 
+Any other setup is likely not going to work.
+
+```bash
+conda create --name hific python=3.6 cudatoolkit=10.0 cudnn
+conda activate hific
+pip install tensorflow-gpu==1.15  # Make sure to install TF via pip, not conda!
+pip install git+git://github.com/google/compare_gan@19922d3004b675c1a49c4d7515c06f6f75acdcc8
+pip install tensorflow-compression==1.3
+pip install Pillow
+```
+
+#### Note on CUDNN Errors
+
+On some of our test machines, the code crashes with one of "Could not create 
+cudnn handle: CUDNN_STATUS_INTERNAL_ERROR", "terminate called after throwing an 
+instance of 'std::bad_alloc'",  "Segmentation fault", "Unknown: Failed to get 
+convolution algorithm. This is probably because cuDNN".
+
+In this case, try setting `TF_FORCE_GPU_ALLOW_GROWTH=true`, e.g.:
+```bash
+TF_FORCE_GPU_ALLOW_GROWTH=true python train.py ...
+```
+
+#### Note on Memory Consumption
+
+This model trains best on a V100. If you get out-of-memory errors 
+("Resource exhausted: OOM"), try lowering the batch size 
+(e.g., `--batch_size 6`), or tweak `num_residual_blocks` in `archs.py/Decoder`.
+
+If you get slow training/stalling, try tweaking the `DATASET_NUM_PARALLEL` and
+`DATASET_PREFETCH` constants in `model.py`.
+
 
 ### Training your own models.
 
+The architecture is defined in `arch.py`, which is used to build the model from
+`model.py`. Our configurations are in `configs.py`.
+
+
 We release a _simplified_ trainer in `train.py` as a starting point for custom
-training. Note that it's using [LSUN]() from [tfds]() which likely needs to be
-adapted to a bigger dataset to obtain state-of-the-art results (see below).
+training. Note that it's using
+[coco2014](https://cocodataset.org) from
+[tfds](https://www.tensorflow.org/datasets/api_docs/python/tfds) which likely
+needs to be adapted to a bigger dataset to obtain good results
+(see below).
 
 For the paper, we initialize our GAN models from a MSE+LPIPS checkpoint. To
 replicate this, first train a model for MSE + LPIPS only, and then use that as a
 starting point:
-
 ```bash
 # First train a model for MSE+LPIPS:
-python train.py --config mselpips --ckpt_dir ckpts --num_steps 1M
+python train.py --config mselpips --ckpt_dir ckpts/mse_lpips --num_steps 1M
+                --tfds_dataset_name coco2014
 
 # Once that finishes, train a GAN model:
-python train.py --config hific --ckpt_dir ckpts \
-                --init_from ckpts/mselpips --num_steps 1M
+python train.py --config hific --ckpt_dir ckpts/hific \
+                --init_autoencoder_from_ckpt_dir ckpts/mselpips --num_steps 1M
+                --tfds_dataset_name coco2014
 ```
+Additional helpful arguments are `--tfds_dataset_name`,
+and `--tfds_download_dir`, see `--help` for more.  
 
-To test a trained model, use `eval.py`:
+Note that TensorBoard summaries will be saved in `--ckpts` as well. By default,
+we create summaries of inputs and reconstructions, which can use a lot of
+memory. Disable with `--no-image-summaries`.
+
+To test a trained model, use `evaluate.py` (it also supports the `--tfds_*` 
+flags):
 
 ```bash
-python eval.py --config hific --ckpt_dir ckpts/hific
+python evaluate.py --config hific --ckpt_dir ckpts/hific --out_dir out/ \
+                   --tfds_dataset_name coco2014
 ```
 
 #### Adapting the dataset
 
-You can change to any other TFDS dataset by changing the `tfds_name` flag for
-`build_input`. To train on a custom dataset, you can replace the `_get_dataset`
+You can change to any other TFDS dataset by adapting the `--tfds_dataset_name`,
+`--tfds_feature_key`, and `--tfds_download_dir` flags of `train.py`.
+
+Note that when using TFDS, the dataset first has to be downloaded, which can
+take time. To do this separately, use the following code snippet:
+```python
+import tensorflow_datasets as tfds
+builder = tfds.builder(TFDS_DATASET_NAME, data_dir=TFDS_DOWNLOAD_DIR)
+builder.download_and_prepare()
+```
+
+To train on a custom dataset, you can replace the `_get_dataset`
 call in `train.py`.
 
 ## Citation
@@ -92,9 +152,10 @@ call in `train.py`.
 If you use the work released here for your research, please cite this paper:
 
 ```
-@inproceedings{mentzer2020hific,
+@article{mentzer2020high,
   title={High-Fidelity Generative Image Compression},
-  author={Fabian Mentzer and George Toderici and Michael Tschannen and Eirikur Agustsson},
+  author={Mentzer, Fabian and Toderici, George and Tschannen, Michael and Agustsson, Eirikur},
+  journal={arXiv preprint arXiv:2006.09965},
   year={2020}
 }
 ```
