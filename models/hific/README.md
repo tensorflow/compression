@@ -78,7 +78,7 @@ convolution algorithm. This is probably because cuDNN".
 
 In this case, try setting `TF_FORCE_GPU_ALLOW_GROWTH=true`, e.g.:
 ```bash
-TF_FORCE_GPU_ALLOW_GROWTH=true python train.py ...
+TF_FORCE_GPU_ALLOW_GROWTH=true python -m hific.train ...
 ```
 
 #### Note on Memory Consumption
@@ -107,16 +107,22 @@ needs to be adapted to a bigger dataset to obtain good results
 For the paper, we initialize our GAN models from a MSE+LPIPS checkpoint. To
 replicate this, first train a model for MSE + LPIPS only, and then use that as a
 starting point:
+
 ```bash
+# Need to be in the models directory such that hific is a subdirectory.
+cd models
+
 # First train a model for MSE+LPIPS:
-python train.py --config mselpips --ckpt_dir ckpts/mse_lpips --num_steps 1M
-                --tfds_dataset_name coco2014
+python -m hific.train --config mselpips --ckpt_dir ckpts/mse_lpips \
+    --num_steps 1M --tfds_dataset_name coco2014
 
 # Once that finishes, train a GAN model:
-python train.py --config hific --ckpt_dir ckpts/hific \
-                --init_autoencoder_from_ckpt_dir ckpts/mselpips --num_steps 1M
+python -m hific.train --config hific --ckpt_dir ckpts/hific \
+                --init_autoencoder_from_ckpt_dir ckpts/mselpips \
+                --num_steps 1M \
                 --tfds_dataset_name coco2014
 ```
+
 Additional helpful arguments are `--tfds_dataset_name`,
 and `--tfds_download_dir`, see `--help` for more.
 
@@ -128,7 +134,7 @@ To test a trained model, use `evaluate.py` (it also supports the `--tfds_*`
 flags):
 
 ```bash
-python evaluate.py --config hific --ckpt_dir ckpts/hific --out_dir out/ \
+python -m hific.evaluate --config hific --ckpt_dir ckpts/hific --out_dir out/ \
                    --tfds_dataset_name coco2014
 ```
 
