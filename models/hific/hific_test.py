@@ -18,6 +18,7 @@
 import contextlib
 import tempfile
 
+import numpy as np
 import tensorflow.compat.v1 as tf
 
 from . import configs
@@ -26,18 +27,33 @@ from . import model
 from . import train
 
 
+class FakeHiFiC(model.HiFiC):
+  """Fake class for testing."""
+
+  def _get_dataset(self, batch_size, crop_size,
+                   tfds_arguments: helpers.TFDSArguments):
+    zeros = np.zeros((batch_size, crop_size, crop_size, 3))
+    return (tf.data.Dataset.from_tensor_slices(
+        (zeros,)).repeat(128).batch(batch_size))
+
+
 class HiFiCTest(tf.test.TestCase):
   """Test public repo."""
 
   def setUp(self):
+    super(HiFiCTest, self).setUp()
+
     self._lpips_weight_path = 'test.weights'
-    tf.reset_default_graph()
 
   def test_input_pipeline(self):
     crop_size = 128
-    hific = model.HiFiC(configs.get_config('hific'),
-                        mode=helpers.ModelMode.TRAINING)
-    ds = hific.build_input(batch_size=2, crop_size=crop_size)
+    hific = FakeHiFiC(
+        configs.get_config('hific'), mode=helpers.ModelMode.TRAINING)
+    ds = hific.build_input(
+        batch_size=2,
+        crop_size=crop_size,
+        tfds_arguments=helpers.TFDSArguments(
+            dataset_name='', features_key='', downloads_dir=''))
     iterator = tf.data.make_initializable_iterator(ds)
     ds_next = iterator.get_next()
     with tf.Session() as sess:

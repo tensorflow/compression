@@ -25,7 +25,16 @@ from . import archs
 from . import helpers
 from .helpers import ModelMode
 from .helpers import ModelType
+from .helpers import TFDSArguments
 
+# How many dataset preprocessing processes to use.
+DATASET_NUM_PARALLEL = 8
+
+# How many batches to prefetch.
+DATASET_PREFETCH_BUFFER = 20
+
+# How many batches to fetch for shuffling.
+DATASET_SHUFFLE_BUFFER = 10
 
 BppPair = collections.namedtuple(
     "BppPair", ["total_nbpp", "total_qbpp"])
@@ -118,9 +127,12 @@ def _pad(input_image, image_shape, factor):
 class HiFiC(object):
   """HiFiC Model class."""
 
-  def __init__(self, config, mode: ModelMode,
+  def __init__(self,
+               config,
+               mode: ModelMode,
                lpips_weight_path=None,
-               auto_encoder_ckpt_dir=None):
+               auto_encoder_ckpt_dir=None,
+               create_image_summaries=True):
     """Instantiate model.
 
     Args:
@@ -130,10 +142,13 @@ class HiFiC(object):
         stored. See helpers.ensure_lpips_weights_exist.
       auto_encoder_ckpt_dir: If given, instantiate auto-encoder and probability
         model from latest checkpoint in this folder.
+      create_image_summaries: Whether to create image summaries. Turn off to
+        save disk space.
     """
     self._mode = mode
     self._config = config
     self._model_type = config.model_type
+    self._create_image_summaries = create_image_summaries
 
     if not isinstance(self._model_type, ModelType):
       raise ValueError("Invalid model_type: [{}]".format(
@@ -158,8 +173,8 @@ class HiFiC(object):
     self._decoder = None
     self._discriminator = None
     self._gan_loss_function = None
-    self._lpips_loss = None
     self._lpips_loss_weight = None
+    self._lpips_loss = None
     self._entropy_model = None
     self._optimize_entropy_vars = True
     self._global_step_disc = None  # global_step used for D training
@@ -232,7 +247,7 @@ class HiFiC(object):
   def num_steps_disc(self):
     return self._num_steps_disc
 
-  def build_input(self, batch_size, crop_size, tfds_name="lsun"):
+  def build_input(self, batch_size, crop_size, tfds_arguments: TFDSArguments):
     """Build input dataset."""
 
     if self._setup_discriminator:
@@ -254,47 +269,78 @@ class HiFiC(object):
       def _batch_to_dict(batch):
         return dict(input_image=batch)
 
-    dataset = self._get_dataset(batch_size, crop_size, tfds_name)
+    dataset = self._get_dataset(batch_size, crop_size, tfds_arguments)
     return dataset.map(_batch_to_dict)
 
-  def _get_dataset(self, batch_size, crop_size,
-                   tfds_name, tfds_key="image"):
+  def _get_dataset(self, batch_size, crop_size, tfds_arguments: TFDSArguments):
     """Build TFDS dataset.
 
     Args:
       batch_size: int, batch_size.
       crop_size: int, will random crop to this (crop_size, crop_size)
-      tfds_name: str, Name of the TFDS pipeline.
-      tfds_key: The key to look for in the TFDS features dict.
+      tfds_arguments: argument for TFDS.
 
     Returns:
       Instance of tf.data.Dataset.
     """
     split = "train" if self.training else "validation"
 
-    tf.logging.info("Building TFDS pipeline: %s[%s], %d, %s",
-                    tfds_name, split, batch_size, crop_size)
+    tf.logging.info("Building TFDS pipeline: %s, %s, %d, %d", tfds_arguments,
+                    split, batch_size, crop_size)
+
+    crop_size_float = tf.constant(crop_size, tf.float32) if crop_size else None
+    smallest_fac = tf.constant(0.75, tf.float32)
+    biggest_fac = tf.constant(0.95, tf.float32)
 
     with tf.name_scope("tfds"):
-      # Note: `data_dir` defaults to ~/tensorflow_datasets.
-      builder = tfds.builder(tfds_name, data_dir=None)
+      builder = tfds.builder(
+          tfds_arguments.dataset_name, data_dir=tfds_arguments.downloads_dir)
+      builder.download_and_prepare()
       dataset = builder.as_dataset(split=split)
 
       def _preprocess(features):
-        if crop_size:
-          return tf.image.random_crop(features[tfds_key],
-                                      [crop_size, crop_size, 3],
-                                      name="random_crop")
-        else:
-          return features[tfds_key]
+        image = features[tfds_arguments.features_key]
+        if not crop_size:
+          return image
+        tf.logging.info("Scaling down %s and cropping to %d x %d", image,
+                        crop_size, crop_size)
+        with tf.name_scope("random_scale"):
+          # Scale down by at least `biggest_fac` and at most `smallest_fac` to
+          # remove JPG artifacts. This code also handles images that have one
+          # side  shorter than crop_size. In this case, we always upscale such
+          # that this side becomes the same as `crop_size`. Overall, images
+          # returned will never be smaller than `crop_size`.
+          image_shape = tf.cast(tf.shape(image), tf.float32)
+          height, width = image_shape[0], image_shape[1]
+          smallest_side = tf.math.minimum(height, width)
+          # The smallest factor such that the downscaled image is still bigger
+          # than `crop_size`. Will be bigger than 1 for images smaller than
+          # `crop_size`.
+          image_smallest_fac = crop_size_float / smallest_side
+          min_fac = tf.math.maximum(smallest_fac, image_smallest_fac)
+          max_fac = tf.math.maximum(min_fac, biggest_fac)
+          scale = tf.random_uniform([],
+                                    minval=min_fac,
+                                    maxval=max_fac,
+                                    dtype=tf.float32,
+                                    seed=42,
+                                    name=None)
+          image = tf.image.resize_images(
+              image, [tf.ceil(scale * height),
+                      tf.ceil(scale * width)])
+        with tf.name_scope("random_crop"):
+          image = tf.image.random_crop(image, [crop_size, crop_size, 3])
+        return image
 
-      dataset = dataset.map(_preprocess)
+      dataset = dataset.map(
+          _preprocess, num_parallel_calls=DATASET_NUM_PARALLEL)
       dataset = dataset.batch(batch_size, drop_remainder=True)
+
       if not self.evaluation:
-        dataset = dataset.repeat()  # Make sure we don't run out of data
-        # Note: this should probably be increased depending on GPU.
-        dataset = dataset.shuffle(buffer_size=2)
-      dataset = dataset.prefetch(buffer_size=2)
+        # Make sure we don't run out of data
+        dataset = dataset.repeat()
+        dataset = dataset.shuffle(buffer_size=DATASET_SHUFFLE_BUFFER)
+      dataset = dataset.prefetch(buffer_size=DATASET_PREFETCH_BUFFER)
 
       return dataset
 
@@ -340,7 +386,8 @@ class HiFiC(object):
 
     if self.evaluation:
       tf.logging.info("Evaluation mode: build_model done.")
-      return nodes_gen.reconstruction, bpp_pair.total_qbpp
+      reconstruction = tf.clip_by_value(nodes_gen.reconstruction, 0, 255.)
+      return reconstruction, bpp_pair.total_qbpp
 
     nodes_disc = []  # list of Nodes, one for every sub-batch of disc
     for i, sub_batch in enumerate(input_images_d_steps):
@@ -465,7 +512,9 @@ class HiFiC(object):
         self._compute_reconstruction(
             decoder_in, image_shape, input_image_scaled.shape)
 
-    if create_summaries:
+    if create_summaries and self._create_image_summaries:
+      tf.summary.image(
+          "input_image", tf.saturate_cast(input_image, tf.uint8), max_outputs=1)
       tf.summary.image(
           "reconstruction",
           tf.saturate_cast(reconstruction, tf.uint8),
@@ -737,10 +786,12 @@ class HiFiC(object):
          ("aux", entropy_vars, self._entropy_model.losses[0])
          ]):
       optimizer = tf.train.AdamOptimizer(
-          learning_rate=_scheduled_value(self._config.lr,
-                                         self._config.lr_schedule,
-                                         step,
-                                         "lr_" + name),
+          learning_rate=_scheduled_value(
+              self._config.lr,
+              self._config.lr_schedule,
+              step,
+              "lr_" + name,
+              summary=True),
           name="adam_" + name)
       minimize = optimizer.minimize(
           l, var_list=vs,
@@ -752,10 +803,12 @@ class HiFiC(object):
     if not self.training:
       return None
     return tf.train.AdamOptimizer(
-        learning_rate=_scheduled_value(self._config.lr,
-                                       self._config.lr_schedule,
-                                       step,
-                                       "lr_disc"),
+        learning_rate=_scheduled_value(
+            self._config.lr,
+            self._config.lr_schedule,
+            step,
+            "lr_disc",
+            summary=True),
         name="adam_disc")
 
 
@@ -793,7 +846,7 @@ class LPIPSLoss(object):
     return tf.reduce_mean(loss)  # Loss is N111, take mean to get scalar.
 
 
-def _scheduled_value(value, schedule, step, name):
+def _scheduled_value(value, schedule, step, name, summary=False):
   """Create a tensor whose value depends on global step.
 
   Args:
@@ -801,6 +854,7 @@ def _scheduled_value(value, schedule, step, name):
     schedule: Dictionary. Expects 'steps' and 'vals'.
     step: The global_step to find to.
     name: Name of the value.
+    summary: Boolean, whether to add a summary for the scheduled value.
 
   Returns:
     tf.Tensor.
@@ -811,4 +865,7 @@ def _scheduled_value(value, schedule, step, name):
     steps = [int(s) for s in schedule["steps"]]
     steps = tf.stack(steps + [step + 1])
     idx = tf.where(step < steps)[0, 0]
-    return value * tf.convert_to_tensor(schedule["vals"])[idx]
+    value = value * tf.convert_to_tensor(schedule["vals"])[idx]
+  if summary:
+    tf.summary.scalar(name, value)
+  return value

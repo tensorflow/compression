@@ -16,8 +16,9 @@
 """Training code for HiFiC."""
 
 import argparse
+import sys
 
-from absl import app
+from absl import logging
 
 import tensorflow.compat.v1 as tf
 
@@ -25,21 +26,25 @@ from . import configs
 from . import helpers
 from . import model
 
+# Show custom tf.logging calls.
+logging.set_verbosity(logging.INFO)
 
-SAVE_CHECKPOINT_STEPS = 100
+SAVE_CHECKPOINT_STEPS = 1000
 
 
 def train(config_name, ckpt_dir, num_steps: int, auto_encoder_ckpt_dir,
-          batch_size, crop_size, lpips_weight_path):
+          batch_size, crop_size, lpips_weight_path, create_image_summaries,
+          tfds_arguments: model.TFDSArguments):
   """Train the model."""
   config = configs.get_config(config_name)
-  hific = model.HiFiC(config, helpers.ModelMode.TRAINING,
-                      lpips_weight_path, auto_encoder_ckpt_dir)
+  hific = model.HiFiC(config, helpers.ModelMode.TRAINING, lpips_weight_path,
+                      auto_encoder_ckpt_dir, create_image_summaries)
 
-  dataset = hific.build_input(batch_size, crop_size, tfds_name='lsun')
+  dataset = hific.build_input(batch_size, crop_size, tfds_arguments)
   iterator = tf.data.make_one_shot_iterator(dataset)
+  get_next = iterator.get_next()
 
-  hific.build_model(**iterator.get_next())
+  hific.build_model(**get_next)
   train_op = hific.train_op
 
   hooks = hific.hooks + [tf.train.StopAtStepHook(last_step=num_steps)]
@@ -51,13 +56,17 @@ def train(config_name, ckpt_dir, num_steps: int, auto_encoder_ckpt_dir,
       hooks=hooks) as sess:
     if auto_encoder_ckpt_dir:
       hific.restore_autoencoder(sess)
+    tf.logging.info('Session setup, starting training...')
     while True:
       if sess.should_stop():
         break
       global_step_np, _ = sess.run([global_step, train_op])
-      if global_step_np % 100 == 0:
-        print(f'Iteration {global_step_np}')
-  print('Training session closed.')
+      global_step_np, _ = sess.run([global_step, train_op])
+      if global_step_np == 0:
+        tf.logging.info('First iteration passed.')
+      if global_step_np > 0 and global_step_np % 100 == 0:
+        tf.logging.info(f'Iteration {global_step_np}')
+  tf.logging.info('Training session closed.')
 
 
 def parse_args(argv):
@@ -86,6 +95,16 @@ def parse_args(argv):
   parser.add_argument('--lpips_weight_path',
                       help=('Where to store the LPIPS weights. Defaults to '
                             'current directory'))
+
+  helpers.add_tfds_arguments(parser)
+
+  parser.add_argument(
+      '--no-image-summaries',
+      dest='image_summaries',
+      action='store_false',
+      help='Disable image summaries.')
+  parser.set_defaults(image_summaries=True)
+
   args = parser.parse_args(argv[1:])
   if args.ckpt_dir == args.init_autoencoder_from_ckpt_dir:
     raise ValueError('--init_autoencoder_from_ckpt_dir should not point to '
@@ -111,9 +130,10 @@ def _parse_num_steps(steps):
 
 def main(args):
   train(args.config, args.ckpt_dir, args.num_steps,
-        args.init_autoencoder_from_ckpt_dir,
-        args.batch_size, args.crop_size, args.lpips_weight_path)
+        args.init_autoencoder_from_ckpt_dir, args.batch_size, args.crop_size,
+        args.lpips_weight_path, args.image_summaries,
+        helpers.parse_tfds_arguments(args))
 
 
 if __name__ == '__main__':
-  app.run(main, flags_parser=parse_args)
+  main(parse_args(sys.argv))
