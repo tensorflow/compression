@@ -62,9 +62,11 @@ def train(config_name, ckpt_dir, num_steps: int, auto_encoder_ckpt_dir,
         break
       global_step_np, _ = sess.run([global_step, train_op])
       global_step_np, _ = sess.run([global_step, train_op])
-      if global_step_np == 0:
+      # We do back to back training steps. If this is intended, we need to
+      # log first step at 1, otherwise revert to 0.
+      if global_step_np == 1:
         tf.logging.info('First iteration passed.')
-      if global_step_np > 0 and global_step_np % 100 == 0:
+      if global_step_np > 1 and global_step_np % 100 == 1:
         tf.logging.info(f'Iteration {global_step_np}')
   tf.logging.info('Training session closed.')
 
