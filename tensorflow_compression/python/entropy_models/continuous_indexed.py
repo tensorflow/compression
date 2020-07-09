@@ -282,7 +282,8 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     probs = prior.prob(quantized)
     probs = math_ops.lower_bound(probs, self.likelihood_bound)
     axes = tuple(range(-self.coding_rank, 0))
-    bits = tf.reduce_sum(tf.math.log(probs), axis=axes) / -tf.math.log(2.)
+    bits = tf.reduce_sum(tf.math.log(probs), axis=axes) / (
+        -tf.math.log(tf.constant(2., dtype=probs.dtype)))
     return bits
 
   @tf.Module.with_name_scope

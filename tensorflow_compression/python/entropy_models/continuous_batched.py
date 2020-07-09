@@ -124,7 +124,7 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         quantization_offset = None
       else:
         quantization_offset = tf.broadcast_to(
-            quantization_offset, self.prior_shape)
+            quantization_offset, self.prior_shape_tensor)
         quantization_offset = tf.Variable(
             quantization_offset, trainable=False, name="quantization_offset")
     self._quantization_offset = quantization_offset
@@ -133,9 +133,9 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     # TODO(jonycgn, ssjhv): Investigate broadcasting in range coding op.
     prior_size = functools.reduce(lambda x, y: x * y, self.prior_shape, 1)
     indexes = tf.range(prior_size, dtype=tf.int32)
-    indexes = tf.reshape(indexes, self.prior_shape)
+    indexes = tf.reshape(indexes, self.prior_shape_tensor)
     indexes = tf.broadcast_to(
-        indexes, tf.concat([broadcast_shape, self.prior_shape], 0))
+        indexes, tf.concat([broadcast_shape, self.prior_shape_tensor], 0))
     return indexes
 
   @tf.Module.with_name_scope
@@ -164,7 +164,8 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     probs = self.prior.prob(quantized)
     probs = math_ops.lower_bound(probs, self.likelihood_bound)
     axes = tuple(range(-self.coding_rank, 0))
-    bits = tf.reduce_sum(tf.math.log(probs), axis=axes) / -tf.math.log(2.)
+    bits = tf.reduce_sum(tf.math.log(probs), axis=axes) / (
+        -tf.math.log(tf.constant(2., dtype=probs.dtype)))
     return bits
 
   @tf.Module.with_name_scope
@@ -265,7 +266,7 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     broadcast_shape = tf.convert_to_tensor(broadcast_shape, dtype=tf.int32)
     batch_shape = tf.shape(strings)
     symbols_shape = tf.concat(
-        [batch_shape, broadcast_shape, self.prior_shape], 0)
+        [batch_shape, broadcast_shape, self.prior_shape_tensor], 0)
 
     indexes = self._compute_indexes(broadcast_shape)
     strings = tf.reshape(strings, [-1])
@@ -321,7 +322,7 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     with self.name_scope:
       # pylint:disable=protected-access
       if config["quantization_offset"]:
-        zeros = tf.zeros(self.prior_shape, dtype=self.dtype)
+        zeros = tf.zeros(self.prior_shape_tensor, dtype=self.dtype)
         self._quantization_offset = tf.Variable(
             zeros, name="quantization_offset")
       else:

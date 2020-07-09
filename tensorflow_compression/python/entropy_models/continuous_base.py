@@ -123,6 +123,11 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
     return self._prior_shape
 
   @property
+  def prior_shape_tensor(self):
+    """Batch shape of `prior` as a `Tensor`."""
+    return tf.constant(self.prior_shape, dtype=tf.int32)
+
+  @property
   def coding_rank(self):
     """Number of innermost dimensions considered a coding unit."""
     return self._coding_rank
@@ -217,10 +222,10 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
     pmf = tf.reshape(pmf, [max_length, -1])
     pmf = tf.transpose(pmf)
 
-    pmf_length = tf.broadcast_to(pmf_length, self.prior_shape)
+    pmf_length = tf.broadcast_to(pmf_length, self.prior_shape_tensor)
     pmf_length = tf.reshape(pmf_length, [-1])
     cdf_length = pmf_length + 2
-    cdf_offset = tf.broadcast_to(-minima, self.prior_shape)
+    cdf_offset = tf.broadcast_to(-minima, self.prior_shape_tensor)
     cdf_offset = tf.reshape(cdf_offset, [-1])
 
     # Prevent tensors from bouncing back and forth between host and GPU.
