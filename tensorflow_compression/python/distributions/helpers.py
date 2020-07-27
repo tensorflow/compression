@@ -82,8 +82,7 @@ def estimate_tails(func, target, shape, dtype):
     init_v = tf.ones(shape, dtype=dtype)
     init_count = tf.zeros(shape, dtype=tf.int32)
     return tf.while_loop(
-        loop_cond, loop_body, (init_tails, init_m, init_v, init_count),
-        back_prop=False)[0]
+        loop_cond, loop_body, (init_tails, init_m, init_v, init_count))[0]
 
 
 def quantization_offset(distribution):

@@ -19,6 +19,7 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_compression.python.distributions import helpers
+from tensorflow_compression.python.ops import math_ops
 
 
 __all__ = ["DeepFactorized"]
@@ -77,7 +78,8 @@ class DeepFactorized(tfp.distributions.Distribution):
         parameters=parameters,
         name=name,
     )
-    self._make_variables()
+    with self.name_scope:
+      self._make_variables()
 
   @property
   def num_filters(self):
@@ -168,6 +170,7 @@ class DeepFactorized(tfp.distributions.Distribution):
     # Flip signs if we can move more towards the left tail of the sigmoid.
     sign = tf.stop_gradient(-tf.math.sign(lower + upper))
     p = abs(tf.sigmoid(sign * upper) - tf.sigmoid(sign * lower))
+    p = math_ops.lower_bound(p, 0.)
 
     # Convert back to (broadcasted) input tensor shape.
     p = tf.transpose(p, (2, 1, 0))

@@ -88,8 +88,12 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
       raise RuntimeError(
           "This entropy model doesn't hold a reference to its prior "
           "distribution. This can happen when it is unserialized, because "
-          "the prior is generally not serializable.")
+          "the prior is not generally serializable.")
     return self._prior
+
+  @prior.deleter
+  def prior(self):
+    del self._prior
 
   def _check_compression(self):
     if not self.compression:
