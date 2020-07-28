@@ -237,7 +237,8 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
       def loop_body(args):
         prob, length = args
         prob = prob[:length]
-        prob = tf.concat([prob, 1 - tf.reduce_sum(prob, keepdims=True)], axis=0)
+        overflow = tf.math.maximum(1 - tf.reduce_sum(prob, keepdims=True), 0.)
+        prob = tf.concat([prob, overflow], axis=0)
         cdf = range_coding_ops.pmf_to_quantized_cdf(
             prob, precision=self.range_coder_precision)
         return tf.pad(
