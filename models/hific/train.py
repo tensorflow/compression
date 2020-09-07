@@ -17,8 +17,6 @@
 import argparse
 import sys
 
-from absl import logging
-
 import tensorflow.compat.v1 as tf
 
 from . import configs
@@ -26,7 +24,7 @@ from . import helpers
 from . import model
 
 # Show custom tf.logging calls.
-logging.set_verbosity(logging.INFO)
+tf.logging.set_verbosity(tf.logging.INFO)
 
 SAVE_CHECKPOINT_STEPS = 1000
 
@@ -48,6 +46,7 @@ def train(config_name, ckpt_dir, num_steps: int, auto_encoder_ckpt_dir,
 
   hooks = hific.hooks + [tf.train.StopAtStepHook(last_step=num_steps)]
   global_step = tf.train.get_or_create_global_step()
+  tf.logging.info(f'\nStarting MonitoredTrainingSession at {ckpt_dir}\n')
 
   with tf.train.MonitoredTrainingSession(
       checkpoint_dir=ckpt_dir,
