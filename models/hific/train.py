@@ -60,7 +60,7 @@ def train(config_name, ckpt_dir, num_steps: int, auto_encoder_ckpt_dir,
       if sess.should_stop():
         break
       global_step_np, _ = sess.run([global_step, train_op])
-      global_step_np, _ = sess.run([global_step, train_op])
+      # TODO(nickj) This was not intended.
       # We do back to back training steps. If this is intended, we need to
       # log first step at 1, otherwise revert to 0.
       if global_step_np == 1:
