@@ -20,6 +20,7 @@ The default values for all constructors reflect what was used in the paper.
 """
 
 import collections
+import os
 from compare_gan.architectures import abstract_arch
 from compare_gan.architectures import arch_ops
 import numpy as np
@@ -529,7 +530,7 @@ class Hyperprior(tf.keras.layers.Layer):
 
     compressed = None
     if training:
-      latents_decoded = _quantize(latents, latent_means)
+      latents_decoded = _ste_quantize(latents, latent_means)
     elif validation:
       latents_decoded = entropy_info.quantized
     else:
@@ -552,10 +553,17 @@ class Hyperprior(tf.keras.layers.Layer):
     tf.summary.scalar("bpp/total/noisy", info.total_nbpp)
     tf.summary.scalar("bpp/total/quantized", info.total_qbpp)
 
+    tf.summary.scalar("bpp/latent/noisy", entropy_info.nbpp)
+    tf.summary.scalar("bpp/latent/quantized", entropy_info.qbpp)
+
+    tf.summary.scalar("bpp/side/noisy", side_info.total_nbpp)
+    tf.summary.scalar("bpp/side/quantized", side_info.total_qbpp)
+
     return info
 
 
-def _quantize(inputs, mean):
+def _ste_quantize(inputs, mean):
+  """Calculates quantize(inputs - mean) + mean, sets straight-through grads."""
   half = tf.constant(.5, dtype=tf.float32)
   outputs = inputs
   outputs -= mean

@@ -37,7 +37,8 @@ def train(config_name, ckpt_dir, num_steps: int, auto_encoder_ckpt_dir,
   hific = model.HiFiC(config, helpers.ModelMode.TRAINING, lpips_weight_path,
                       auto_encoder_ckpt_dir, create_image_summaries)
 
-  dataset = hific.build_input(batch_size, crop_size, tfds_arguments)
+  dataset = hific.build_input(batch_size, crop_size,
+                              tfds_arguments=tfds_arguments)
   iterator = tf.data.make_one_shot_iterator(dataset)
   get_next = iterator.get_next()
 

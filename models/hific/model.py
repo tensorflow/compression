@@ -14,6 +14,7 @@
 # ==============================================================================
 """HiFiC model code."""
 import collections
+import glob
 import itertools
 
 from compare_gan.gans import loss_lib as compare_gan_loss_lib
@@ -25,6 +26,7 @@ from . import helpers
 from .helpers import ModelMode
 from .helpers import ModelType
 from .helpers import TFDSArguments
+
 
 # How many dataset preprocessing processes to use.
 DATASET_NUM_PARALLEL = 8
@@ -246,8 +248,11 @@ class HiFiC(object):
   def num_steps_disc(self):
     return self._num_steps_disc
 
-  def build_input(self, batch_size, crop_size, tfds_arguments: TFDSArguments):
+  def build_input(self, batch_size, crop_size,
+                  images_glob=None, tfds_arguments: TFDSArguments=None):
     """Build input dataset."""
+    if not (images_glob or tfds_arguments):
+      raise ValueError("Need images_glob or tfds_arguments!")
 
     if self._setup_discriminator:
       # Unroll dataset for GAN training. If we unroll for N steps,
@@ -268,37 +273,47 @@ class HiFiC(object):
       def _batch_to_dict(batch):
         return dict(input_image=batch)
 
-    dataset = self._get_dataset(batch_size, crop_size, tfds_arguments)
+    dataset = self._get_dataset(batch_size, crop_size,
+                                images_glob, tfds_arguments)
     return dataset.map(_batch_to_dict)
 
-  def _get_dataset(self, batch_size, crop_size, tfds_arguments: TFDSArguments):
+  def _get_dataset(self, batch_size, crop_size,
+                   images_glob, tfds_arguments: TFDSArguments):
     """Build TFDS dataset.
 
     Args:
       batch_size: int, batch_size.
       crop_size: int, will random crop to this (crop_size, crop_size)
+      images_glob:
       tfds_arguments: argument for TFDS.
 
     Returns:
       Instance of tf.data.Dataset.
     """
-    split = "train" if self.training else "validation"
-
-    tf.logging.info("Building TFDS pipeline: %s, %s, %d, %d", tfds_arguments,
-                    split, batch_size, crop_size)
 
     crop_size_float = tf.constant(crop_size, tf.float32) if crop_size else None
     smallest_fac = tf.constant(0.75, tf.float32)
     biggest_fac = tf.constant(0.95, tf.float32)
 
     with tf.name_scope("tfds"):
-      builder = tfds.builder(
-          tfds_arguments.dataset_name, data_dir=tfds_arguments.downloads_dir)
-      builder.download_and_prepare()
-      dataset = builder.as_dataset(split=split)
+      if images_glob:
+        tf.logging.info(f'Using images_glob={images_glob}')
+        filenames = tf.data.Dataset.from_tensor_slices(
+          sorted(glob.glob(images_glob)))
+        dataset = filenames.map(lambda x: tf.image.decode_png(tf.read_file(x)))
+      else:
+        tf.logging.info(f'Using TFDS={tfds_arguments}')
+        builder = tfds.builder(
+            tfds_arguments.dataset_name, data_dir=tfds_arguments.downloads_dir)
+        builder.download_and_prepare()
+        split = "train" if self.training else "validation"
+        dataset = builder.as_dataset(split=split)
 
       def _preprocess(features):
-        image = features[tfds_arguments.features_key]
+        if images_glob:
+          image = features
+        else:
+          image = features[tfds_arguments.features_key]
         if not crop_size:
           return image
         tf.logging.info("Scaling down %s and cropping to %d x %d", image,
@@ -381,17 +396,18 @@ class HiFiC(object):
     global_step = tf.train.get_or_create_global_step()
 
     # Compute output graph.
-    nodes_gen, bpp_pair = self._compute_compression_graph(input_image)
+    nodes_gen, bpp_pair, bitstrings = \
+      self._compute_compression_graph(input_image)
 
     if self.evaluation:
       tf.logging.info("Evaluation mode: build_model done.")
       reconstruction = tf.clip_by_value(nodes_gen.reconstruction, 0, 255.)
-      return reconstruction, bpp_pair.total_qbpp
+      return reconstruction, bpp_pair.total_qbpp, bitstrings
 
     nodes_disc = []  # list of Nodes, one for every sub-batch of disc
     for i, sub_batch in enumerate(input_images_d_steps):
       with tf.name_scope("sub_batch_disc_{}".format(i)):
-        nodes, _ = self._compute_compression_graph(sub_batch,
+        nodes, _, _ = self._compute_compression_graph(sub_batch,
                                                    create_summaries=False)
         nodes_disc.append(nodes)
 
@@ -506,6 +522,7 @@ class HiFiC(object):
     decoder_in = info.decoded
     total_nbpp = info.total_nbpp
     total_qbpp = info.total_qbpp
+    bitstrings = (info.bitstring, info.side_bitstring)
 
     reconstruction, reconstruction_scaled = \
         self._compute_reconstruction(
@@ -522,7 +539,7 @@ class HiFiC(object):
     nodes = Nodes(input_image, input_image_scaled,
                   reconstruction, reconstruction_scaled,
                   latent_quantized=decoder_in)
-    return nodes, BppPair(total_nbpp, total_qbpp)
+    return nodes, BppPair(total_nbpp, total_qbpp), bitstrings
 
   def _get_encoder_out(self,
                        input_image_scaled,

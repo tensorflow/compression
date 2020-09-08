@@ -18,34 +18,46 @@ NOTE: To evaluate models used in the paper, use tfci.py! See README.md.
 """
 
 import argparse
+import collections
 import itertools
 import os
+import io
 import sys
 from PIL import Image
 
+import tensorflow_compression as tfc
 import tensorflow.compat.v1 as tf
+import numpy as np
 
 from . import configs
 from . import helpers
 from . import model
 
 
+# Show custom tf.logging calls.
+tf.logging.set_verbosity(tf.logging.INFO)
+
+
 def eval_trained_model(config_name,
                        ckpt_dir,
                        out_dir,
+                       images_glob,
                        tfds_arguments: helpers.TFDSArguments,
                        max_images=None):
   """Evaluate a trained model."""
   config = configs.get_config(config_name)
   hific = model.HiFiC(config, helpers.ModelMode.EVALUATION)
 
-  # Automatically uses the validation split.
+  # Note: Automatically uses the validation split for TFDS.
   dataset = hific.build_input(
-      batch_size=1, crop_size=None, tfds_arguments=tfds_arguments)
+    batch_size=1, crop_size=None,
+    images_glob=images_glob, tfds_arguments=tfds_arguments)
   iterator = tf.data.make_one_shot_iterator(dataset)
   get_next_image = iterator.get_next()
 
-  output_image, bpp = hific.build_model(**get_next_image)
+  output_image, bpp, bitstr = hific.build_model(**get_next_image)
+  latent_bitstr, hyper_latent_bitstr = bitstr
+
   input_image = get_next_image['input_image']
 
   input_image = tf.cast(tf.round(input_image[0, ...]), tf.uint8)
@@ -53,14 +65,50 @@ def eval_trained_model(config_name,
 
   os.makedirs(out_dir, exist_ok=True)
 
+  accumulated_metrics = collections.defaultdict(list)
+
   with tf.Session() as sess:
     hific.restore_trained_model(sess, ckpt_dir)
+
+    temp = set(tf.all_variables())
+
+    aux_optimizer = tf.train.AdamOptimizer(learning_rate=1e-3)
+    aux_loss = hific._entropy_model._side_entropy_model.losses[0]
+    aux_step = aux_optimizer.minimize(aux_loss)
+
+    # I honestly don't know how else to initialize ADAM in TensorFlow.
+    sess.run(tf.initialize_variables(set(tf.all_variables()) - temp))
+
+
+    for i in range(5000):
+      _, l = sess.run([aux_step, aux_loss])
+      if i % 10 == 0:
+        print(f'\r{l}', end=' ', flush=True)
+
     for i in itertools.count(0):
       if max_images and i == max_images:
         break
       try:
-        inp_np, otp_np, bpp_np = sess.run([input_image, output_image, bpp])
-        print(f'Image {i}: {bpp_np:.3} bpp, saving in {out_dir}...')
+        inp_np, otp_np, bpp_np, latent_bitstr_np, hyper_latent_bitstr_np = \
+          sess.run([input_image, output_image, bpp,
+                    latent_bitstr, hyper_latent_bitstr])
+
+        h, w, c = inp_np.shape
+        assert c == 3
+
+        metrics = get_metrics(inp_np, otp_np)
+        metrics['bpp'] = bpp_np
+        metrics['bpp_real'] = get_real_bpp(
+          latent_bitstr, hyper_latent_bitstr,
+          latent_bitstr_np, hyper_latent_bitstr_np,
+          num_pixels=h * w)
+        print(f'Image {i}: {metrics}, saving in {out_dir}...')
+
+        # Update accumulated
+        for metric, value in metrics.items():
+          accumulated_metrics[metric].append(value)
+
+        # Save images
         Image.fromarray(inp_np).save(
             os.path.join(out_dir, f'img_{i:010d}inp.png'))
         Image.fromarray(otp_np).save(
@@ -68,7 +116,33 @@ def eval_trained_model(config_name,
       except tf.errors.OutOfRangeError:
         print('No more inputs')
         break
+  print('\n'.join(f'{metric}: {np.mean(values)}'
+                  for metric, values in accumulated_metrics.items()))
   print('Done!')
+
+
+def get_real_bpp(
+        latent_bitstr, hyper_latent_bitstr,
+        latent_bitstr_np, hyper_latent_bitstr_np,
+        num_pixels):
+  tensors = [latent_bitstr]
+  arrays = [latent_bitstr_np]
+
+  packed = tfc.PackedTensors()
+  packed.pack(tensors, arrays)
+
+  print(len(latent_bitstr_np[0]))
+  print(len(hyper_latent_bitstr_np[0]))
+  print(len(packed.string))
+
+  return len(packed.string) * 8 / num_pixels
+
+
+def get_metrics(inp, otp):
+  # For now only PSNR
+  mse = np.mean(np.square(inp.astype(np.float32) - otp.astype(np.float32)))
+  psnr = 20. * np.log10(255.) - 10. * np.log10(mse)
+  return {'psnr': psnr}
 
 
 def parse_args(argv):
@@ -83,6 +157,8 @@ def parse_args(argv):
                             'trained model are.'))
   parser.add_argument('--out_dir', required=True, help='Where to save outputs.')
 
+  parser.add_argument('--images_glob', help='If given, use TODO')
+
   helpers.add_tfds_arguments(parser)
 
   args = parser.parse_args(argv[1:])
@@ -91,6 +167,7 @@ def parse_args(argv):
 
 def main(args):
   eval_trained_model(args.config, args.ckpt_dir, args.out_dir,
+                     args.images_glob,
                      helpers.parse_tfds_arguments(args))
 
 
