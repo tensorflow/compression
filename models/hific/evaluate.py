@@ -21,7 +21,6 @@ import argparse
 import collections
 import itertools
 import os
-import io
 import sys
 from PIL import Image
 
@@ -55,8 +54,7 @@ def eval_trained_model(config_name,
   iterator = tf.data.make_one_shot_iterator(dataset)
   get_next_image = iterator.get_next()
 
-  output_image, bpp, bitstr = hific.build_model(**get_next_image)
-  latent_bitstr, hyper_latent_bitstr = bitstr
+  output_image, qbpp, bitstring = hific.build_model(**get_next_image)
 
   input_image = get_next_image['input_image']
 
@@ -69,80 +67,58 @@ def eval_trained_model(config_name,
 
   with tf.Session() as sess:
     hific.restore_trained_model(sess, ckpt_dir)
-
-    temp = set(tf.all_variables())
-
-    aux_optimizer = tf.train.AdamOptimizer(learning_rate=1e-3)
-    aux_loss = hific._entropy_model._side_entropy_model.losses[0]
-    aux_step = aux_optimizer.minimize(aux_loss)
-
-    # I honestly don't know how else to initialize ADAM in TensorFlow.
-    sess.run(tf.initialize_variables(set(tf.all_variables()) - temp))
-
-
-    for i in range(5000):
-      _, l = sess.run([aux_step, aux_loss])
-      if i % 10 == 0:
-        print(f'\r{l}', end=' ', flush=True)
+    hific.prepare_for_arithmetic_coding(sess)
 
     for i in itertools.count(0):
       if max_images and i == max_images:
         break
       try:
-        inp_np, otp_np, bpp_np, latent_bitstr_np, hyper_latent_bitstr_np = \
-          sess.run([input_image, output_image, bpp,
-                    latent_bitstr, hyper_latent_bitstr])
+        inp_np, otp_np, qbpp_np, bitstring_np = \
+          sess.run([input_image, output_image, qbpp, bitstring])
 
         h, w, c = inp_np.shape
         assert c == 3
+        real_bpp = get_real_bpp(bitstring, bitstring_np, num_pixels=h * w)
 
-        metrics = get_metrics(inp_np, otp_np)
-        metrics['bpp'] = bpp_np
-        metrics['bpp_real'] = get_real_bpp(
-          latent_bitstr, hyper_latent_bitstr,
-          latent_bitstr_np, hyper_latent_bitstr_np,
-          num_pixels=h * w)
-        print(f'Image {i}: {metrics}, saving in {out_dir}...')
+        metrics = {
+          'psnr': get_psnr(inp_np, otp_np),
+          'bpp_theory': qbpp_np,
+          'bpp_real': real_bpp}
 
-        # Update accumulated
+        metrics_str = ' / '.join(f'{metric}: {value:.5f}'
+                                 for metric, value in metrics.items())
+        print(f'Image {i: 4d}: {metrics_str}, saving in {out_dir}...')
+
         for metric, value in metrics.items():
           accumulated_metrics[metric].append(value)
 
-        # Save images
+        # Save images.
         Image.fromarray(inp_np).save(
             os.path.join(out_dir, f'img_{i:010d}inp.png'))
         Image.fromarray(otp_np).save(
-            os.path.join(out_dir, f'img_{i:010d}otp_{bpp_np:.3f}.png'))
+            os.path.join(out_dir, f'img_{i:010d}otp_{real_bpp:.3f}.png'))
+
       except tf.errors.OutOfRangeError:
-        print('No more inputs')
+        print('No more inputs.')
         break
+
   print('\n'.join(f'{metric}: {np.mean(values)}'
                   for metric, values in accumulated_metrics.items()))
   print('Done!')
 
 
-def get_real_bpp(
-        latent_bitstr, hyper_latent_bitstr,
-        latent_bitstr_np, hyper_latent_bitstr_np,
-        num_pixels):
-  tensors = [latent_bitstr]
-  arrays = [latent_bitstr_np]
-
+def get_real_bpp(bitstring, bitstring_np, num_pixels):
+  """Calculate bitrate we obtain with arithmetic coding."""
+  # TODO(mentzer): Add `compress` and `decompress` methods.
   packed = tfc.PackedTensors()
-  packed.pack(tensors, arrays)
-
-  print(len(latent_bitstr_np[0]))
-  print(len(hyper_latent_bitstr_np[0]))
-  print(len(packed.string))
-
+  packed.pack(tensors=bitstring, arrays=bitstring_np)
   return len(packed.string) * 8 / num_pixels
 
 
-def get_metrics(inp, otp):
-  # For now only PSNR
+def get_psnr(inp, otp):
   mse = np.mean(np.square(inp.astype(np.float32) - otp.astype(np.float32)))
   psnr = 20. * np.log10(255.) - 10. * np.log10(mse)
-  return {'psnr': psnr}
+  return psnr
 
 
 def parse_args(argv):

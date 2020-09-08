@@ -453,6 +453,11 @@ class HiFiC(object):
     if self.training:
       self._train_op = train_op
 
+  def prepare_for_arithmetic_coding(self, sess):
+    """Run's the update op of the EntropyBottleneck."""
+    update_op = self._entropy_model.updates[0]
+    sess.run(update_op)
+
   def restore_trained_model(self, sess, ckpt_dir):
     """Restore a trained model for evaluation."""
     saver = tf.train.Saver()
@@ -522,7 +527,7 @@ class HiFiC(object):
     decoder_in = info.decoded
     total_nbpp = info.total_nbpp
     total_qbpp = info.total_qbpp
-    bitstrings = (info.bitstring, info.side_bitstring)
+    bitstream_tensors = info.bitstream_tensors
 
     reconstruction, reconstruction_scaled = \
         self._compute_reconstruction(
@@ -539,7 +544,7 @@ class HiFiC(object):
     nodes = Nodes(input_image, input_image_scaled,
                   reconstruction, reconstruction_scaled,
                   latent_quantized=decoder_in)
-    return nodes, BppPair(total_nbpp, total_qbpp), bitstrings
+    return nodes, BppPair(total_nbpp, total_qbpp), bitstream_tensors
 
   def _get_encoder_out(self,
                        input_image_scaled,

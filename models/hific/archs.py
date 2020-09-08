@@ -62,7 +62,7 @@ HyperInfo = collections.namedtuple(
     "HyperInfo",
     "decoded latent_shape hyper_latent_shape "
     "nbpp side_nbpp total_nbpp qbpp side_qbpp total_qbpp "
-    "bitstring side_bitstring",
+    "bitstream_tensors",
 )
 
 
@@ -480,6 +480,14 @@ class Hyperprior(tf.keras.layers.Layer):
     self._side_entropy_model = FactorizedPriorLayer()
 
   @property
+  def losses(self):
+    return self._side_entropy_model.losses
+
+  @property
+  def updates(self):
+    return self._side_entropy_model.updates
+
+  @property
   def transform_layers(self):
     return [self._analysis, self._synthesis_scale, self._synthesis_mean]
 
@@ -547,8 +555,10 @@ class Hyperprior(tf.keras.layers.Layer):
         qbpp=entropy_info.qbpp,
         side_qbpp=side_info.total_qbpp,
         total_qbpp=entropy_info.qbpp + side_info.total_qbpp,
-        bitstring=compressed,
-        side_bitstring=side_info.bitstring)
+        # We put everything that's needed for real arithmetic coding into
+        # the bistream_tensors tuple.
+        bitstream_tensors=(compressed, side_info.bitstring,
+                           image_shape, latent_shape, side_info.latent_shape))
 
     tf.summary.scalar("bpp/total/noisy", info.total_nbpp)
     tf.summary.scalar("bpp/total/quantized", info.total_qbpp)
