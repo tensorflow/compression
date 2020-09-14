@@ -103,17 +103,17 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
   @property
   def cdf(self):
     self._check_compression()
-    return self._cdf.value()
+    return tf.identity(self._cdf)
 
   @property
   def cdf_offset(self):
     self._check_compression()
-    return self._cdf_offset.value()
+    return tf.identity(self._cdf_offset)
 
   @property
   def cdf_length(self):
     self._check_compression()
-    return self._cdf_length.value()
+    return tf.identity(self._cdf_length)
 
   @property
   def dtype(self):
