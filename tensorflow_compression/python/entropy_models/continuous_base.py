@@ -39,7 +39,7 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
   @abc.abstractmethod
   def __init__(self, prior, coding_rank, compression=False,
                likelihood_bound=1e-9, tail_mass=2**-8,
-               range_coder_precision=12):
+               range_coder_precision=12, no_variables=False):
     """Initializer.
 
     Arguments:
@@ -60,6 +60,8 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
       tail_mass: Float. Approximate probability mass which is range encoded with
         less precision, by using a Golomb-like code.
       range_coder_precision: Integer. Precision passed to the range coding op.
+      no_variables: Boolean. If True, creates range coding tables as `Tensor`s
+        rather than `Variable`s.
 
     Raises:
       RuntimeError: when attempting to instantiate an entropy model with
@@ -77,6 +79,7 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
       self._likelihood_bound = float(likelihood_bound)
       self._tail_mass = float(tail_mass)
       self._range_coder_precision = int(range_coder_precision)
+      self._no_variables = bool(no_variables)
       if self.compression:
         self._build_tables(prior)
 
@@ -103,17 +106,17 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
   @property
   def cdf(self):
     self._check_compression()
-    return tf.identity(self._cdf)
+    return tf.convert_to_tensor(self._cdf)
 
   @property
   def cdf_offset(self):
     self._check_compression()
-    return tf.identity(self._cdf_offset)
+    return tf.convert_to_tensor(self._cdf_offset)
 
   @property
   def cdf_length(self):
     self._check_compression()
-    return tf.identity(self._cdf_length)
+    return tf.convert_to_tensor(self._cdf_length)
 
   @property
   def dtype(self):
@@ -154,6 +157,11 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
   def range_coder_precision(self):
     """Precision passed to range coding op."""
     return self._range_coder_precision
+
+  @property
+  def no_variables(self):
+    """Whether range coding tables are created as `Tensor`s or `Variable`s."""
+    return self._no_variables
 
   @tf.custom_gradient
   def _quantize_no_offset(self, inputs):
@@ -247,11 +255,16 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
       cdf = tf.map_fn(
           loop_body, (pmf, pmf_length), dtype=tf.int32, name="pmf_to_cdf")
 
-    self._cdf = tf.Variable(cdf, trainable=False, name="cdf")
-    self._cdf_offset = tf.Variable(
-        cdf_offset, trainable=False, name="cdf_offset")
-    self._cdf_length = tf.Variable(
-        cdf_length, trainable=False, name="cdf_length")
+    if self.no_variables:
+      self._cdf = cdf
+      self._cdf_offset = cdf_offset
+      self._cdf_length = cdf_length
+    else:
+      self._cdf = tf.Variable(cdf, trainable=False, name="cdf")
+      self._cdf_offset = tf.Variable(
+          cdf_offset, trainable=False, name="cdf_offset")
+      self._cdf_length = tf.Variable(
+          cdf_length, trainable=False, name="cdf_length")
 
   @abc.abstractmethod
   def get_config(self):
@@ -264,10 +277,10 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
       NotImplementedError: on attempting to call this method on an entropy model
         with `compression=False`.
     """
-    if not self.compression:
+    if self.no_variables or not self.compression:
       raise NotImplementedError(
-          "Serializing entropy models with `compression=False` is currently "
-          "not supported.")
+          "Serializing entropy models with `compression=False` or "
+          "`no_variables=True` is currently not supported.")
     return dict(
         dtype=self._dtype.name,
         prior_shape=self._prior_shape,
@@ -304,6 +317,7 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
       self._likelihood_bound = float(config["likelihood_bound"])
       self._tail_mass = float(config["tail_mass"])
       self._range_coder_precision = int(config["range_coder_precision"])
+      self._no_variables = False
 
       prior_size = functools.reduce(lambda x, y: x * y, self.prior_shape, 1)
       cdf_width = int(config["cdf_width"])

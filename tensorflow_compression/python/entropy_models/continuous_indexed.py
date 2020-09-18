@@ -129,7 +129,7 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
   def __init__(self, prior_fn, index_ranges, parameter_fns, coding_rank,
                compression=False, channel_axis=-1, dtype=tf.float32,
                likelihood_bound=1e-9, tail_mass=2**-8,
-               range_coder_precision=12):
+               range_coder_precision=12, no_variables=False):
     """Initializer.
 
     Arguments:
@@ -170,6 +170,8 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       tail_mass: Float. Approximate probability mass which is range encoded with
         less precision, by using a Golomb-like code.
       range_coder_precision: Integer. Precision passed to the range coding op.
+      no_variables: Boolean. If True, creates range coding tables as `Tensor`s
+        rather than `Variable`s.
 
     Raises:
       RuntimeError: when attempting to instantiate an entropy model with
@@ -204,9 +206,14 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     prior = self.prior_fn(**parameters)  # pylint:disable=not-callable
 
     super().__init__(
-        prior, coding_rank, compression=compression,
-        likelihood_bound=likelihood_bound, tail_mass=tail_mass,
-        range_coder_precision=range_coder_precision)
+        prior=prior,
+        coding_rank=coding_rank,
+        compression=compression,
+        likelihood_bound=likelihood_bound,
+        tail_mass=tail_mass,
+        range_coder_precision=range_coder_precision,
+        no_variables=no_variables,
+    )
 
   @property
   def index_ranges(self):
@@ -433,7 +440,7 @@ class LocationScaleIndexedEntropyModel(ContinuousIndexedEntropyModel):
 
   def __init__(self, prior_fn, num_scales, scale_fn, coding_rank,
                compression=False, dtype=tf.float32, likelihood_bound=1e-9,
-               tail_mass=2**-8, range_coder_precision=12):
+               tail_mass=2**-8, range_coder_precision=12, no_variables=False):
     """Initializer.
 
     Arguments:
@@ -464,6 +471,8 @@ class LocationScaleIndexedEntropyModel(ContinuousIndexedEntropyModel):
       tail_mass: Float. Approximate probability mass which is range encoded with
         less precision, by using a Golomb-like code.
       range_coder_precision: Integer. Precision passed to the range coding op.
+      no_variables: Boolean. If True, creates range coding tables as `Tensor`s
+        rather than `Variable`s.
     """
     num_scales = int(num_scales)
     super().__init__(
@@ -479,6 +488,7 @@ class LocationScaleIndexedEntropyModel(ContinuousIndexedEntropyModel):
         likelihood_bound=likelihood_bound,
         tail_mass=tail_mass,
         range_coder_precision=range_coder_precision,
+        no_variables=no_variables,
     )
 
   @tf.Module.with_name_scope

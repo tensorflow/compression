@@ -75,7 +75,7 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
 
   def __init__(self, prior, coding_rank, compression=False,
                likelihood_bound=1e-9, tail_mass=2**-8,
-               range_coder_precision=12):
+               range_coder_precision=12, no_variables=False):
     """Initializer.
 
     Arguments:
@@ -98,6 +98,8 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       tail_mass: Float. Approximate probability mass which is range encoded with
         less precision, by using a Golomb-like code.
       range_coder_precision: Integer. Precision passed to the range coding op.
+      no_variables: Boolean. If True, creates range coding tables as `Tensor`s
+        rather than `Variable`s.
 
     Raises:
       RuntimeError: when attempting to instantiate an entropy model with
@@ -107,26 +109,37 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       raise ValueError(
           "`coding_rank` can't be smaller than batch rank of prior.")
     super().__init__(
-        prior, coding_rank, compression=compression,
-        likelihood_bound=likelihood_bound, tail_mass=tail_mass,
-        range_coder_precision=range_coder_precision)
+        prior=prior,
+        coding_rank=coding_rank,
+        compression=compression,
+        likelihood_bound=likelihood_bound,
+        tail_mass=tail_mass,
+        range_coder_precision=range_coder_precision,
+        no_variables=no_variables,
+    )
 
     quantization_offset = helpers.quantization_offset(prior)
-    if self.compression:
-      # Optimization: if the quantization offset is zero, we don't need to
-      # subtract/add it when quantizing, and we don't need to serialize its
-      # value. Note that this code will only work in eager mode.
-      # TODO(jonycgn): Reconsider if this optimization is worth keeping once
-      # the implementation is stable.
-      if tf.executing_eagerly() and tf.reduce_all(
-          tf.equal(quantization_offset, 0.)):
-        quantization_offset = None
-      else:
-        quantization_offset = tf.broadcast_to(
-            quantization_offset, self.prior_shape_tensor)
+    # Optimization: if the quantization offset is zero, we don't need to
+    # subtract/add it when quantizing, and we don't need to serialize its value.
+    # Note that this code will only work in eager mode.
+    # TODO(jonycgn): Reconsider if this optimization is worth keeping once the
+    # implementation is stable.
+    if tf.executing_eagerly() and tf.reduce_all(
+        tf.equal(quantization_offset, 0.)):
+      quantization_offset = None
+    else:
+      quantization_offset = tf.broadcast_to(
+          quantization_offset, self.prior_shape_tensor)
+      if self.compression and not self.no_variables:
         quantization_offset = tf.Variable(
             quantization_offset, trainable=False, name="quantization_offset")
     self._quantization_offset = quantization_offset
+
+  @property
+  def quantization_offset(self):
+    if self._quantization_offset is None:
+      return None
+    return tf.convert_to_tensor(self._quantization_offset)
 
   def _compute_indexes(self, broadcast_shape):
     # TODO(jonycgn, ssjhv): Investigate broadcasting in range coding op.
@@ -187,7 +200,7 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     Returns:
       A `tf.Tensor` containing the quantized values.
     """
-    return self._quantize(bottleneck, self._quantization_offset)
+    return self._quantize(bottleneck, self.quantization_offset)
 
   @tf.Module.with_name_scope
   def compress(self, bottleneck):
@@ -220,8 +233,8 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         :self.coding_rank - len(self.prior_shape)]
 
     indexes = self._compute_indexes(broadcast_shape)
-    if self._quantization_offset is not None:
-      bottleneck -= self._quantization_offset
+    if self.quantization_offset is not None:
+      bottleneck -= self.quantization_offset
     symbols = tf.cast(tf.round(bottleneck), tf.int32)
     symbols = tf.reshape(symbols, tf.concat([[-1], coding_shape], 0))
 
@@ -287,8 +300,8 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
 
     symbols = tf.reshape(symbols, symbols_shape)
     outputs = tf.cast(symbols, self.dtype)
-    if self._quantization_offset is not None:
-      outputs += self._quantization_offset
+    if self.quantization_offset is not None:
+      outputs += self.quantization_offset
     return outputs
 
   def get_config(self):
