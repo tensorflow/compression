@@ -297,9 +297,9 @@ class HiFiC(object):
 
     with tf.name_scope("tfds"):
       if images_glob:
-        tf.logging.info(f'Using images_glob={images_glob}')
-        filenames = tf.data.Dataset.from_tensor_slices(
-          sorted(glob.glob(images_glob)))
+        images = sorted(glob.glob(images_glob))
+        tf.logging.info(f'Using images_glob={images_glob} ({len(images)} images)')
+        filenames = tf.data.Dataset.from_tensor_slices(images)
         dataset = filenames.map(lambda x: tf.image.decode_png(tf.read_file(x)))
       else:
         tf.logging.info(f'Using TFDS={tfds_arguments}')
@@ -368,7 +368,7 @@ class HiFiC(object):
         See build_input.
 
     Returns:
-      output_image and bpp if self.evaluation else None.
+      output_image and bitstrings if self.evaluation else None.
     """
     if input_images_d_steps is None:
       input_images_d_steps = []
@@ -402,7 +402,7 @@ class HiFiC(object):
     if self.evaluation:
       tf.logging.info("Evaluation mode: build_model done.")
       reconstruction = tf.clip_by_value(nodes_gen.reconstruction, 0, 255.)
-      return reconstruction, bpp_pair.total_qbpp, bitstrings
+      return reconstruction, bitstrings
 
     nodes_disc = []  # list of Nodes, one for every sub-batch of disc
     for i, sub_batch in enumerate(input_images_d_steps):

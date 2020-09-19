@@ -21,6 +21,7 @@ import argparse
 import collections
 import itertools
 import os
+import glob
 import sys
 from PIL import Image
 
@@ -51,12 +52,11 @@ def eval_trained_model(config_name,
   dataset = hific.build_input(
     batch_size=1, crop_size=None,
     images_glob=images_glob, tfds_arguments=tfds_arguments)
+  image_names = get_image_names(images_glob)
   iterator = tf.data.make_one_shot_iterator(dataset)
   get_next_image = iterator.get_next()
-
-  output_image, qbpp, bitstring = hific.build_model(**get_next_image)
-
   input_image = get_next_image['input_image']
+  output_image, bitstring = hific.build_model(**get_next_image)
 
   input_image = tf.cast(tf.round(input_image[0, ...]), tf.uint8)
   output_image = tf.cast(tf.round(output_image[0, ...]), tf.uint8)
@@ -73,17 +73,15 @@ def eval_trained_model(config_name,
       if max_images and i == max_images:
         break
       try:
-        inp_np, otp_np, qbpp_np, bitstring_np = \
-          sess.run([input_image, output_image, qbpp, bitstring])
+        inp_np, otp_np, bitstring_np = \
+          sess.run([input_image, output_image, bitstring])
 
         h, w, c = inp_np.shape
         assert c == 3
-        real_bpp = get_real_bpp(bitstring, bitstring_np, num_pixels=h * w)
+        bpp = get_arithmetic_coding_bpp(bitstring, bitstring_np, num_pixels=h * w)
 
-        metrics = {
-          'psnr': get_psnr(inp_np, otp_np),
-          'bpp_theory': qbpp_np,
-          'bpp_real': real_bpp}
+        metrics = {'psnr': get_psnr(inp_np, otp_np),
+                   'bpp_real': bpp}
 
         metrics_str = ' / '.join(f'{metric}: {value:.5f}'
                                  for metric, value in metrics.items())
@@ -93,10 +91,11 @@ def eval_trained_model(config_name,
           accumulated_metrics[metric].append(value)
 
         # Save images.
+        name = image_names.get(i, f'img_{i:010d}')
         Image.fromarray(inp_np).save(
-            os.path.join(out_dir, f'img_{i:010d}inp.png'))
+            os.path.join(out_dir, f'{name}_inp.png'))
         Image.fromarray(otp_np).save(
-            os.path.join(out_dir, f'img_{i:010d}otp_{real_bpp:.3f}.png'))
+            os.path.join(out_dir, f'{name}_otp_{bpp:.3f}.png'))
 
       except tf.errors.OutOfRangeError:
         print('No more inputs.')
@@ -107,7 +106,7 @@ def eval_trained_model(config_name,
   print('Done!')
 
 
-def get_real_bpp(bitstring, bitstring_np, num_pixels):
+def get_arithmetic_coding_bpp(bitstring, bitstring_np, num_pixels):
   """Calculate bitrate we obtain with arithmetic coding."""
   # TODO(mentzer): Add `compress` and `decompress` methods.
   packed = tfc.PackedTensors()
@@ -119,6 +118,13 @@ def get_psnr(inp, otp):
   mse = np.mean(np.square(inp.astype(np.float32) - otp.astype(np.float32)))
   psnr = 20. * np.log10(255.) - 10. * np.log10(mse)
   return psnr
+
+
+def get_image_names(images_glob):
+  if not images_glob:
+    return {}
+  return {i: os.path.splitext(os.path.basename(p))[0]
+          for i, p in enumerate(sorted(glob.glob(images_glob)))}
 
 
 def parse_args(argv):
