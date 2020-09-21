@@ -77,6 +77,10 @@ class HelpersTest(tf.test.TestCase):
     self.assertAllGreater(
         helpers.upper_tail(dist, 2**-8) - helpers.lower_tail(dist, 2**-8), 0)
 
+  def test_noisy_deep_factorized_tails_are_in_order(self):
+    dist = deep_factorized.NoisyDeepFactorized(batch_shape=[10])
+    self.assertAllGreater(
+        helpers.upper_tail(dist, 2**-8) - helpers.lower_tail(dist, 2**-8), 0)
 
 if __name__ == "__main__":
   tf.test.main()

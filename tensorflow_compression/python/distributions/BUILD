@@ -19,10 +19,7 @@ py_library(
     name = "deep_factorized",
     srcs = ["deep_factorized.py"],
     srcs_version = "PY3",
-    deps = [
-        ":helpers",
-        "//tensorflow_compression/python/ops:math_ops",
-    ],
+    deps = [":uniform_noise"],
 )
 
 py_test(

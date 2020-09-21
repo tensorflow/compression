@@ -17,11 +17,31 @@
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_compression.python.distributions import helpers
-from tensorflow_compression.python.ops import math_ops
+from tensorflow_compression.python.distributions import uniform_noise
 
 
-__all__ = ["DeepFactorized"]
+__all__ = ["DeepFactorized", "NoisyDeepFactorized"]
+
+
+def log_expm1(x):
+  """Computes log(exp(x)-1) stably.
+
+  For large values of x, exp(x) will return Inf whereas log(exp(x)-1) ~= x.
+  Here we use this approximation for x>15, such that the output is non-Inf for
+  all positive values x.
+
+  Args:
+   x: A tensor.
+
+  Returns:
+    log(exp(x)-1)
+
+  """
+  # If x<15.0, we can compute it directly. For larger values,
+  # we have log(exp(x)-1) ~= log(exp(x)) = x.
+  cond = (x < 15.0)
+  x_small = tf.minimum(x, 15.0)
+  return tf.where(cond, tf.math.log(tf.math.expm1(x_small)), x)
 
 
 class DeepFactorized(tfp.distributions.Distribution):
@@ -34,7 +54,7 @@ class DeepFactorized(tfp.distributions.Distribution):
   > J. Ballé, D. Minnen, S. Singh, S. J. Hwang, N. Johnston<br />
   > https://openreview.net/forum?id=rkcQFMZRb
 
-  This implementation already includes convolution with a unit-width uniform
+  but *without* convolution with a unit-width uniform
   density, as described in appendix 6.2 of the same paper. Please cite the paper
   if you use this code for scientific work.
 
@@ -43,7 +63,8 @@ class DeepFactorized(tfp.distributions.Distribution):
   trainable distribution parameters.
   """
 
-  def __init__(self, batch_shape=(), num_filters=(3, 3), init_scale=10,
+  def __init__(self,
+               batch_shape=(), num_filters=(3, 3), init_scale=10,
                allow_nan_stats=False, dtype=tf.float32, name="DeepFactorized"):
     """Initializer.
 
@@ -98,22 +119,31 @@ class DeepFactorized(tfp.distributions.Distribution):
     self._factors = []
 
     for i in range(len(self.num_filters) + 1):
-      init = tf.math.log(tf.math.expm1(1 / scale / filters[i + 1]))
-      init = tf.cast(init, dtype=self.dtype)
-      init = tf.broadcast_to(init, (channels, filters[i + 1], filters[i]))
-      matrix = tf.Variable(init, name="matrix_{}".format(i))
+
+      def matrix_initializer(i=i):
+        init = log_expm1(1 / scale / filters[i + 1])
+        init = tf.cast(init, dtype=self.dtype)
+        init = tf.broadcast_to(init, (channels, filters[i + 1], filters[i]))
+        return init
+
+      matrix = tf.Variable(matrix_initializer, name="matrix_{}".format(i))
       self._matrices.append(matrix)
 
-      bias = tf.Variable(
-          tf.random.uniform(
-              (channels, filters[i + 1], 1), -.5, .5, dtype=self.dtype),
-          name="bias_{}".format(i))
+      def bias_initializer(i=i):
+        return tf.random.uniform((channels, filters[i + 1], 1),
+                                 -.5,
+                                 .5,
+                                 dtype=self.dtype)
+
+      bias = tf.Variable(bias_initializer, name="bias_{}".format(i))
       self._biases.append(bias)
 
       if i < len(self.num_filters):
-        factor = tf.Variable(
-            tf.zeros((channels, filters[i + 1], 1), dtype=self.dtype),
-            name="factor_{}".format(i))
+
+        def factor_initializer(i=i):
+          return tf.zeros((channels, filters[i + 1], 1), dtype=self.dtype)
+
+        factor = tf.Variable(factor_initializer, name="factor_{}".format(i))
         self._factors.append(factor)
 
   def _batch_shape_tensor(self):
@@ -132,13 +162,20 @@ class DeepFactorized(tfp.distributions.Distribution):
     """Evaluate logits of the cumulative densities.
 
     Arguments:
-      inputs: The values at which to evaluate the cumulative densities, expected
-        to be a `tf.Tensor` of shape `(channels, 1, batch)`.
+      inputs: The values at which to evaluate the cumulative densities.
 
     Returns:
       A `tf.Tensor` of the same shape as `inputs`, containing the logits of the
       cumulative densities evaluated at the given inputs.
     """
+    # Convert to (channels, 1, batch) format by collapsing dimensions and then
+    # commuting channels to front.
+    inputs = tf.broadcast_to(
+        inputs,
+        tf.broadcast_dynamic_shape(tf.shape(inputs), self.batch_shape_tensor()))
+    shape = tf.shape(inputs)
+    inputs = tf.reshape(inputs, (-1, 1, self.batch_shape.num_elements()))
+    inputs = tf.transpose(inputs, (2, 1, 0))
     logits = inputs
     for i in range(len(self.num_filters) + 1):
       matrix = tf.nn.softplus(self._matrices[i])
@@ -147,48 +184,53 @@ class DeepFactorized(tfp.distributions.Distribution):
       if i < len(self.num_filters):
         factor = tf.math.tanh(self._factors[i])
         logits += factor * tf.math.tanh(logits)
-    return logits
-
-  def _prob(self, y):
-    """Called by the base class to compute likelihoods."""
-    # Convert to (channels, 1, batch) format by collapsing dimensions and then
-    # commuting channels to front.
-    y = tf.broadcast_to(
-        y, tf.broadcast_dynamic_shape(tf.shape(y), self.batch_shape_tensor()))
-    shape = tf.shape(y)
-    y = tf.reshape(y, (-1, 1, self.batch_shape.num_elements()))
-    y = tf.transpose(y, (2, 1, 0))
-
-    # Evaluate densities.
-    # We can use the special rule below to only compute differences in the left
-    # tail of the sigmoid. This increases numerical stability: sigmoid(x) is 1
-    # for large x, 0 for small x. Subtracting two numbers close to 0 can be done
-    # with much higher precision than subtracting two numbers close to 1.
-    lower = self._logits_cumulative(y - .5)
-    upper = self._logits_cumulative(y + .5)
-    # Flip signs if we can move more towards the left tail of the sigmoid.
-    sign = tf.stop_gradient(-tf.math.sign(lower + upper))
-    p = abs(tf.sigmoid(sign * upper) - tf.sigmoid(sign * lower))
-    p = math_ops.lower_bound(p, 0.)
 
     # Convert back to (broadcasted) input tensor shape.
-    p = tf.transpose(p, (2, 1, 0))
-    p = tf.reshape(p, shape)
-    return p
+    logits = tf.transpose(logits, (2, 1, 0))
+    logits = tf.reshape(logits, shape)
+    return logits
+
+  def _log_cdf(self, inputs):
+    logits = self._logits_cumulative(inputs)
+    return tf.math.log_sigmoid(logits)
+
+  def _log_survival_function(self, inputs):
+    logits = self._logits_cumulative(inputs)
+    # 1-sigmoid(x) = sigmoid(-x)
+    return tf.math.log_sigmoid(-logits)
+
+  def _cdf(self, inputs):
+    logits = self._logits_cumulative(inputs)
+    return tf.math.sigmoid(logits)
+
+  def _prob(self, inputs):
+    with tf.GradientTape() as tape:
+      tape.watch(inputs)
+      cdf = self._cdf(inputs)
+    prob = tape.gradient(cdf, inputs)
+    return prob
+
+  def _log_prob(self, inputs):
+    # let x=inputs and s(x)=sigmoid(x).
+    with tf.GradientTape() as tape:
+      tape.watch(inputs)
+      logits = self._logits_cumulative(inputs)
+    # We have F(x) = s(logits(x))
+    # so p(x) = F'(x)
+    #         = s'(logits(x)) * logits'(x)
+    #         = s(logits(x))*s(-logits(x)) * logits'(x)
+    # so log p(x) = log(s(logits(x)) + log(s(-logits(x)) + log(logits'(x))
+    log_s_logits = tf.math.log_sigmoid(logits)
+    log_s_neg_logits = tf.math.log_sigmoid(-logits)
+    dlogits = tape.gradient(logits, inputs)
+    return log_s_logits + log_s_neg_logits + tf.math.log(dlogits)
 
   def _quantization_offset(self):
     return tf.constant(0, dtype=self.dtype)
 
-  def _lower_tail(self, tail_mass):
-    tail = helpers.estimate_tails(
-        self._logits_cumulative, -tf.math.log(2 / tail_mass - 1),
-        tf.constant([self.batch_shape.num_elements(), 1, 1], tf.int32),
-        self.dtype)
-    return tf.reshape(tail, self.batch_shape_tensor())
 
-  def _upper_tail(self, tail_mass):
-    tail = helpers.estimate_tails(
-        self._logits_cumulative, tf.math.log(2 / tail_mass - 1),
-        tf.constant([self.batch_shape.num_elements(), 1, 1], tf.int32),
-        self.dtype)
-    return tf.reshape(tail, self.batch_shape_tensor())
+class NoisyDeepFactorized(uniform_noise.UniformNoiseAdapter):
+  """DeepFactorized that is convolved with uniform noise."""
+
+  def __init__(self, name="NoisyDeepFactorized", **kwargs):
+    super().__init__(DeepFactorized(**kwargs), name=name)
