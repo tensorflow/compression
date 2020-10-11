@@ -87,7 +87,7 @@ class Encoder(tf.keras.Sequential):
     model = [
         tf.keras.layers.Conv2D(
             filters=num_filters_base, kernel_size=7, padding="same"),
-        LayerNorm(),
+        ChannelNorm(),
         tf.keras.layers.ReLU()
     ]
 
@@ -96,7 +96,7 @@ class Encoder(tf.keras.Sequential):
           tf.keras.layers.Conv2D(
               filters=num_filters_base * 2 ** (i + 1),
               kernel_size=3, padding="same", strides=2),
-          LayerNorm(),
+          ChannelNorm(),
           tf.keras.layers.ReLU()])
 
     model.append(
@@ -128,11 +128,11 @@ class Decoder(tf.keras.layers.Layer):
       num_filters_base: base number of filters.
       num_residual_blocks: number of residual blocks.
     """
-    head = [LayerNorm(),
+    head = [ChannelNorm(),
             tf.keras.layers.Conv2D(
                 filters=num_filters_base * (2 ** num_up),
                 kernel_size=3, padding="same"),
-            LayerNorm()]
+            ChannelNorm()]
 
     residual_blocks = []
     for block_idx in range(num_residual_blocks):
@@ -152,7 +152,7 @@ class Decoder(tf.keras.layers.Layer):
               filters=filters,
               kernel_size=3, padding="same",
               strides=2),
-          LayerNorm(),
+          ChannelNorm(),
           tf.keras.layers.ReLU()]
 
     # Final conv layer.
@@ -202,10 +202,10 @@ class ResidualBlock(tf.keras.layers.Layer):
 
     block = [
         tf.keras.layers.Conv2D(**kwargs_conv2d),
-        LayerNorm(),
+        ChannelNorm(),
         tf.keras.layers.Activation(activation),
         tf.keras.layers.Conv2D(**kwargs_conv2d),
-        LayerNorm()]
+        ChannelNorm()]
 
     self.block = tf.keras.Sequential(name=name, layers=block)
 
@@ -213,8 +213,8 @@ class ResidualBlock(tf.keras.layers.Layer):
     return inputs + self.block(inputs, **kwargs)
 
 
-class LayerNorm(tf.keras.layers.Layer):
-  """Implement LayerNorm.
+class ChannelNorm(tf.keras.layers.Layer):
+  """Implement ChannelNorm.
 
   Based on this paper and keras' InstanceNorm layer:
     Ba, Jimmy Lei, Jamie Ryan Kiros, and Geoffrey E. Hinton.
@@ -239,7 +239,7 @@ class LayerNorm(tf.keras.layers.Layer):
       gamma_initializer: Initializer for gamma.
       **kwargs: Passed to keras.
     """
-    super(LayerNorm, self).__init__(**kwargs)
+    super(ChannelNorm, self).__init__(**kwargs)
 
     self.axis = -1
     self.epsilon = epsilon
