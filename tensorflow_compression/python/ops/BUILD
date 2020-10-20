@@ -1,5 +1,5 @@
 package(
-    default_visibility = ["//:__subpackages__"],
+    default_visibility = [":__subpackages__"],
 )
 
 licenses(["notice"])  # Apache 2.0
@@ -12,6 +12,7 @@ py_library(
         ":math_ops",
         ":padding_ops",
         ":range_coding_ops",
+        ":soft_round_ops",
         ":spectral_ops",
     ],
 )
@@ -34,6 +35,12 @@ py_library(
     data = ["//tensorflow_compression/cc:libtensorflow_compression.so"],
     srcs_version = "PY3",
     deps = [":namespace_helper"],
+)
+
+py_library(
+    name = "soft_round_ops",
+    srcs = ["soft_round_ops.py"],
+    srcs_version = "PY3",
 )
 
 py_library(
@@ -75,6 +82,13 @@ py_test(
     srcs = ["spectral_ops_test.py"],
     python_version = "PY3",
     deps = [":spectral_ops"],
+)
+
+py_test(
+    name = "soft_round_ops_test",
+    srcs = ["soft_round_ops_test.py"],
+    python_version = "PY3",
+    deps = [":soft_round_ops"],
 )
 
 filegroup(

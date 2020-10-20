@@ -11,6 +11,7 @@ py_library(
     deps = [
         ":deep_factorized",
         ":helpers",
+        ":round_adapters",
         ":uniform_noise",
     ],
 )
@@ -62,6 +63,28 @@ py_test(
     deps = [
         ":helpers",
         ":uniform_noise",
+    ],
+)
+
+py_library(
+    name = "round_adapters",
+    srcs = ["round_adapters.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":deep_factorized",
+        ":helpers",
+        ":uniform_noise",
+        "//tensorflow_compression/python/ops:soft_round_ops",
+    ],
+)
+
+py_test(
+    name = "round_adapters_test",
+    srcs = ["round_adapters_test.py"],
+    python_version = "PY3",
+    deps = [
+        ":deep_factorized",
+        ":round_adapters",
     ],
 )
 

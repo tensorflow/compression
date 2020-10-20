@@ -14,6 +14,7 @@ py_library(
         ":initializers",
         ":parameterizers",
         ":signal_conv",
+        ":soft_round",
     ],
 )
 
@@ -68,6 +69,13 @@ py_library(
     ],
 )
 
+py_library(
+    name = "soft_round",
+    srcs = ["soft_round.py"],
+    srcs_version = "PY3",
+    deps = ["//tensorflow_compression/python/ops:soft_round_ops"],
+)
+
 py_test(
     name = "entropy_models_test",
     srcs = ["entropy_models_test.py"],
@@ -93,6 +101,13 @@ py_test(
         ":parameterizers",
         ":signal_conv",
     ],
+)
+
+py_test(
+    name = "soft_round_test",
+    srcs = ["soft_round_test.py"],
+    python_version = "PY3",
+    deps = [":soft_round"],
 )
 
 filegroup(
