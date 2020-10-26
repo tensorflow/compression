@@ -20,6 +20,7 @@ The default values for all constructors reflect what was used in the paper.
 """
 
 import collections
+import os
 from compare_gan.architectures import abstract_arch
 from compare_gan.architectures import arch_ops
 import numpy as np
@@ -61,7 +62,7 @@ HyperInfo = collections.namedtuple(
     "HyperInfo",
     "decoded latent_shape hyper_latent_shape "
     "nbpp side_nbpp total_nbpp qbpp side_qbpp total_qbpp "
-    "bitstring side_bitstring",
+    "bitstream_tensors",
 )
 
 
@@ -86,7 +87,7 @@ class Encoder(tf.keras.Sequential):
     model = [
         tf.keras.layers.Conv2D(
             filters=num_filters_base, kernel_size=7, padding="same"),
-        LayerNorm(),
+        ChannelNorm(),
         tf.keras.layers.ReLU()
     ]
 
@@ -95,7 +96,7 @@ class Encoder(tf.keras.Sequential):
           tf.keras.layers.Conv2D(
               filters=num_filters_base * 2 ** (i + 1),
               kernel_size=3, padding="same", strides=2),
-          LayerNorm(),
+          ChannelNorm(),
           tf.keras.layers.ReLU()])
 
     model.append(
@@ -127,11 +128,11 @@ class Decoder(tf.keras.layers.Layer):
       num_filters_base: base number of filters.
       num_residual_blocks: number of residual blocks.
     """
-    head = [LayerNorm(),
+    head = [ChannelNorm(),
             tf.keras.layers.Conv2D(
                 filters=num_filters_base * (2 ** num_up),
                 kernel_size=3, padding="same"),
-            LayerNorm()]
+            ChannelNorm()]
 
     residual_blocks = []
     for block_idx in range(num_residual_blocks):
@@ -151,7 +152,7 @@ class Decoder(tf.keras.layers.Layer):
               filters=filters,
               kernel_size=3, padding="same",
               strides=2),
-          LayerNorm(),
+          ChannelNorm(),
           tf.keras.layers.ReLU()]
 
     # Final conv layer.
@@ -201,10 +202,10 @@ class ResidualBlock(tf.keras.layers.Layer):
 
     block = [
         tf.keras.layers.Conv2D(**kwargs_conv2d),
-        LayerNorm(),
+        ChannelNorm(),
         tf.keras.layers.Activation(activation),
         tf.keras.layers.Conv2D(**kwargs_conv2d),
-        LayerNorm()]
+        ChannelNorm()]
 
     self.block = tf.keras.Sequential(name=name, layers=block)
 
@@ -212,8 +213,8 @@ class ResidualBlock(tf.keras.layers.Layer):
     return inputs + self.block(inputs, **kwargs)
 
 
-class LayerNorm(tf.keras.layers.Layer):
-  """Implement LayerNorm.
+class ChannelNorm(tf.keras.layers.Layer):
+  """Implement ChannelNorm.
 
   Based on this paper and keras' InstanceNorm layer:
     Ba, Jimmy Lei, Jamie Ryan Kiros, and Geoffrey E. Hinton.
@@ -238,7 +239,7 @@ class LayerNorm(tf.keras.layers.Layer):
       gamma_initializer: Initializer for gamma.
       **kwargs: Passed to keras.
     """
-    super(LayerNorm, self).__init__(**kwargs)
+    super(ChannelNorm, self).__init__(**kwargs)
 
     self.axis = -1
     self.epsilon = epsilon
@@ -479,6 +480,14 @@ class Hyperprior(tf.keras.layers.Layer):
     self._side_entropy_model = FactorizedPriorLayer()
 
   @property
+  def losses(self):
+    return self._side_entropy_model.losses
+
+  @property
+  def updates(self):
+    return self._side_entropy_model.updates
+
+  @property
   def transform_layers(self):
     return [self._analysis, self._synthesis_scale, self._synthesis_mean]
 
@@ -529,7 +538,7 @@ class Hyperprior(tf.keras.layers.Layer):
 
     compressed = None
     if training:
-      latents_decoded = _quantize(latents, latent_means)
+      latents_decoded = _ste_quantize(latents, latent_means)
     elif validation:
       latents_decoded = entropy_info.quantized
     else:
@@ -546,16 +555,25 @@ class Hyperprior(tf.keras.layers.Layer):
         qbpp=entropy_info.qbpp,
         side_qbpp=side_info.total_qbpp,
         total_qbpp=entropy_info.qbpp + side_info.total_qbpp,
-        bitstring=compressed,
-        side_bitstring=side_info.bitstring)
+        # We put everything that's needed for real arithmetic coding into
+        # the bistream_tensors tuple.
+        bitstream_tensors=(compressed, side_info.bitstring,
+                           image_shape, latent_shape, side_info.latent_shape))
 
     tf.summary.scalar("bpp/total/noisy", info.total_nbpp)
     tf.summary.scalar("bpp/total/quantized", info.total_qbpp)
 
+    tf.summary.scalar("bpp/latent/noisy", entropy_info.nbpp)
+    tf.summary.scalar("bpp/latent/quantized", entropy_info.qbpp)
+
+    tf.summary.scalar("bpp/side/noisy", side_info.total_nbpp)
+    tf.summary.scalar("bpp/side/quantized", side_info.total_qbpp)
+
     return info
 
 
-def _quantize(inputs, mean):
+def _ste_quantize(inputs, mean):
+  """Calculates quantize(inputs - mean) + mean, sets straight-through grads."""
   half = tf.constant(.5, dtype=tf.float32)
   outputs = inputs
   outputs -= mean

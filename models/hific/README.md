@@ -1,7 +1,5 @@
 # High-Fidelity Generative Image Compression
 
-## PRE-RELEASE
-
 <div align="center">
   <a href='https://hific.github.io'>
   <img src='https://hific.github.io/social/thumb.jpg' width="80%"/>
@@ -95,7 +93,6 @@ If you get slow training/stalling, try tweaking the `DATASET_NUM_PARALLEL` and
 
 The architecture is defined in `arch.py`, which is used to build the model from
 `model.py`. Our configurations are in `configs.py`.
-
 
 We release a _simplified_ trainer in `train.py` as a starting point for custom
 training. Note that it's using
