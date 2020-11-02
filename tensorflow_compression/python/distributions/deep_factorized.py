@@ -17,6 +17,7 @@
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_compression.python.distributions import helpers
 from tensorflow_compression.python.distributions import uniform_noise
 
 
@@ -89,7 +90,6 @@ class DeepFactorized(tfp.distributions.Distribution):
     self._batch_shape_tuple = tuple(int(s) for s in batch_shape)
     self._num_filters = tuple(int(f) for f in num_filters)
     self._init_scale = float(init_scale)
-    self._estimated_tail_mass = None
     super().__init__(
         dtype=dtype,
         reparameterization_type=tfp.distributions.NOT_REPARAMETERIZED,
@@ -130,10 +130,8 @@ class DeepFactorized(tfp.distributions.Distribution):
       self._matrices.append(matrix)
 
       def bias_initializer(i=i):
-        return tf.random.uniform((channels, filters[i + 1], 1),
-                                 -.5,
-                                 .5,
-                                 dtype=self.dtype)
+        return tf.random.uniform(
+            (channels, filters[i + 1], 1), -.5, .5, dtype=self.dtype)
 
       bias = tf.Variable(bias_initializer, name="bias_{}".format(i))
       self._biases.append(bias)
@@ -158,6 +156,11 @@ class DeepFactorized(tfp.distributions.Distribution):
   def _event_shape(self):
     return tf.TensorShape(())
 
+  def _broadcast_inputs(self, inputs):
+    shape = tf.broadcast_dynamic_shape(
+        tf.shape(inputs), self.batch_shape_tensor())
+    return tf.broadcast_to(inputs, shape)
+
   def _logits_cumulative(self, inputs):
     """Evaluate logits of the cumulative densities.
 
@@ -170,9 +173,6 @@ class DeepFactorized(tfp.distributions.Distribution):
     """
     # Convert to (channels, 1, batch) format by collapsing dimensions and then
     # commuting channels to front.
-    inputs = tf.broadcast_to(
-        inputs,
-        tf.broadcast_dynamic_shape(tf.shape(inputs), self.batch_shape_tensor()))
     shape = tf.shape(inputs)
     inputs = tf.reshape(inputs, (-1, 1, self.batch_shape.num_elements()))
     inputs = tf.transpose(inputs, (2, 1, 0))
@@ -191,35 +191,46 @@ class DeepFactorized(tfp.distributions.Distribution):
     return logits
 
   def _log_cdf(self, inputs):
+    inputs = self._broadcast_inputs(inputs)
     logits = self._logits_cumulative(inputs)
     return tf.math.log_sigmoid(logits)
 
   def _log_survival_function(self, inputs):
+    inputs = self._broadcast_inputs(inputs)
     logits = self._logits_cumulative(inputs)
     # 1-sigmoid(x) = sigmoid(-x)
     return tf.math.log_sigmoid(-logits)
 
   def _cdf(self, inputs):
+    inputs = self._broadcast_inputs(inputs)
     logits = self._logits_cumulative(inputs)
     return tf.math.sigmoid(logits)
 
+  def _survival_function(self, inputs):
+    inputs = self._broadcast_inputs(inputs)
+    logits = self._logits_cumulative(inputs)
+    # 1-sigmoid(x) = sigmoid(-x)
+    return tf.math.sigmoid(-logits)
+
   def _prob(self, inputs):
-    with tf.GradientTape() as tape:
+    inputs = self._broadcast_inputs(inputs)
+    with tf.GradientTape(watch_accessed_variables=False) as tape:
       tape.watch(inputs)
       cdf = self._cdf(inputs)
     prob = tape.gradient(cdf, inputs)
     return prob
 
   def _log_prob(self, inputs):
-    # let x=inputs and s(x)=sigmoid(x).
-    with tf.GradientTape() as tape:
+    inputs = self._broadcast_inputs(inputs)
+    with tf.GradientTape(watch_accessed_variables=False) as tape:
       tape.watch(inputs)
       logits = self._logits_cumulative(inputs)
-    # We have F(x) = s(logits(x))
+    # Let x=inputs and s(x)=sigmoid(x).
+    # We have F(x) = s(logits(x)),
     # so p(x) = F'(x)
     #         = s'(logits(x)) * logits'(x)
     #         = s(logits(x))*s(-logits(x)) * logits'(x)
-    # so log p(x) = log(s(logits(x)) + log(s(-logits(x)) + log(logits'(x))
+    # so log p(x) = log(s(logits(x)) + log(s(-logits(x)) + log(logits'(x)).
     log_s_logits = tf.math.log_sigmoid(logits)
     log_s_neg_logits = tf.math.log_sigmoid(-logits)
     dlogits = tape.gradient(logits, inputs)
@@ -227,6 +238,16 @@ class DeepFactorized(tfp.distributions.Distribution):
 
   def _quantization_offset(self):
     return tf.constant(0, dtype=self.dtype)
+
+  def _lower_tail(self, tail_mass):
+    logits = tf.math.log(tail_mass / 2 / (1. - tail_mass / 2))
+    return helpers.estimate_tails(
+        self._logits_cumulative, logits, self.batch_shape_tensor(), self.dtype)
+
+  def _upper_tail(self, tail_mass):
+    logits = -tf.math.log(tail_mass / 2 / (1. - tail_mass / 2))
+    return helpers.estimate_tails(
+        self._logits_cumulative, logits, self.batch_shape_tensor(), self.dtype)
 
 
 class NoisyDeepFactorized(uniform_noise.UniformNoiseAdapter):

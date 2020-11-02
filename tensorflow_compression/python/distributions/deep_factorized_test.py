@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tests of deep factorized distribution."""
 
+from absl.testing import parameterized
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
@@ -21,7 +22,7 @@ from tensorflow_compression.python.distributions import deep_factorized
 from tensorflow_compression.python.distributions import helpers
 
 
-class DeepFactorizedTest(tf.test.TestCase):
+class DeepFactorizedTest(tf.test.TestCase, parameterized.TestCase):
 
   def test_can_instantiate_scalar(self):
     df = deep_factorized.DeepFactorized()
@@ -37,56 +38,31 @@ class DeepFactorizedTest(tf.test.TestCase):
     self.assertEqual(df.num_filters, (3, 3))
     self.assertEqual(df.init_scale, 10)
 
-  def test_logistic_is_special_case_prob(self):
+  @parameterized.parameters(
+      "prob", "log_prob",
+      "cdf", "log_cdf",
+      "survival_function", "log_survival_function",
+  )
+  def test_logistic_is_special_case(self, method):
     # With no hidden units, the density should collapse to a logistic
     # distribution.
     df = deep_factorized.DeepFactorized(num_filters=(), init_scale=1)
     logistic = tfp.distributions.Logistic(loc=-df._biases[0][0, 0], scale=1.)
     x = tf.linspace(-5., 5., 20)
-    prob_df = df.prob(x)
-    prob_logistic = logistic.prob(x)
-    self.assertAllClose(prob_df, prob_logistic)
+    val_df = getattr(df, method)(x)
+    val_logistic = getattr(logistic, method)(x)
+    self.assertAllClose(val_df, val_logistic)
 
-  def test_logistic_is_special_case_cdf(self):
-    # With no hidden units, the density should collapse to a logistic
-    # distribution.
-    df = deep_factorized.DeepFactorized(num_filters=(), init_scale=1)
-    logistic = tfp.distributions.Logistic(loc=-df._biases[0][0, 0], scale=1.)
-    x = tf.linspace(-5., 5., 20)
-    cdf_df = df.cdf(x)
-    cdf_logistic = logistic.cdf(x)
-    self.assertAllClose(cdf_df, cdf_logistic)
-
-  def test_logistic_is_special_case_log_prob(self):
-    # With no hidden units, the density should collapse to a logistic
-    # distribution.
-    df = deep_factorized.DeepFactorized(num_filters=(), init_scale=1)
-    logistic = tfp.distributions.Logistic(loc=-df._biases[0][0, 0], scale=1.)
-    x = tf.linspace(-5000., 5000., 1000)
-    log_prob_df = df.log_prob(x)
-    log_prob_logistic = logistic.log_prob(x)
-    self.assertAllClose(log_prob_df, log_prob_logistic)
-
-  def test_logistic_is_special_case_log_cdf(self):
-    # With no hidden units, the density should collapse to a logistic
-    # distribution.
-    df = deep_factorized.DeepFactorized(num_filters=(), init_scale=1)
-    logistic = tfp.distributions.Logistic(loc=-df._biases[0][0, 0], scale=1.)
-    x = tf.linspace(-5000., 5000., 1000)
-    log_cdf_df = df.log_cdf(x)
-    log_cdf_logistic = logistic.log_cdf(x)
-    self.assertAllClose(log_cdf_df, log_cdf_logistic)
-
-  def test_logistic_is_special_case_log_survival_function(self):
-    # With no hidden units, the density should collapse to a logistic
-    # distribution.
-    df = deep_factorized.DeepFactorized(num_filters=(), init_scale=1)
-    logistic = tfp.distributions.Logistic(loc=-df._biases[0][0, 0], scale=1.)
-    x = tf.linspace(-5000., 5000., 1000)
-    log_survival_function_df = df.log_survival_function(x)
-    log_survival_function_logistic = logistic.log_survival_function(x)
-    self.assertAllClose(log_survival_function_df,
-                        log_survival_function_logistic)
+  @parameterized.parameters(
+      "prob", "log_prob",
+      "cdf", "log_cdf",
+      "survival_function", "log_survival_function",
+  )
+  def test_broadcasts_correctly(self, method):
+    df = deep_factorized.DeepFactorized(batch_shape=(2, 3))
+    x = tf.reshape(tf.linspace(-5., 5., 20), (4, 5, 1, 1))
+    val = getattr(df, method)(x)
+    self.assertEqual(val.shape, (4, 5, 2, 3))
 
 
 class NoisyDeepFactorizedTest(tf.test.TestCase):
@@ -140,13 +116,11 @@ class NoisyDeepFactorizedTest(tf.test.TestCase):
     df = deep_factorized.NoisyDeepFactorized()
     self.assertEqual(helpers.quantization_offset(df), 0)
 
-  def test_tails_and_offset_are_in_order(self):
+  def test_tails_are_in_order(self):
     df = deep_factorized.NoisyDeepFactorized()
-    offset = helpers.quantization_offset(df)
     lower_tail = helpers.lower_tail(df, 2**-8)
     upper_tail = helpers.upper_tail(df, 2**-8)
-    self.assertGreater(upper_tail, offset)
-    self.assertGreater(offset, lower_tail)
+    self.assertGreater(upper_tail, lower_tail)
 
   def test_stats_throw_error(self):
     df = deep_factorized.NoisyDeepFactorized()
