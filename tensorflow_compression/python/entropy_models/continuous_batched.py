@@ -20,7 +20,6 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_compression.python.distributions import helpers
 from tensorflow_compression.python.entropy_models import continuous_base
-from tensorflow_compression.python.ops import math_ops
 from tensorflow_compression.python.ops import range_coding_ops
 
 
@@ -74,8 +73,7 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
   """
 
   def __init__(self, prior, coding_rank, compression=False,
-               likelihood_bound=1e-9, tail_mass=2**-8,
-               range_coder_precision=12, no_variables=False):
+               tail_mass=2**-8, range_coder_precision=12, no_variables=False):
     """Initializer.
 
     Arguments:
@@ -93,8 +91,6 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       compression: Boolean. If set to `True`, the range coding tables used by
         `compress()` and `decompress()` will be built on instantiation. If set
         to `False`, these two methods will not be accessible.
-      likelihood_bound: Float. Lower bound for likelihood values, to prevent
-        training instabilities.
       tail_mass: Float. Approximate probability mass which is range encoded with
         less precision, by using a Golomb-like code.
       range_coder_precision: Integer. Precision passed to the range coding op.
@@ -112,7 +108,6 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         prior=prior,
         coding_rank=coding_rank,
         compression=compression,
-        likelihood_bound=likelihood_bound,
         tail_mass=tail_mass,
         range_coder_precision=range_coder_precision,
         no_variables=no_variables,
@@ -173,11 +168,10 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
           tf.shape(bottleneck), minval=-.5, maxval=.5, dtype=bottleneck.dtype)
     else:
       quantized = self.quantize(bottleneck)
-    probs = self.prior.prob(quantized)
-    probs = math_ops.lower_bound(probs, self.likelihood_bound)
+    log_probs = self.prior.log_prob(quantized)
     axes = tuple(range(-self.coding_rank, 0))
-    bits = tf.reduce_sum(tf.math.log(probs), axis=axes) / (
-        -tf.math.log(tf.constant(2., dtype=probs.dtype)))
+    bits = tf.reduce_sum(log_probs, axis=axes) / (
+        -tf.math.log(tf.constant(2, dtype=log_probs.dtype)))
     return bits
 
   @tf.Module.with_name_scope

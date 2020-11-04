@@ -128,8 +128,7 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
 
   def __init__(self, prior_fn, index_ranges, parameter_fns, coding_rank,
                compression=False, channel_axis=-1, dtype=tf.float32,
-               likelihood_bound=1e-9, tail_mass=2**-8,
-               range_coder_precision=12, no_variables=False):
+               tail_mass=2**-8, range_coder_precision=12, no_variables=False):
     """Initializer.
 
     Arguments:
@@ -165,8 +164,6 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         dimension.
       dtype: `tf.dtypes.DType`. The data type of all floating-point
         computations carried out in this class.
-      likelihood_bound: Float. Lower bound for likelihood values, to prevent
-        training instabilities.
       tail_mass: Float. Approximate probability mass which is range encoded with
         less precision, by using a Golomb-like code.
       range_coder_precision: Integer. Precision passed to the range coding op.
@@ -209,7 +206,6 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         prior=prior,
         coding_rank=coding_rank,
         compression=compression,
-        likelihood_bound=likelihood_bound,
         tail_mass=tail_mass,
         range_coder_precision=range_coder_precision,
         no_variables=no_variables,
@@ -285,11 +281,10 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     else:
       offset = helpers.quantization_offset(prior)
       quantized = self._quantize(bottleneck, offset)
-    probs = prior.prob(quantized)
-    probs = math_ops.lower_bound(probs, self.likelihood_bound)
+    log_probs = prior.log_prob(quantized)
     axes = tuple(range(-self.coding_rank, 0))
-    bits = tf.reduce_sum(tf.math.log(probs), axis=axes) / (
-        -tf.math.log(tf.constant(2., dtype=probs.dtype)))
+    bits = tf.reduce_sum(log_probs, axis=axes) / (
+        -tf.math.log(tf.constant(2, dtype=log_probs.dtype)))
     return bits
 
   @tf.Module.with_name_scope
@@ -439,8 +434,8 @@ class LocationScaleIndexedEntropyModel(ContinuousIndexedEntropyModel):
   """
 
   def __init__(self, prior_fn, num_scales, scale_fn, coding_rank,
-               compression=False, dtype=tf.float32, likelihood_bound=1e-9,
-               tail_mass=2**-8, range_coder_precision=12, no_variables=False):
+               compression=False, dtype=tf.float32, tail_mass=2**-8,
+               range_coder_precision=12, no_variables=False):
     """Initializer.
 
     Arguments:
@@ -466,8 +461,6 @@ class LocationScaleIndexedEntropyModel(ContinuousIndexedEntropyModel):
         be accessible.
       dtype: `tf.dtypes.DType`. The data type of all floating-point
         computations carried out in this class.
-      likelihood_bound: Float. Lower bound for likelihood values, to prevent
-        training instabilities.
       tail_mass: Float. Approximate probability mass which is range encoded with
         less precision, by using a Golomb-like code.
       range_coder_precision: Integer. Precision passed to the range coding op.
@@ -485,7 +478,6 @@ class LocationScaleIndexedEntropyModel(ContinuousIndexedEntropyModel):
         coding_rank=coding_rank,
         compression=compression,
         dtype=dtype,
-        likelihood_bound=likelihood_bound,
         tail_mass=tail_mass,
         range_coder_precision=range_coder_precision,
         no_variables=no_variables,

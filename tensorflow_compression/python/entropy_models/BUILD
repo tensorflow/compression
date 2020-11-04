@@ -32,7 +32,6 @@ py_library(
     deps = [
         ":continuous_base",
         "//tensorflow_compression/python/distributions:helpers",
-        "//tensorflow_compression/python/ops:math_ops",
         "//tensorflow_compression/python/ops:range_coding_ops",
     ],
 )

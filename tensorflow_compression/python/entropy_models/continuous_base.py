@@ -38,8 +38,7 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
 
   @abc.abstractmethod
   def __init__(self, prior, coding_rank, compression=False,
-               likelihood_bound=1e-9, tail_mass=2**-8,
-               range_coder_precision=12, no_variables=False):
+               tail_mass=2**-8, range_coder_precision=12, no_variables=False):
     """Initializer.
 
     Arguments:
@@ -55,8 +54,6 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
       compression: Boolean. If set to `True`, the range coding tables used by
         `compress()` and `decompress()` will be built on instantiation. If set
         to `False`, these two methods will not be accessible.
-      likelihood_bound: Float. Lower bound for likelihood values, to prevent
-        training instabilities.
       tail_mass: Float. Approximate probability mass which is range encoded with
         less precision, by using a Golomb-like code.
       range_coder_precision: Integer. Precision passed to the range coding op.
@@ -76,7 +73,6 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
       self._prior_shape = tuple(int(s) for s in prior.batch_shape)
       self._coding_rank = int(coding_rank)
       self._compression = bool(compression)
-      self._likelihood_bound = float(likelihood_bound)
       self._tail_mass = float(tail_mass)
       self._range_coder_precision = int(range_coder_precision)
       self._no_variables = bool(no_variables)
@@ -142,11 +138,6 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
   def compression(self):
     """Whether this entropy model is prepared for compression."""
     return self._compression
-
-  @property
-  def likelihood_bound(self):
-    """Lower bound for likelihood values."""
-    return self._likelihood_bound
 
   @property
   def tail_mass(self):
@@ -285,7 +276,6 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
         dtype=self._dtype.name,
         prior_shape=self._prior_shape,
         coding_rank=self._coding_rank,
-        likelihood_bound=self._likelihood_bound,
         tail_mass=self._tail_mass,
         range_coder_precision=self._range_coder_precision,
         cdf_width=self._cdf.shape.as_list()[1],
@@ -314,7 +304,6 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
       self._prior_shape = tuple(int(s) for s in config["prior_shape"])
       self._coding_rank = int(config["coding_rank"])
       self._compression = True
-      self._likelihood_bound = float(config["likelihood_bound"])
       self._tail_mass = float(config["tail_mass"])
       self._range_coder_precision = int(config["range_coder_precision"])
       self._no_variables = False

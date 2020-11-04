@@ -28,7 +28,6 @@ class ContinuousBatchedEntropyModelTest(tf.test.TestCase):
     em = ContinuousBatchedEntropyModel(noisy, 1)
     self.assertIs(em.prior, noisy)
     self.assertEqual(em.coding_rank, 1)
-    self.assertEqual(em.likelihood_bound, 1e-9)
     self.assertEqual(em.tail_mass, 2**-8)
     self.assertEqual(em.range_coder_precision, 12)
     self.assertEqual(em.dtype, noisy.dtype)
