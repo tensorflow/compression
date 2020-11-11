@@ -88,6 +88,7 @@ py_test(
     deps = [
         ":deep_factorized",
         ":round_adapters",
+        "//tensorflow_compression/python/ops:soft_round_ops",
     ],
 )
 

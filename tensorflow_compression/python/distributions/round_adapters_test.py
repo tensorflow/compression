@@ -21,6 +21,7 @@ import tensorflow_probability as tfp
 
 from tensorflow_compression.python.distributions import deep_factorized
 from tensorflow_compression.python.distributions import round_adapters
+from tensorflow_compression.python.ops import soft_round_ops
 
 
 def _test_log_prob_gradient_is_bounded(self, dist_cls, values, params=()):
@@ -49,19 +50,21 @@ class AdaptersTest(tf.test.TestCase, parameterized.TestCase):
        deep_factorized.DeepFactorized, 0.0),
       ("softround_logistic",
        lambda d: round_adapters.SoftRoundAdapter(d, alpha=5.0),
-       lambda: tfp.distributions.Logistic(loc=10, scale=1.5), 10.0),
+       lambda: tfp.distributions.Logistic(loc=10.3, scale=1.5),
+       lambda: soft_round_ops.soft_round(0.3, alpha=5.0)),
       ("softround_normal",
-       lambda d: round_adapters.SoftRoundAdapter(d, alpha=5.0),
-       lambda: tfp.distributions.Normal(loc=10, scale=1.5), 10.0),
+       lambda d: round_adapters.SoftRoundAdapter(d, alpha=4.0),
+       lambda: tfp.distributions.Normal(loc=10.4, scale=1.5),
+       lambda: soft_round_ops.soft_round(0.4, alpha=4.0)),
       ("noisysoftround_deepfactorized",
        lambda d: round_adapters.NoisySoftRoundAdapter(d, alpha=5.0),
        deep_factorized.DeepFactorized, 0.0),
       ("noisysoftround_logistic",
        lambda d: round_adapters.NoisySoftRoundAdapter(d, alpha=5.0),
-       lambda: tfp.distributions.Logistic(loc=10, scale=1.5), 10.0),
+       lambda: tfp.distributions.Logistic(loc=10, scale=1.5), 0.0),
       ("noisysoftround_normal",
        lambda d: round_adapters.NoisySoftRoundAdapter(d, alpha=5.0),
-       lambda: tfp.distributions.Normal(loc=10, scale=1.5), 10.0),
+       lambda: tfp.distributions.Normal(loc=10, scale=1.5), 0.0),
       ("round_deepfactorized",
        round_adapters.RoundAdapter,
        lambda: deep_factorized.DeepFactorized(init_scale=1.0), 0.0),
@@ -101,6 +104,10 @@ class AdaptersTest(tf.test.TestCase, parameterized.TestCase):
 
     self.assertGreater(upper_tail, lower_tail)
     offset = dist._quantization_offset()
+    if not isinstance(expected_offset, float):
+      # We cannot run tf inside the parameterized test declaration, hence
+      # non-float values are wrapped in a lambda.
+      expected_offset = expected_offset()
     self.assertAllClose(offset, expected_offset)
 
   @parameterized.named_parameters(

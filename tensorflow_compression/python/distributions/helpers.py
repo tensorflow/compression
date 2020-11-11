@@ -104,6 +104,9 @@ def quantization_offset(distribution):
   these are implemented, it falls back on quantizing to integer values (i.e.,
   an offset of zero).
 
+  Note the offset is always in the range [-.5, .5] as it is assumed to be
+  combined with a round quantizer.
+
   Arguments:
     distribution: A `tfp.distributions.Distribution` object.
 
@@ -125,7 +128,7 @@ def quantization_offset(distribution):
           offset = distribution.mean()
         except NotImplementedError:
           offset = tf.constant(0, dtype=distribution.dtype)
-  return tf.stop_gradient(offset)
+  return tf.stop_gradient(offset - tf.round(offset))
 
 
 def lower_tail(distribution, tail_mass):

@@ -19,6 +19,7 @@ import functools
 
 from absl import logging
 import tensorflow.compat.v2 as tf
+import tensorflow_probability as tfp
 
 from tensorflow_compression.python.distributions import helpers
 from tensorflow_compression.python.ops import range_coding_ops
@@ -37,9 +38,18 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
   """
 
   @abc.abstractmethod
-  def __init__(self, prior, coding_rank, compression=False,
-               tail_mass=2**-8, range_coder_precision=12, no_variables=False):
-    """Initializer.
+  def __init__(
+      self,
+      prior,
+      coding_rank,
+      compression=False,
+      laplace_tail_mass=0.0,
+      expected_grads=False,
+      tail_mass=2**-8,
+      range_coder_precision=12,
+      no_variables=False,
+  ):
+    """Initializes the instance.
 
     Arguments:
       prior: A `tfp.distributions.Distribution` object. A density model fitting
@@ -50,10 +60,14 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
         marginal distribution for bottleneck dimensions that are constant.
       coding_rank: Integer. Number of innermost dimensions considered a coding
         unit. Each coding unit is compressed to its own bit string, and the
-        `bits()` method sums over each coding unit.
+        `__call__()` method sums over each coding unit.
       compression: Boolean. If set to `True`, the range coding tables used by
         `compress()` and `decompress()` will be built on instantiation. If set
         to `False`, these two methods will not be accessible.
+      laplace_tail_mass: Float. If positive, will augment the prior with a
+        Laplace mixture for training stability. (experimental)
+      expected_grads: If True, will use analytical expected gradients during
+        backpropagation w.r.t. additive uniform noise.
       tail_mass: Float. Approximate probability mass which is range encoded with
         less precision, by using a Golomb-like code.
       range_coder_precision: Integer. Precision passed to the range coding op.
@@ -76,18 +90,24 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
       self._tail_mass = float(tail_mass)
       self._range_coder_precision = int(range_coder_precision)
       self._no_variables = bool(no_variables)
+      self._laplace_tail_mass = laplace_tail_mass
+      self._expected_grads = bool(expected_grads)
+      self._laplace_prior = (
+          tfp.distributions.Laplace(loc=0.0, scale=1.0)
+          if laplace_tail_mass else None)
       if self.compression:
         self._build_tables(prior)
 
   @property
   def prior(self):
     """Prior distribution, used for range coding."""
-    if not hasattr(self, "_prior"):
+    try:
+      return self._prior
+    except AttributeError:
       raise RuntimeError(
           "This entropy model doesn't hold a reference to its prior "
           "distribution. This can happen when it is unserialized, because "
           "the prior is not generally serializable.")
-    return self._prior
 
   @prior.deleter
   def prior(self):
@@ -130,6 +150,21 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
     return tf.constant(self.prior_shape, dtype=tf.int32)
 
   @property
+  def context_shape(self):
+    """The shape of the non-flattened PDF/CDF tables for range coding.
+
+    This is typically the same as the prior shape, but can differ e.g. in
+    universal entropy models. In any case, the context_shape contains the prior
+    shape (in the trailing dimensions).
+    """
+    return self.prior_shape
+
+  @property
+  def context_shape_tensor(self):
+    """The context shape as a `Tensor`."""
+    return tf.constant(self.context_shape, dtype=tf.int32)
+
+  @property
   def coding_rank(self):
     """Number of innermost dimensions considered a coding unit."""
     return self._coding_rank
@@ -169,6 +204,10 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
       outputs = self._quantize_offset(inputs, offset)
     return outputs
 
+  def _offset_from_prior(self, prior):
+    """Computes quantization offset from the prior distribution."""
+    return helpers.quantization_offset(prior)
+
   def _build_tables(self, prior):
     """Computes integer-valued probability tables used by the range coder.
 
@@ -190,22 +229,20 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
     Arguments:
       prior: The `tfp.distributions.Distribution` object (see initializer).
     """
-    offset = helpers.quantization_offset(prior)
+    # TODO(jonycgn, relational): Consider not using offset when soft quantization
+    # is used.
+    offset = self._offset_from_prior(prior)
     lower_tail = helpers.lower_tail(prior, self.tail_mass)
     upper_tail = helpers.upper_tail(prior, self.tail_mass)
-
-    # Largest distance observed between lower tail and median, and between
-    # median and upper tail.
-    minima = offset - lower_tail
-    minima = tf.cast(tf.math.ceil(minima), tf.int32)
-    minima = tf.math.maximum(minima, 0)
-    maxima = upper_tail - offset
-    maxima = tf.cast(tf.math.ceil(maxima), tf.int32)
-    maxima = tf.math.maximum(maxima, 0)
+    # Integers such that:
+    # minima + offset < lower_tail
+    # maxima + offset > upper_tail
+    minima = tf.cast(tf.math.floor(lower_tail - offset), tf.int32)
+    maxima = tf.cast(tf.math.ceil(upper_tail - offset), tf.int32)
 
     # PMF starting positions and lengths.
-    pmf_start = offset - tf.cast(minima, self.dtype)
-    pmf_length = maxima + minima + 1
+    pmf_start = tf.cast(minima, self.dtype) + offset
+    pmf_length = maxima - minima + 1
 
     # Sample the densities in the computed ranges, possibly computing more
     # samples than necessary at the upper end.
@@ -216,7 +253,7 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
           "Consider priors with smaller dispersion or increasing `tail_mass` "
           "parameter.", int(max_length))
     samples = tf.range(tf.cast(max_length, self.dtype), dtype=self.dtype)
-    samples = tf.reshape(samples, [-1] + len(self.prior_shape) * [1])
+    samples = tf.reshape(samples, [-1] + len(self.context_shape) * [1])
     samples += pmf_start
     pmf = prior.prob(samples)
 
@@ -224,10 +261,10 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
     pmf = tf.reshape(pmf, [max_length, -1])
     pmf = tf.transpose(pmf)
 
-    pmf_length = tf.broadcast_to(pmf_length, self.prior_shape_tensor)
+    pmf_length = tf.broadcast_to(pmf_length, self.context_shape_tensor)
     pmf_length = tf.reshape(pmf_length, [-1])
     cdf_length = pmf_length + 2
-    cdf_offset = tf.broadcast_to(-minima, self.prior_shape_tensor)
+    cdf_offset = tf.broadcast_to(minima, self.context_shape_tensor)
     cdf_offset = tf.reshape(cdf_offset, [-1])
 
     # Prevent tensors from bouncing back and forth between host and GPU.
@@ -257,6 +294,24 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
       self._cdf_length = tf.Variable(
           cdf_length, trainable=False, name="cdf_length")
 
+  def _log_prob_from_prior(self, prior, bottleneck_perturbed):
+    """Evaluates prior.log_prob(bottleneck + noise)."""
+    if self._laplace_tail_mass:
+      laplace_prior = self._laplace_prior
+      probs = prior.prob(bottleneck_perturbed)
+      probs = ((1 - self._laplace_tail_mass) * probs +
+               self._laplace_tail_mass *
+               laplace_prior.prob(bottleneck_perturbed))
+      probs_too_small = probs < 1e-10
+      probs_bounded = tf.maximum(probs, 1e-10)
+      return tf.where(
+          probs_too_small,
+          tf.math.log(self._laplace_tail_mass) +
+          laplace_prior.log_prob(bottleneck_perturbed),
+          tf.math.log(probs_bounded))
+    else:
+      return prior.log_prob(bottleneck_perturbed)
+
   @abc.abstractmethod
   def get_config(self):
     """Returns the configuration of the entropy model.
@@ -276,6 +331,8 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
         dtype=self._dtype.name,
         prior_shape=self._prior_shape,
         coding_rank=self._coding_rank,
+        laplace_tail_mass=self._laplace_tail_mass,
+        expected_grads=self._expected_grads,
         tail_mass=self._tail_mass,
         range_coder_precision=self._range_coder_precision,
         cdf_width=self._cdf.shape.as_list()[1],
@@ -301,16 +358,21 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
     with self.name_scope:
       # pylint:disable=protected-access
       self._dtype = tf.as_dtype(config["dtype"])
-      self._prior_shape = tuple(int(s) for s in config["prior_shape"])
+      self._prior_shape = tuple(map(int, config["prior_shape"]))
       self._coding_rank = int(config["coding_rank"])
       self._compression = True
+      self._laplace_tail_mass = float(config["laplace_tail_mass"])
+      if self._laplace_tail_mass:
+        self._laplace_prior = tfp.distributions.Laplace(loc=0.0, scale=1.0)
+      self._expected_grads = bool(config["expected_grads"])
       self._tail_mass = float(config["tail_mass"])
       self._range_coder_precision = int(config["range_coder_precision"])
       self._no_variables = False
 
-      prior_size = functools.reduce(lambda x, y: x * y, self.prior_shape, 1)
+      # TODO(relational): Switch to math.prod when we switch to Python 3.8
+      context_size = functools.reduce(lambda x, y: x * y, self.context_shape, 1)
       cdf_width = int(config["cdf_width"])
-      zeros = tf.zeros([prior_size, cdf_width], dtype=tf.int32)
+      zeros = tf.zeros([context_size, cdf_width], dtype=tf.int32)
       self._cdf = tf.Variable(zeros, trainable=False, name="cdf")
       self._cdf_offset = tf.Variable(
           zeros[:, 0], trainable=False, name="cdf_offset")

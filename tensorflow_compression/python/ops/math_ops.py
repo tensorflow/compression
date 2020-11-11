@@ -24,6 +24,7 @@ import tensorflow.compat.v1 as tf
 __all__ = [
     "upper_bound",
     "lower_bound",
+    "perturb_and_apply",
 ]
 
 
@@ -182,3 +183,65 @@ def lower_bound(inputs, bound, gradient="identity_if_towards", name=None):
         return tf.maximum(inputs, bound, name=scope)
     else:
       return tf.maximum(inputs, bound, name=scope)
+
+
+def perturb_and_apply(f, x, *args, u=None, x_plus_u=None, expected_grads=True):
+  """Perturbs the inputs of a pointwise function.
+
+  This function adds uniform noise in the range -0.5 to 0.5 to the first
+  argument of the given function.
+  It further replaces derivatives of the function with (analytically computed)
+  expected derivatives w.r.t. the noise.
+
+  This is described in Sec. 4.2. in the paper
+  > "Universally Quantized Neural Compression"<br />
+  > Eirikur Agustsson & Lucas Theis<br />
+  > https://arxiv.org/abs/2006.09952
+
+  Args:
+    f: Callable. Pointwise function applied after perturbation.
+    x: The inputs.
+    *args: Other arguments to f.
+    u: The noise to perturb x with. If not set and x_plus_u is not provided,
+      it will be sampled.
+    x_plus_u: Alternative way to provide the noise, as `x+u`.
+    expected_grads: If True, will compute expected gradients.
+
+  Returns:
+   A tuple (y, x+u) where y=f(x+u, *args) and u is uniform noise, and the
+   gradient of `y` w.r.t. `x` uses expected derivatives w.r.t. the distribution
+   of u.
+  """
+
+  if x_plus_u is None:
+    if u is None:
+      u = tf.random.uniform(tf.shape(x), minval=-.5, maxval=.5, dtype=x.dtype)
+    x_plus_u = x + u
+  elif u is not None:
+    raise ValueError("Cannot provide both `u` and `x_plus_u`.")
+
+  args = [tf.convert_to_tensor(arg) for arg in args]
+  if not expected_grads:
+    return f(x_plus_u, *args), x_plus_u
+
+  @tf.custom_gradient
+  def _perturb_and_apply(x, *args):
+    tape = tf.GradientTape(persistent=True)
+    with tape:
+      tape.watch(args)
+      y = f(x_plus_u, *args)
+
+    # The expected derivative of f with respect to x
+    dydx = f(x + 0.5, *args) - f(x - 0.5, *args)
+
+    def grad(grad_ys, variables=None):
+      # Calculate gradients of other variables as usual
+      if variables is None:
+        variables = []
+      grad_args, grad_vars = tape.gradient(
+          y, (args, variables), output_gradients=grad_ys)
+      return [grad_ys * dydx] + list(grad_args), grad_vars
+
+    return y, grad
+
+  return _perturb_and_apply(x, *args), x_plus_u

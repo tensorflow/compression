@@ -60,7 +60,10 @@ py_test(
     name = "math_ops_test",
     srcs = ["math_ops_test.py"],
     python_version = "PY3",
-    deps = [":math_ops"],
+    deps = [
+        ":math_ops",
+        ":soft_round_ops",
+    ],
 )
 
 py_test(

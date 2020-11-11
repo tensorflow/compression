@@ -60,12 +60,12 @@ class LocationScaleTest(object):
     self.assertEqual(sample.shape, (5, 4, 2))
 
   def test_tails_and_offset_are_in_order(self):
-    dist = self.dist_cls(loc=10, scale=1.5)
+    dist = self.dist_cls(loc=10.3, scale=1.5)
     offset = helpers.quantization_offset(dist)
     lower_tail = helpers.lower_tail(dist, 2**-8)
     upper_tail = helpers.upper_tail(dist, 2**-8)
-    self.assertGreater(upper_tail, offset)
-    self.assertGreater(offset, lower_tail)
+    self.assertGreater(upper_tail, lower_tail)
+    self.assertAllClose(offset, 0.3)
 
   def test_stats_throw_error(self):
     dist = self.dist_cls(loc=1, scale=2)
@@ -130,12 +130,12 @@ class MixtureTest(object):
     self.assertEqual(sample.shape, (5, 4, 1))
 
   def test_tails_and_offset_are_in_order(self):
-    dist = self.dist_cls(loc=10, scale=[1.5, 2], weight=[.5, .5])
+    dist = self.dist_cls(loc=[5.4, 8.6], scale=[1.4, 2], weight=[.6, .4])
     offset = helpers.quantization_offset(dist)
     lower_tail = helpers.lower_tail(dist, 2**-8)
     upper_tail = helpers.upper_tail(dist, 2**-8)
-    self.assertGreater(upper_tail, offset)
-    self.assertGreater(offset, lower_tail)
+    self.assertGreater(upper_tail, lower_tail)
+    self.assertAllClose(offset, 0.4)  # Decimal part of the peakiest mode (5.4).
 
   def test_stats_throw_error(self):
     dist = self.dist_cls(loc=[1, 0], scale=2, weight=[.1, .9])
