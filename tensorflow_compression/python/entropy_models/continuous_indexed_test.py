@@ -28,15 +28,23 @@ class ContinuousIndexedEntropyModelTest(tf.test.TestCase):
   def test_can_instantiate_one_dimensional(self):
     em = continuous_indexed.ContinuousIndexedEntropyModel(
         uniform_noise.NoisyNormal, 64,
-        dict(loc=lambda _: 0, scale=lambda i: tf.exp(i / 8 - 5)), 1)
+        dict(loc=lambda _: 0, scale=lambda i: tf.exp(i / 8 - 5)), 1,
+        compression=True)
     self.assertIsInstance(em.prior, uniform_noise.NoisyNormal)
     self.assertEqual(em.coding_rank, 1)
-    self.assertEqual(em.likelihood_bound, 1e-9)
     self.assertEqual(em.tail_mass, 2**-8)
     self.assertEqual(em.range_coder_precision, 12)
     self.assertEqual(em.dtype, tf.float32)
+    x = tf.random.stateless_normal((3, 8, 16), seed=(0, 0))
+    indexes = tf.cast(64 * tf.random.stateless_uniform((3, 8, 16), seed=(0, 0)),
+                      tf.int32)
+    em(x, indexes)
+    bitstring = em.compress(x, indexes)
+    x_hat = em.decompress(bitstring, indexes)
+    self.assertAllLess(x - x_hat, 0.5)
+    self.assertAllGreater(x - x_hat, -0.5)
 
-  def test_can_instantiate_n_dimensional(self):
+  def test_can_instantiate_and_compress_n_dimensional(self):
     em = continuous_indexed.ContinuousIndexedEntropyModel(
         uniform_noise.NoisyLogisticMixture,
         (10, 10, 5),
@@ -46,27 +54,47 @@ class ContinuousIndexedEntropyModelTest(tf.test.TestCase):
             weight=lambda i: tf.nn.softmax((i[..., 2:3] - 2) * [-1, 1]),
         ),
         1,
+        compression=True
     )
     self.assertIsInstance(em.prior, uniform_noise.NoisyLogisticMixture)
     self.assertEqual(em.coding_rank, 1)
     self.assertEqual(em.channel_axis, -1)
-    self.assertEqual(em.likelihood_bound, 1e-9)
     self.assertEqual(em.tail_mass, 2**-8)
     self.assertEqual(em.range_coder_precision, 12)
     self.assertEqual(em.dtype, tf.float32)
+    x = tf.random.stateless_normal((3, 8, 16), seed=(0, 0))
+    indexes = tf.cast(
+        10 * tf.random.stateless_uniform((3, 8, 16, 3), seed=(0, 0)), tf.int32)
+    em(x, indexes)
+    bitstring = em.compress(x, indexes)
+    x_hat = em.decompress(bitstring, indexes)
+    self.assertAllLess(x - x_hat, 0.5)
+    self.assertAllGreater(x - x_hat, -0.5)
 
 
 class LocationScaleIndexedEntropyModelTest(tf.test.TestCase):
 
-  def test_can_instantiate(self):
+  def test_can_instantiate_and_compress(self):
     em = continuous_indexed.LocationScaleIndexedEntropyModel(
-        uniform_noise.NoisyNormal, 64, lambda i: tf.exp(i / 8 - 5), 1)
+        uniform_noise.NoisyNormal,
+        64,
+        lambda i: tf.exp(i / 8 - 5),
+        1,
+        compression=True)
     self.assertIsInstance(em.prior, uniform_noise.NoisyNormal)
     self.assertEqual(em.coding_rank, 1)
-    self.assertEqual(em.likelihood_bound, 1e-9)
     self.assertEqual(em.tail_mass, 2**-8)
     self.assertEqual(em.range_coder_precision, 12)
     self.assertEqual(em.dtype, tf.float32)
+    x = tf.random.stateless_normal((3, 8, 16), seed=(0, 0))
+    indexes = tf.cast(10 * tf.random.stateless_uniform((3, 8, 16), seed=(0, 0)),
+                      tf.int32)
+    loc = tf.random.stateless_uniform((3, 8, 16), seed=(0, 0))
+    em(x, indexes, loc=loc)
+    bitstring = em.compress(x, indexes, loc=loc)
+    x_hat = em.decompress(bitstring, indexes, loc=loc)
+    self.assertAllLessEqual(x - x_hat, 0.5)
+    self.assertAllGreaterEqual(x - x_hat, -0.5)
 
 
 if __name__ == "__main__":

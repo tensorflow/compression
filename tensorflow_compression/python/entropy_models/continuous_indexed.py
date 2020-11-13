@@ -14,7 +14,7 @@
 # ==============================================================================
 """Indexed entropy model for continuous random variables."""
 
-import tensorflow.compat.v2 as tf
+import tensorflow as tf
 
 from tensorflow_compression.python.distributions import helpers
 from tensorflow_compression.python.entropy_models import continuous_base
@@ -40,12 +40,11 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
   A typical workflow looks like this:
 
   - Train a model using an instance of this entropy model as a bottleneck,
-    passing the bottleneck tensor through `quantize()` while optimizing
-    compressibility of the tensor using `bits()`. `bits(training=True)` computes
-    a differentiable upper bound on the number of bits needed to compress the
-    bottleneck tensor.
+    passing the bottleneck tensor through it. With training=True, the model
+    computes a differentiable upper bound on the number of bits needed to
+    compress the bottleneck tensor.
   - For evaluation, get a closer estimate of the number of compressed bits
-    using `bits(training=False)`.
+    using `training=False`.
   - Instantiate an entropy model with `compression=True` (and the same
     parameters as during training), and share the model between a sender and a
     receiver.
@@ -126,11 +125,20 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
   weightings.
   """
 
-  def __init__(self, prior_fn, index_ranges, parameter_fns, coding_rank,
-               compression=False, channel_axis=-1, dtype=tf.float32,
-               likelihood_bound=1e-9, tail_mass=2**-8,
-               range_coder_precision=12, no_variables=False):
-    """Initializer.
+  def __init__(self,
+               prior_fn,
+               index_ranges,
+               parameter_fns,
+               coding_rank,
+               compression=False,
+               channel_axis=-1,
+               dtype=tf.float32,
+               laplace_tail_mass=0.0,
+               expected_grads=False,
+               tail_mass=2**-8,
+               range_coder_precision=12,
+               no_variables=False):
+    """Initializes the instance.
 
     Arguments:
       prior_fn: A callable returning a `tfp.distributions.Distribution` object,
@@ -154,7 +162,7 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         argument to `prior_fn`.
       coding_rank: Integer. Number of innermost dimensions considered a coding
         unit. Each coding unit is compressed to its own bit string, and the
-        `bits()` method sums over each coding unit.
+        bits in the `__call__` method are summed over each coding unit.
       compression: Boolean. If set to `True`, the range coding tables used by
         `compress()` and `decompress()` will be built on instantiation. This
         assumes eager mode (throws an error if in graph mode or inside a
@@ -165,8 +173,10 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         dimension.
       dtype: `tf.dtypes.DType`. The data type of all floating-point
         computations carried out in this class.
-      likelihood_bound: Float. Lower bound for likelihood values, to prevent
-        training instabilities.
+      laplace_tail_mass: Float. If positive, will augment the prior with a
+        laplace mixture for training stability. (experimental)
+      expected_grads: If True, will use analytical expected gradients during
+        backpropagation w.r.t. additive uniform noise.
       tail_mass: Float. Approximate probability mass which is range encoded with
         less precision, by using a Golomb-like code.
       range_coder_precision: Integer. Precision passed to the range coding op.
@@ -179,41 +189,34 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     """
     if coding_rank <= 0:
       raise ValueError("`coding_rank` must be larger than 0.")
-
-    self._prior_fn = prior_fn
-    if not callable(self.prior_fn):
+    if not callable(prior_fn):
       raise TypeError("`prior_fn` must be a class or factory function.")
+    for name, fn in parameter_fns.items():
+      if not isinstance(name, str):
+        raise TypeError("`parameter_fns` must have string keys.")
+      if not callable(fn):
+        raise TypeError("`parameter_fns['{}']` must be callable.".format(name))
+
+    prior = self._make_range_coding_prior(prior_fn, index_ranges, parameter_fns,
+                                          channel_axis, dtype)
+    super().__init__(
+        prior=prior,
+        coding_rank=coding_rank,
+        compression=compression,
+        laplace_tail_mass=laplace_tail_mass,
+        expected_grads=expected_grads,
+        tail_mass=tail_mass,
+        range_coder_precision=range_coder_precision,
+        no_variables=no_variables
+    )
+    self._channel_axis = int(channel_axis)
+    self._prior_fn = prior_fn
+    # TODO(relational, jonycgn): Do we need special casing for int index_ranges?
     try:
       self._index_ranges = int(index_ranges)
     except TypeError:
       self._index_ranges = tuple(int(r) for r in index_ranges)  # pytype:disable=attribute-error
     self._parameter_fns = dict(parameter_fns)
-    for name, fn in self.parameter_fns.items():
-      if not isinstance(name, str):
-        raise TypeError("`parameter_fns` must have string keys.")
-      if not callable(fn):
-        raise TypeError("`parameter_fns['{}']` must be callable.".format(name))
-    self._channel_axis = int(channel_axis)
-    dtype = tf.as_dtype(dtype)
-
-    if isinstance(self.index_ranges, int):
-      indexes = tf.range(self.index_ranges, dtype=dtype)
-    else:
-      indexes = [tf.range(r, dtype=dtype) for r in self.index_ranges]
-      indexes = tf.meshgrid(*indexes, indexing="ij")
-      indexes = tf.stack(indexes, axis=self.channel_axis)
-    parameters = {k: f(indexes) for k, f in self.parameter_fns.items()}
-    prior = self.prior_fn(**parameters)  # pylint:disable=not-callable
-
-    super().__init__(
-        prior=prior,
-        coding_rank=coding_rank,
-        compression=compression,
-        likelihood_bound=likelihood_bound,
-        tail_mass=tail_mass,
-        range_coder_precision=range_coder_precision,
-        no_variables=no_variables,
-    )
 
   @property
   def index_ranges(self):
@@ -235,20 +238,33 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     """Position of channel axis in `indexes` tensor."""
     return self._channel_axis
 
-  def _make_prior(self, indexes):
-    indexes = tf.cast(indexes, self.dtype)
+  def _make_prior(self, indexes, dtype=None):
+    indexes = tf.cast(indexes, dtype or self.dtype)
     parameters = {k: f(indexes) for k, f in self.parameter_fns.items()}
-    return self.prior_fn(**parameters)  # pylint:disable=not-callable
+    return self.prior_fn(**parameters)
+
+  def _make_range_coding_prior(self, prior_fn, index_ranges, parameter_fns,
+                               channel_axis, dtype):
+    del self  # Method does not depend on instance state.
+    dtype = tf.as_dtype(dtype)
+    if isinstance(index_ranges, int):
+      indexes = tf.range(index_ranges, dtype=dtype)
+    else:
+      indexes = [tf.range(r, dtype=dtype) for r in index_ranges]
+      indexes = tf.meshgrid(*indexes, indexing="ij")
+      indexes = tf.stack(indexes, axis=channel_axis)
+    parameters = {k: f(indexes) for k, f in parameter_fns.items()}
+    return prior_fn(**parameters)
 
   def _normalize_indexes(self, indexes):
     indexes = math_ops.lower_bound(indexes, 0)
     if isinstance(self.index_ranges, int):
-      indexes = math_ops.upper_bound(indexes, self.index_ranges - 1)
+      bounds = self.index_ranges - 1
     else:
       axes = [1] * indexes.shape.rank
       axes[self.channel_axis] = len(self.index_ranges)
       bounds = tf.reshape([s - 1 for s in self.index_ranges], axes)
-      indexes = math_ops.upper_bound(indexes, bounds)
+    indexes = math_ops.upper_bound(indexes, tf.cast(bounds, indexes.dtype))
     return indexes
 
   def _flatten_indexes(self, indexes):
@@ -256,12 +272,18 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     if isinstance(self.index_ranges, int):
       return indexes
     else:
-      strides = tf.cumprod(self.index_ranges, exclusive=True, reverse=True)
+      strides = tf.math.cumprod(self.index_ranges, exclusive=True, reverse=True)
       return tf.linalg.tensordot(indexes, strides, [[self.channel_axis], [0]])
 
+  def _offset_from_indexes(self, indexes):
+    """Compute the quantization offset from the respective prior."""
+    prior = self._make_prior(indexes)
+    return helpers.quantization_offset(prior)
+
   @tf.Module.with_name_scope
-  def bits(self, bottleneck, indexes, training=True):
-    """Estimates the number of bits needed to compress a tensor.
+  def __call__(self, bottleneck, indexes, training=True):
+    """Perturbs a tensor with (quantization) noise and estimates bitcost.
+
 
     Arguments:
       bottleneck: `tf.Tensor` containing the data to be compressed.
@@ -274,23 +296,36 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         somewhat looser, but differentiable *upper* bound on this quantity.
 
     Returns:
-      A `tf.Tensor` having the same shape as `bottleneck` without the
-      `self.coding_rank` innermost dimensions, containing the number of bits.
+      A tuple (bottleneck_perturbed, bits),
+      where `bottleneck_perturbed` is `bottleneck` perturbed with (quantization)
+      noise and `bits` is the bitcost with the same shape as `bottleneck`
+      without the `self.coding_rank` innermost dimensions.
     """
     indexes = self._normalize_indexes(indexes)
     prior = self._make_prior(indexes)
     if training:
-      quantized = bottleneck + tf.random.uniform(
+      bottleneck_perturbed = bottleneck + tf.random.uniform(
           tf.shape(bottleneck), minval=-.5, maxval=.5, dtype=bottleneck.dtype)
+      def log_prob_fn(bottleneck_perturbed, indexes):
+        # When using expected_grads=True, we will use a tf.custom_gradient on
+        # this function. In this case, all non-Variable tensors that determine
+        # the result of this function need to be declared explicitly, i.e we
+        # need `indexes` to be a declared argument and `prior` instantiated
+        # here. If we would instantiate it outside this function declaration and
+        # reference here via a closure, we would get a `None` gradient for
+        # `indexes`.
+        prior = self._make_prior(indexes)
+        return self._log_prob_from_prior(prior, bottleneck_perturbed)
+      log_probs, bottleneck_perturbed = math_ops.perturb_and_apply(
+          log_prob_fn, bottleneck, indexes, expected_grads=self._expected_grads)
     else:
       offset = helpers.quantization_offset(prior)
-      quantized = self._quantize(bottleneck, offset)
-    probs = prior.prob(quantized)
-    probs = math_ops.lower_bound(probs, self.likelihood_bound)
+      bottleneck_perturbed = self._quantize(bottleneck, offset)
+      log_probs = self._log_prob_from_prior(prior, bottleneck_perturbed)
     axes = tuple(range(-self.coding_rank, 0))
-    bits = tf.reduce_sum(tf.math.log(probs), axis=axes) / (
-        -tf.math.log(tf.constant(2., dtype=probs.dtype)))
-    return bits
+    bits = tf.reduce_sum(log_probs, axis=axes) / (
+        -tf.math.log(tf.constant(2, dtype=log_probs.dtype)))
+    return bottleneck_perturbed, bits
 
   @tf.Module.with_name_scope
   def quantize(self, bottleneck, indexes):
@@ -314,7 +349,7 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       A `tf.Tensor` containing the quantized values.
     """
     indexes = self._normalize_indexes(indexes)
-    offset = helpers.quantization_offset(self._make_prior(indexes))
+    offset = self._offset_from_indexes(indexes)
     return self._quantize(bottleneck, offset)
 
   @tf.Module.with_name_scope
@@ -349,7 +384,7 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
 
     flat_indexes = tf.reshape(flat_indexes, flat_shape)
 
-    offset = helpers.quantization_offset(self._make_prior(indexes))
+    offset = self._offset_from_indexes(indexes)
     symbols = tf.cast(tf.round(bottleneck - offset), tf.int32)
     symbols = tf.reshape(symbols, flat_shape)
 
@@ -412,7 +447,7 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
           loop_body, (strings, flat_indexes), dtype=tf.int32, name="decompress")
 
     symbols = tf.reshape(symbols, symbols_shape)
-    offset = helpers.quantization_offset(self._make_prior(indexes))
+    offset = self._offset_from_indexes(indexes)
     return tf.cast(symbols, self.dtype) + offset
 
   def get_config(self):
@@ -439,9 +474,9 @@ class LocationScaleIndexedEntropyModel(ContinuousIndexedEntropyModel):
   """
 
   def __init__(self, prior_fn, num_scales, scale_fn, coding_rank,
-               compression=False, dtype=tf.float32, likelihood_bound=1e-9,
-               tail_mass=2**-8, range_coder_precision=12, no_variables=False):
-    """Initializer.
+               compression=False, dtype=tf.float32, tail_mass=2**-8,
+               range_coder_precision=12, no_variables=False):
+    """Initializes the instance.
 
     Arguments:
       prior_fn: A callable returning a `tfp.distributions.Distribution` object,
@@ -459,15 +494,13 @@ class LocationScaleIndexedEntropyModel(ContinuousIndexedEntropyModel):
         value is given as `scale` keyword argument to `prior_fn`.
       coding_rank: Integer. Number of innermost dimensions considered a coding
         unit. Each coding unit is compressed to its own bit string, and the
-        `bits()` method sums over each coding unit.
+        bits in the `__call__` method are summed over each coding unit.
       compression: Boolean. If set to `True`, the range coding tables used by
         `compress()` and `decompress()` will be built on instantiation.
         Otherwise, some computation can be saved, but these two methods will not
         be accessible.
       dtype: `tf.dtypes.DType`. The data type of all floating-point
         computations carried out in this class.
-      likelihood_bound: Float. Lower bound for likelihood values, to prevent
-        training instabilities.
       tail_mass: Float. Approximate probability mass which is range encoded with
         less precision, by using a Golomb-like code.
       range_coder_precision: Integer. Precision passed to the range coding op.
@@ -485,15 +518,14 @@ class LocationScaleIndexedEntropyModel(ContinuousIndexedEntropyModel):
         coding_rank=coding_rank,
         compression=compression,
         dtype=dtype,
-        likelihood_bound=likelihood_bound,
         tail_mass=tail_mass,
         range_coder_precision=range_coder_precision,
         no_variables=no_variables,
     )
 
   @tf.Module.with_name_scope
-  def bits(self, bottleneck, scale_indexes, loc=None, training=True):
-    """Estimates the number of bits needed to compress a tensor.
+  def __call__(self, bottleneck, scale_indexes, loc=None, training=True):
+    """Perturbs a tensor with (quantization) noise and estimates bitcost.
 
     Arguments:
       bottleneck: `tf.Tensor` containing the data to be compressed.
@@ -513,9 +545,13 @@ class LocationScaleIndexedEntropyModel(ContinuousIndexedEntropyModel):
       A `tf.Tensor` having the same shape as `bottleneck` without the
       `self.coding_rank` innermost dimensions, containing the number of bits.
     """
-    if loc is not None:
-      bottleneck -= loc
-    return super().bits(bottleneck, scale_indexes, training=training)
+    if loc is None:
+      loc = 0.0
+    bottleneck_centered = bottleneck - loc
+    bottleneck_centered_perturbed, bits = super().__call__(
+        bottleneck_centered, scale_indexes, training=training)
+    bottleneck_perturbed = bottleneck_centered_perturbed + loc
+    return bottleneck_perturbed, bits
 
   @tf.Module.with_name_scope
   def quantize(self, bottleneck, scale_indexes, loc=None):

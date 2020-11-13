@@ -37,7 +37,7 @@ def estimate_tails(func, target, shape, dtype):
   For instance, if `func` is a CDF and the target is a quantile value, this
   would find the approximate location of that quantile. Note that `func` is
   assumed to be monotonic. When each tail estimate has passed the optimal value
-  of `x`, the algorithm does 10 additional iterations and then stops.
+  of `x`, the algorithm does 100 additional iterations and then stops.
 
   This operation is vectorized. The tensor shape of `x` is given by `shape`, and
   `target` must have a shape that is broadcastable to the output of `func(x)`.
@@ -59,20 +59,21 @@ def estimate_tails(func, target, shape, dtype):
 
     def loop_cond(tails, m, v, count):
       del tails, m, v  # unused
-      return tf.reduce_min(count) < 10
+      return tf.reduce_min(count) < 100
 
-    def loop_body(tails, m, v, count):
+    def loop_body(tails, prev_m, prev_v, count):
       with tf.GradientTape(watch_accessed_variables=False) as tape:
         tape.watch(tails)
         loss = abs(func(tails) - target)
       grad = tape.gradient(loss, tails)
-      m = .5 * m + .5 * grad  # Adam mean estimate.
-      v = .9 * v + .1 * tf.square(grad)  # Adam variance estimate.
-      tails -= .5 * m / (tf.sqrt(v) + 1e-7)
-      # Start counting when the gradient flips sign (note that this assumes
-      # `tails` is initialized to zero).
+      m = (prev_m + grad) / 2  # Adam mean estimate.
+      v = (prev_v + tf.square(grad)) / 2  # Adam variance estimate.
+      tails -= .1 * m / (tf.sqrt(v) + 1e-20)
+      # Start counting when the gradient flips sign. Since the function is
+      # monotonic, m must have the same sign in all initial iterations, until
+      # the optimal point is crossed. At that point the gradient flips sign.
       count = tf.where(
-          tf.math.logical_or(count > 0, tails * grad > 0),
+          tf.math.logical_or(count > 0, prev_m * grad < 0),
           count + 1, count)
       return tails, m, v, count
 
@@ -103,6 +104,9 @@ def quantization_offset(distribution):
   these are implemented, it falls back on quantizing to integer values (i.e.,
   an offset of zero).
 
+  Note the offset is always in the range [-.5, .5] as it is assumed to be
+  combined with a round quantizer.
+
   Arguments:
     distribution: A `tfp.distributions.Distribution` object.
 
@@ -124,7 +128,7 @@ def quantization_offset(distribution):
           offset = distribution.mean()
         except NotImplementedError:
           offset = tf.constant(0, dtype=distribution.dtype)
-  return tf.stop_gradient(offset)
+  return tf.stop_gradient(offset - tf.round(offset))
 
 
 def lower_tail(distribution, tail_mass):

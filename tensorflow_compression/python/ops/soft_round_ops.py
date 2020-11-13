@@ -20,7 +20,7 @@ import tensorflow as tf
 __all__ = ["soft_round", "soft_round_inverse", "soft_round_conditional_mean"]
 
 
-def soft_round(x, alpha, eps=1e-12):
+def soft_round(x, alpha, eps=1e-3):
   """Differentiable approximation to round().
 
   Larger alphas correspond to closer approximations of the round function.
@@ -39,28 +39,19 @@ def soft_round(x, alpha, eps=1e-12):
   Returns:
     tf.Tensor
   """
-
   if isinstance(alpha, (float, int)) and alpha < eps:
     return tf.identity(x, name="soft_round")
 
-  m = tf.floor(x) + 0.5
+  m = tf.floor(x) + .5
   r = x - m
-  z = tf.maximum(tf.tanh(alpha / 2.0) * 2.0, eps)
+  z = tf.tanh(alpha / 2.) * 2.
   y = m + tf.tanh(alpha * r) / z
 
   # For very low alphas, soft_round behaves like identity
   return tf.where(alpha < eps, x, y, name="soft_round")
 
 
-@tf.custom_gradient
-def _clip_st(s):
-  """Clip s to [-1 + 1e-7, 1 - 1e-7] with straight-through gradients."""
-  s = tf.clip_by_value(s, -1 + 1e-7, 1 - 1e-7)
-  grad = lambda x: x
-  return s, grad
-
-
-def soft_round_inverse(y, alpha, eps=1e-12):
+def soft_round_inverse(y, alpha, eps=1e-3):
   """Inverse of soft_round().
 
   This is described in Sec. 4.1. in the paper
@@ -77,21 +68,19 @@ def soft_round_inverse(y, alpha, eps=1e-12):
   Returns:
     tf.Tensor
   """
-
   if isinstance(alpha, (float, int)) and alpha < eps:
     return tf.identity(y, name="soft_round_inverse")
 
-  m = tf.floor(y) + 0.5
-  s = (y - m) * (tf.tanh(alpha / 2.0) * 2.0)
-  # We have -0.5 <= (y-m) <= 0.5 and -1 < tanh < 1, so
-  # -1 <= s <= 1. However tf.atanh is only stable for inputs
-  # in the range [-1+1e-7, 1-1e-7], so we (safely) clip s to this range.
-  # In the rare case where `1-|s| < 1e-7`, we use straight-through for the
-  # gradient.
-  s = _clip_st(s)
-  r = tf.atanh(s) / tf.maximum(alpha, eps)
+  m = tf.floor(y) + .5
+  s = (y - m) * (tf.tanh(alpha / 2.) * 2.)
+  r = tf.atanh(s) / alpha
+  # `r` must be between -.5 and .5 by definition. In case atanh becomes +-inf
+  # due to numerical instability, this prevents the forward pass from yielding
+  # infinite values. Note that it doesn't prevent the backward pass from
+  # returning non-finite values.
+  r = tf.clip_by_value(r, -.5, .5)
 
-  # For very low alphas, soft_round behaves like identity
+  # For very low alphas, soft_round behaves like identity.
   return tf.where(alpha < eps, y, m + r, name="soft_round_inverse")
 
 
@@ -107,7 +96,6 @@ def soft_round_conditional_mean(inputs, alpha):
   > Eirikur Agustsson & Lucas Theis<br />
   > https://arxiv.org/abs/2006.09952
 
-
   Args:
     inputs: The input tensor.
     alpha: The softround alpha.
@@ -115,4 +103,4 @@ def soft_round_conditional_mean(inputs, alpha):
   Returns:
     The conditional mean, of same shape as `inputs`.
   """
-  return soft_round_inverse(inputs - 0.5, alpha) + 0.5
+  return soft_round_inverse(inputs - .5, alpha) + .5

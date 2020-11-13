@@ -23,29 +23,29 @@ from tensorflow_compression.python.distributions import helpers
 
 class HelpersTest(tf.test.TestCase):
 
-  def test_cauchy_quantizes_to_mode(self):
-    dist = tfp.distributions.Cauchy(loc=1.5, scale=3.)
-    self.assertEqual(helpers.quantization_offset(dist), 1.5)
+  def test_cauchy_quantizes_to_mode_decimal_part(self):
+    dist = tfp.distributions.Cauchy(loc=1.4, scale=3.)
+    self.assertAllClose(helpers.quantization_offset(dist), 0.4)
 
-  def test_gamma_quantizes_to_mode(self):
+  def test_gamma_quantizes_to_mode_decimal_part(self):
     dist = tfp.distributions.Gamma(concentration=5., rate=1.)
-    self.assertEqual(helpers.quantization_offset(dist), 4.)
+    self.assertEqual(helpers.quantization_offset(dist), 0.)
 
-  def test_laplace_quantizes_to_mode(self):
+  def test_laplace_quantizes_to_mode_decimal_part(self):
     dist = tfp.distributions.Laplace(loc=-2., scale=5.)
-    self.assertEqual(helpers.quantization_offset(dist), -2.)
+    self.assertEqual(helpers.quantization_offset(dist), 0.)
 
-  def test_logistic_quantizes_to_mode(self):
+  def test_logistic_quantizes_to_mode_decimal_part(self):
     dist = tfp.distributions.Logistic(loc=-3., scale=1.)
-    self.assertEqual(helpers.quantization_offset(dist), -3.)
+    self.assertEqual(helpers.quantization_offset(dist), 0.)
 
-  def test_lognormal_quantizes_to_mode(self):
+  def test_lognormal_quantizes_to_mode_decimal_part(self):
     dist = tfp.distributions.LogNormal(loc=4., scale=1.)
-    self.assertEqual(helpers.quantization_offset(dist), tf.exp(3.))
+    self.assertAllClose(helpers.quantization_offset(dist), tf.exp(3.)-20.0)
 
-  def test_normal_quantizes_to_mode(self):
+  def test_normal_quantizes_to_mode_decimal_part(self):
     dist = tfp.distributions.Normal(loc=3., scale=5.)
-    self.assertEqual(helpers.quantization_offset(dist), 3.)
+    self.assertEqual(helpers.quantization_offset(dist), 0.)
 
   def test_cauchy_tails_are_in_order(self):
     dist = tfp.distributions.Cauchy(loc=1.5, scale=3.)

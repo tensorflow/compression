@@ -28,7 +28,6 @@ class ContinuousBatchedEntropyModelTest(tf.test.TestCase):
     em = ContinuousBatchedEntropyModel(noisy, 1)
     self.assertIs(em.prior, noisy)
     self.assertEqual(em.coding_rank, 1)
-    self.assertEqual(em.likelihood_bound, 1e-9)
     self.assertEqual(em.tail_mass, 2**-8)
     self.assertEqual(em.range_coder_precision, 12)
     self.assertEqual(em.dtype, noisy.dtype)
@@ -87,17 +86,17 @@ class ContinuousBatchedEntropyModelTest(tf.test.TestCase):
     self.assertAllEqual(x_decompressed, x_quantized)
 
   def test_information_bounds(self):
-    # `bits(training=True)` should be greater than `bits(training=False)`
+    # bits w/ `training=True` should be greater than bits w/ `training=False`
     # because it is defined as an upper bound (albeit for infinite data). The
     # actual length of the bit string should always be greater than
-    # `bits(training=False)` because range coding is only asymptotically
+    # bits w/ `training=False` because range coding is only asymptotically
     # optimal, and because it operates on quantized probabilities.
     for scale in 2 ** tf.linspace(-2., 7., 10):
       noisy = uniform_noise.NoisyNormal(loc=0., scale=scale)
       em = ContinuousBatchedEntropyModel(noisy, 1, compression=True)
       x = noisy.base.sample([10000])
-      bits_eval = em.bits(x, training=False)
-      bits_training = em.bits(x, training=True)
+      _, bits_eval = em(x, training=False)
+      _, bits_training = em(x, training=True)
       bits_compressed = 8 * len(em.compress(x).numpy())
       self.assertGreater(bits_training, .9975 * bits_eval)
       self.assertGreater(bits_compressed, bits_eval)
@@ -108,8 +107,8 @@ class ContinuousBatchedEntropyModelTest(tf.test.TestCase):
     noisy = uniform_noise.NoisyNormal(loc=0., scale=.25)
     em = ContinuousBatchedEntropyModel(noisy, 1, compression=True)
     x = noisy.base.sample([10000])
-    bits_eval = em.bits(x, training=False)
-    bits_training = em.bits(x, training=True)
+    _, bits_eval = em(x, training=False)
+    _, bits_training = em(x, training=True)
     bits_compressed = 8 * len(em.compress(x).numpy())
     self.assertAllClose(bits_training, bits_eval, atol=0, rtol=1.25)
     self.assertAllClose(bits_compressed, bits_eval, atol=0, rtol=5e-3)
@@ -120,8 +119,8 @@ class ContinuousBatchedEntropyModelTest(tf.test.TestCase):
     noisy = uniform_noise.NoisyNormal(loc=0., scale=100.)
     em = ContinuousBatchedEntropyModel(noisy, 1, compression=True)
     x = noisy.base.sample([10000])
-    bits_eval = em.bits(x, training=False)
-    bits_training = em.bits(x, training=True)
+    _, bits_eval = em(x, training=False)
+    _, bits_training = em(x, training=True)
     bits_compressed = 8 * len(em.compress(x).numpy())
     self.assertAllClose(bits_training, bits_eval, atol=0, rtol=5e-5)
     self.assertAllClose(bits_compressed, bits_eval, atol=0, rtol=5e-3)
@@ -176,6 +175,30 @@ class ContinuousBatchedEntropyModelTest(tf.test.TestCase):
     values_function = tf.function(Compressor().compress)(sample)
     self.assertAllEqual(values_eager, values_function)
 
+  def test_small_cdfs_for_dirac_prior_without_quantization_offset(self):
+    prior = uniform_noise.NoisyNormal(loc=100 * tf.range(16.0), scale=1e-10)
+    prior._quantization_offset = lambda: 0.0
+    em = ContinuousBatchedEntropyModel(
+        prior, coding_rank=2, compression=True)
+    self.assertAllLessEqual(em._cdf_length, 10)
+
+  def test_small_bitcost_for_dirac_prior(self):
+    prior = uniform_noise.NoisyNormal(loc=100 * tf.range(16.0), scale=1e-10)
+    em = ContinuousBatchedEntropyModel(
+        prior, coding_rank=2, compression=True)
+    num_symbols = 1000
+    source = prior.base
+    x = source.sample((3, num_symbols))
+    _, bits_estimate = em(x, training=True)
+    bitstring = em.compress(x)
+    x_decoded = em.decompress(bitstring, (num_symbols,))
+    bitstring_bits = tf.reshape(
+        [len(b) * 8 for b in bitstring.numpy().flatten()], bitstring.shape)
+    # Max 2 bytes.
+    self.assertAllLessEqual(bits_estimate, 16)
+    self.assertAllLessEqual(bitstring_bits, 16)
+    # Quantization noise should be between -.5 and .5
+    self.assertAllLessEqual(tf.abs(x - x_decoded), 0.5)
 
 if __name__ == "__main__":
   tf.test.main()

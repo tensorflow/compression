@@ -42,12 +42,11 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
   A typical workflow looks like this:
 
   - Train a model using an instance of this entropy model as a bottleneck,
-    passing the bottleneck tensor through `quantize()` while optimizing
-    compressibility of the tensor using `bits()`. `bits(training=True)` computes
-    a differentiable upper bound on the number of bits needed to compress the
-    bottleneck tensor.
+    passing the bottleneck tensor through it. With training=True, the model
+    computes a differentiable upper bound on the number of bits needed to
+    compress the bottleneck tensor.
   - For evaluation, get a closer estimate of the number of compressed bits
-    using `bits(training=False)`.
+    using training=False`.
   - Instantiate an entropy model with `compression=True` (and the same
     parameters as during training), and share the model between a sender and a
     receiver.
@@ -73,10 +72,16 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
   > https://openreview.net/forum?id=rJxdQ3jeg
   """
 
-  def __init__(self, prior, coding_rank, compression=False,
-               likelihood_bound=1e-9, tail_mass=2**-8,
-               range_coder_precision=12, no_variables=False):
-    """Initializer.
+  def __init__(self,
+               prior,
+               coding_rank,
+               compression=False,
+               laplace_tail_mass=0.0,
+               expected_grads=False,
+               tail_mass=2**-8,
+               range_coder_precision=12,
+               no_variables=False):
+    """Initializes the instance.
 
     Arguments:
       prior: A `tfp.distributions.Distribution` object. A density model fitting
@@ -89,12 +94,14 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         variables or constants).
       coding_rank: Integer. Number of innermost dimensions considered a coding
         unit. Each coding unit is compressed to its own bit string, and the
-        `bits()` method sums over each coding unit.
+        bits in the __call__ method are summed over each coding unit.
       compression: Boolean. If set to `True`, the range coding tables used by
         `compress()` and `decompress()` will be built on instantiation. If set
         to `False`, these two methods will not be accessible.
-      likelihood_bound: Float. Lower bound for likelihood values, to prevent
-        training instabilities.
+      laplace_tail_mass: Float. If positive, will augment the prior with a
+        laplace mixture for training stability. (experimental)
+      expected_grads: If True, will use analytical expected gradients during
+        backpropagation w.r.t. additive uniform noise.
       tail_mass: Float. Approximate probability mass which is range encoded with
         less precision, by using a Golomb-like code.
       range_coder_precision: Integer. Precision passed to the range coding op.
@@ -112,13 +119,17 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         prior=prior,
         coding_rank=coding_rank,
         compression=compression,
-        likelihood_bound=likelihood_bound,
+        laplace_tail_mass=laplace_tail_mass,
+        expected_grads=expected_grads,
         tail_mass=tail_mass,
         range_coder_precision=range_coder_precision,
         no_variables=no_variables,
     )
+    self._cache_quantization_offset()
 
-    quantization_offset = helpers.quantization_offset(prior)
+  def _cache_quantization_offset(self):
+    """Comptue quantization offset from prior and cache it."""
+    quantization_offset = helpers.quantization_offset(self.prior)
     # Optimization: if the quantization offset is zero, we don't need to
     # subtract/add it when quantizing, and we don't need to serialize its value.
     # Note that this code will only work in eager mode.
@@ -141,18 +152,20 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       return None
     return tf.convert_to_tensor(self._quantization_offset)
 
-  def _compute_indexes(self, broadcast_shape):
+  def _compute_indexes_and_offset(self, broadcast_shape):
+    """Returns the indexes for range coding and the quantization offset."""
     # TODO(jonycgn, ssjhv): Investigate broadcasting in range coding op.
     prior_size = functools.reduce(lambda x, y: x * y, self.prior_shape, 1)
     indexes = tf.range(prior_size, dtype=tf.int32)
     indexes = tf.reshape(indexes, self.prior_shape_tensor)
     indexes = tf.broadcast_to(
         indexes, tf.concat([broadcast_shape, self.prior_shape_tensor], 0))
-    return indexes
+    return indexes, self.quantization_offset
 
   @tf.Module.with_name_scope
-  def bits(self, bottleneck, training=True):
-    """Estimates the number of bits needed to compress a tensor.
+  def __call__(self, bottleneck, training=True):
+    """Perturbs a tensor with (quantization) noise and estimates bitcost.
+
 
     Arguments:
       bottleneck: `tf.Tensor` containing the data to be compressed. Must have at
@@ -165,20 +178,23 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         looser, but differentiable *upper* bound on this quantity.
 
     Returns:
-      A `tf.Tensor` having the same shape as `bottleneck` without the
-      `self.coding_rank` innermost dimensions, containing the number of bits.
+      A tuple (bottleneck_perturbed, bits),
+      where `bottleneck_perturbed` is `bottleneck` perturbed with (quantization)
+      noise and `bits` is the bitcost with the same shape as `bottleneck`
+      without the `self.coding_rank` innermost dimensions.
     """
+    log_prob_fn = functools.partial(self._log_prob_from_prior, self.prior)
     if training:
-      quantized = bottleneck + tf.random.uniform(
-          tf.shape(bottleneck), minval=-.5, maxval=.5, dtype=bottleneck.dtype)
+      log_probs, bottleneck_perturbed = math_ops.perturb_and_apply(
+          log_prob_fn, bottleneck, expected_grads=self._expected_grads)
     else:
-      quantized = self.quantize(bottleneck)
-    probs = self.prior.prob(quantized)
-    probs = math_ops.lower_bound(probs, self.likelihood_bound)
+      bottleneck_perturbed = self.quantize(bottleneck)
+      log_probs = log_prob_fn(bottleneck_perturbed)
+
     axes = tuple(range(-self.coding_rank, 0))
-    bits = tf.reduce_sum(tf.math.log(probs), axis=axes) / (
-        -tf.math.log(tf.constant(2., dtype=probs.dtype)))
-    return bits
+    bits = tf.reduce_sum(log_probs, axis=axes) / (
+        -tf.math.log(tf.constant(2, dtype=log_probs.dtype)))
+    return bottleneck_perturbed, bits
 
   @tf.Module.with_name_scope
   def quantize(self, bottleneck):
@@ -232,9 +248,9 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     broadcast_shape = coding_shape[
         :self.coding_rank - len(self.prior_shape)]
 
-    indexes = self._compute_indexes(broadcast_shape)
-    if self.quantization_offset is not None:
-      bottleneck -= self.quantization_offset
+    indexes, offset = self._compute_indexes_and_offset(broadcast_shape)
+    if offset is not None:
+      bottleneck -= offset
     symbols = tf.cast(tf.round(bottleneck), tf.int32)
     symbols = tf.reshape(symbols, tf.concat([[-1], coding_shape], 0))
 
@@ -280,7 +296,7 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     symbols_shape = tf.concat(
         [batch_shape, broadcast_shape, self.prior_shape_tensor], 0)
 
-    indexes = self._compute_indexes(broadcast_shape)
+    indexes, offset = self._compute_indexes_and_offset(broadcast_shape)
     strings = tf.reshape(strings, [-1])
 
     # Prevent tensors from bouncing back and forth between host and GPU.
@@ -300,9 +316,7 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
 
     symbols = tf.reshape(symbols, symbols_shape)
     outputs = tf.cast(symbols, self.dtype)
-    if self.quantization_offset is not None:
-      outputs += self.quantization_offset
-    return outputs
+    return outputs + offset if offset is not None else outputs
 
   def get_config(self):
     """Returns the configuration of the entropy model.

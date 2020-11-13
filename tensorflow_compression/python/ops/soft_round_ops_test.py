@@ -14,12 +14,13 @@
 # ==============================================================================
 """Tests for soft round."""
 
+from absl.testing import parameterized
 import tensorflow as tf
 
 from tensorflow_compression.python.ops import soft_round_ops
 
 
-class SoftRoundTest(tf.test.TestCase):
+class SoftRoundTest(tf.test.TestCase, parameterized.TestCase):
 
   def test_soft_round_small_alpha_is_identity(self):
     x = tf.linspace(-2., 2., 50)
@@ -57,6 +58,33 @@ class SoftRoundTest(tf.test.TestCase):
       x = tf.linspace(offset + 0.001, offset + 0.999, 100)
       y = soft_round_ops.soft_round_conditional_mean(x, alpha=5000.0)
       self.assertAllClose(tf.math.round(x), y, atol=0.001)
+
+  @parameterized.parameters(0., 1e-6, 1e-2, 5., 1e6)
+  def test_soft_round_values_and_gradients_are_finite(self, alpha):
+    x = tf.linspace(0., 1., 11)  # covers exact integers and half-integers
+    with tf.GradientTape() as tape:
+      tape.watch(x)
+      y = soft_round_ops.soft_round(x, alpha=alpha)
+    dy = tape.gradient(y, x)
+    self.assertAllEqual(tf.math.is_finite(y), tf.ones(x.shape, dtype=bool))
+    self.assertAllEqual(tf.math.is_finite(dy), tf.ones(x.shape, dtype=bool))
+
+  @parameterized.parameters(0., 1e-6, 1e-2, 5., 1e6)
+  def test_soft_round_inverse_values_and_gradients_are_finite(self, alpha):
+    x = tf.linspace(-.5, .5, 11)  # covers exact integers and half-integers
+    with tf.GradientTape() as tape:
+      tape.watch(x)
+      y = soft_round_ops.soft_round_inverse(x, alpha=alpha)
+    dy = tape.gradient(y, x)
+    self.assertAllEqual(tf.math.is_finite(y), tf.ones(x.shape, dtype=bool))
+    if alpha > 15:
+      # We allow non-finite values for large alphas, since the function simply
+      # is extremely steep there.
+      expected_finite = tf.one_hot(5, 11, False, True)
+    else:
+      expected_finite = tf.ones(x.shape, dtype=bool)
+    self.assertAllEqual(tf.math.is_finite(dy), expected_finite)
+
 
 if __name__ == "__main__":
   tf.test.main()
