@@ -29,7 +29,7 @@ from . import train
 class FakeHiFiC(model.HiFiC):
   """Fake class for testing."""
 
-  def _get_dataset(self, batch_size, crop_size,
+  def _get_dataset(self, batch_size, crop_size, images_glob,
                    tfds_arguments: helpers.TFDSArguments):
     zeros = np.zeros((batch_size, crop_size, crop_size, 3))
     return (tf.data.Dataset.from_tensor_slices(
