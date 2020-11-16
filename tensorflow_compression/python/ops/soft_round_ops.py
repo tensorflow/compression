@@ -39,13 +39,14 @@ def soft_round(x, alpha, eps=1e-3):
   Returns:
     tf.Tensor
   """
-  if isinstance(alpha, (float, int)) and alpha < eps:
-    return tf.identity(x, name="soft_round")
+  # This guards the gradient of tf.where below against NaNs, while maintaining
+  # correctness, as for alpha < eps the result is ignored.
+  alpha_bounded = tf.maximum(alpha, eps)
 
   m = tf.floor(x) + .5
   r = x - m
-  z = tf.tanh(alpha / 2.) * 2.
-  y = m + tf.tanh(alpha * r) / z
+  z = tf.tanh(alpha_bounded / 2.) * 2.
+  y = m + tf.tanh(alpha_bounded * r) / z
 
   # For very low alphas, soft_round behaves like identity
   return tf.where(alpha < eps, x, y, name="soft_round")
@@ -68,12 +69,12 @@ def soft_round_inverse(y, alpha, eps=1e-3):
   Returns:
     tf.Tensor
   """
-  if isinstance(alpha, (float, int)) and alpha < eps:
-    return tf.identity(y, name="soft_round_inverse")
-
+  # This guards the gradient of tf.where below against NaNs, while maintaining
+  # correctness, as for alpha < eps the result is ignored.
+  alpha_bounded = tf.maximum(alpha, eps)
   m = tf.floor(y) + .5
-  s = (y - m) * (tf.tanh(alpha / 2.) * 2.)
-  r = tf.atanh(s) / alpha
+  s = (y - m) * (tf.tanh(alpha_bounded / 2.) * 2.)
+  r = tf.atanh(s) / alpha_bounded
   # `r` must be between -.5 and .5 by definition. In case atanh becomes +-inf
   # due to numerical instability, this prevents the forward pass from yielding
   # infinite values. Note that it doesn't prevent the backward pass from
