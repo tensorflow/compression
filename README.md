@@ -1,58 +1,60 @@
 # Introduction
 
-This project contains data compression ops and layers for TensorFlow. The
-project website is at
-[tensorflow.github.io/compression](https://tensorflow.github.io/compression).
+This project contains data compression ops and layers for TensorFlow.
 
 You can use this library to build your own ML models with end-to-end optimized
 data compression built in. It's useful to find storage-efficient representations
-of your data (features, examples, images, etc.) while only sacrificing a tiny
+of your data (images, features, examples, etc.) while only sacrificing a tiny
 fraction of model performance. It can compress any floating point tensor to a
 much smaller sequence of bits.
 
-Specifically, the
-[EntropyBottleneck class](https://tensorflow.github.io/compression/docs/entropy_bottleneck.html)
-in this library simplifies the process of designing rate–distortion optimized
-codes. During training, it acts like a likelihood model. Once training is
-completed, it encodes floating point tensors into optimal bit sequences by
-automating the design of probability tables and calling a range coder
-implementation behind the scenes.
+Specifically, the entropy model classes in this library simplify the process of
+designing rate–distortion optimized codes. During training, they act like
+likelihood models. Once training is completed, they encode floating point
+tensors into optimal bit sequences by automating the design of probability
+tables and calling a range coder implementation behind the scenes.
 
-For an introduction to lossy image compression with machine learning, take a
-look at @jonycgn's
-[talk on Learned Image Compression](https://www.youtube.com/watch?v=x_q7cZviXkY).
+The main novelty of this method over traditional transform coding is the
+stochastic minimization of the rate-distortion Lagrangian, and using nonlinear
+transforms implemented by neural networks. For an introduction to this, consider
+our [paper on nonlinear transform coding](https://arxiv.org/abs/2007.03034), or
+watch @jonycgn's [talk on learned image
+compression](https://www.youtube.com/watch?v=x_q7cZviXkY).
 
 ## Documentation & getting help
 
-For usage questions and discussions, please head over to our
-[Google group](https://groups.google.com/forum/#!forum/tensorflow-compression).
+Please post all questions or comments in our [Google
+group](https://groups.google.com/forum/#!forum/tensorflow-compression). Only
+file Github issues for actual bugs or feature requests. If you post to the group
+instead, you may get a faster answer, and you help other people find the
+question or answer more easily later.
 
-Refer to
-[the API documentation](https://tensorflow.github.io/compression/docs/api_docs/python/tfc.html)
+Refer to [the API
+documentation](https://tensorflow.github.io/compression/docs/api_docs/python/tfc.html)
 for a complete description of the Keras layers and TensorFlow ops this package
 implements.
-
-There's also an introduction to our `EntropyBottleneck` class
-[here](https://tensorflow.github.io/compression/docs/entropy_bottleneck.html),
-and a description of the range coding operators
-[here](https://tensorflow.github.io/compression/docs/range_coding.html).
+***Note: the API docs have not been updated for the current beta release yet.***
 
 ## Installation
 
-***Note: Precompiled packages are currently only provided for Linux (Python 2.7,
-3.3-3.6) and Darwin/Mac OS (Python 2.7, 3.7). To use these packages on Windows,
-consider using a
-[TensorFlow Docker image](https://www.tensorflow.org/install/docker) and
-installing tensorflow-compression using pip inside the Docker container.***
+***Note: Precompiled packages are currently only provided for Linux and
+Darwin/Mac OS. To use these packages on Windows, consider using a [TensorFlow
+Docker image](https://www.tensorflow.org/install/docker) and installing
+tensorflow-compression using pip inside the Docker container.***
 
 Set up an environment in which you can install precompiled binary Python
 packages using the `pip` command. Refer to the
 [TensorFlow installation instructions](https://www.tensorflow.org/install/pip)
 for more information on how to set up such a Python environment.
 
-The current version of tensorflow-compression requires TensorFlow 1.15. For
-TensorFlow 1.14 or earlier, see our
-[previous releases](https://github.com/tensorflow/compression/releases). You can
+The current stable version of TFC (1.3) requires TensorFlow 1.15. The current
+beta release of TFC (2.0b1) is built for TensorFlow 2.3. For versions compatible
+with TensorFlow 1.14 or earlier, see our [previous
+releases](https://github.com/tensorflow/compression/releases). The following
+instructions are for the stable release. To install the beta, replace the
+version numbers with 2.0b1 and 2.3, respectively.
+
+You can
 install TensorFlow from any source. To install it via `pip`, run the following
 command:
 ```bash
@@ -67,7 +69,7 @@ for CPU-only.
 Then, run the following command to install the tensorflow-compression pip
 package:
 ```bash
-pip install tensorflow-compression
+pip install tensorflow-compression==1.3
 ```
 
 To test that the installation works correctly, you can run the unit tests with
@@ -86,7 +88,7 @@ and then run the `pip install` command inside the Docker container, not on the
 host. For instance, you can use a command line like this:
 ```bash
 docker run tensorflow/tensorflow:1.15.0-py3 bash -c \
-    "pip install tensorflow-compression &&
+    "pip install tensorflow-compression==1.3 &&
      python -m tensorflow_compression.python.all_test"
 ```
 This will fetch the TensorFlow Docker image if it's not already cached, install
@@ -95,16 +97,15 @@ the pip package and then run the unit tests to confirm that it works.
 ### Anaconda
 
 It seems that [Anaconda](https://www.anaconda.com/distribution/) ships its own
-binary version of TensorFlow which is incompatible with our pip package. It
-also installs Python 3.7 by default, which we currently don't support on Linux.
-To solve this, make sure to use Python 3.6 on Linux, and always install
-TensorFlow via `pip` rather than `conda`. For example, this creates an Anaconda
-environment with Python 3.6 and CUDA libraries, and then installs TensorFlow
-and tensorflow-compression with GPU support:
+binary version of TensorFlow which is incompatible with our pip package. To
+solve this, always install TensorFlow via `pip` rather than `conda`. For
+example, this creates an Anaconda environment with Python 3.6 and CUDA
+libraries, and then installs TensorFlow and tensorflow-compression with GPU
+support:
 ```bash
 conda create --name ENV_NAME python=3.6 cudatoolkit=10.0 cudnn
 conda activate ENV_NAME
-pip install tensorflow-gpu==1.15 tensorflow-compression
+pip install tensorflow-gpu==1.15 tensorflow-compression==1.3
 ```
 
 ## Usage
@@ -194,24 +195,24 @@ This section describes the necessary steps to build your own pip packages of
 tensorflow-compression. This may be necessary to install it on platforms for
 which we don't provide precompiled binaries (currently only Linux and Darwin).
 
-We use the Docker image `tensorflow/tensorflow:custom-op-ubuntu16` for building
-pip packages for Linux. Note that this is different from
-`tensorflow/tensorflow:devel`. To be compatible with the TensorFlow pip package,
-the GCC version must match, but `tensorflow/tensorflow:devel` has a different
-GCC version installed.
+We use the custom-op Docker images (e.g.
+`tensorflow/tensorflow:nightly-custom-op-ubuntu16`) for building pip packages
+for Linux. Note that this is different from `tensorflow/tensorflow:devel`. To be
+compatible with the TensorFlow pip package, the GCC version must match, but
+`tensorflow/tensorflow:devel` has a different GCC version installed. For more
+information, refer to the [custom-op
+instructions](https://github.com/tensorflow/custom-op).
 
 Inside a Docker container from the image, the following steps need to be taken.
 
-1. Install the TensorFlow pip package.
-2. Clone the `tensorflow/compression` repo from GitHub.
-3. Run `:build_pip_pkg` inside the cloned repo.
+1. Clone the `tensorflow-compression` repo from GitHub.
+2. Run `:build_pip_pkg` inside the cloned repo.
 
 For example:
 ```bash
 sudo docker run -v /tmp/tensorflow_compression:/tmp/tensorflow_compression \
-    tensorflow/tensorflow:custom-op-ubuntu16 bash -c \
-    "pip install tensorflow==1.15 &&
-     git clone https://github.com/tensorflow/compression.git
+    tensorflow/tensorflow:nightly-custom-op-ubuntu16 bash -c \
+    "git clone https://github.com/tensorflow/compression.git
          /tensorflow_compression &&
      cd /tensorflow_compression &&
      bazel run -c opt --copt=-mavx :build_pip_pkg"
@@ -228,7 +229,7 @@ pip install /tmp/tensorflow_compression/tensorflow_compression-*.whl
 Then run the unit tests (Do not run the tests in the workspace directory where
 `WORKSPACE` of `tensorflow_compression` repo lives. In that case, the Python
 interpreter would attempt to import `tensorflow_compression` packages from the
-source tree rather than from the installed package system directory):
+source tree, rather than from the installed package system directory):
 ```bash
 pushd /tmp
 python -m tensorflow_compression.python.all_test
@@ -256,5 +257,6 @@ for more information.
 * Sung Jin Hwang (github: [ssjhv](https://github.com/ssjhv))
 * Nick Johnston (github: [nmjohn](https://github.com/nmjohn))
 * David Minnen (github: [minnend](https://github.com/minnend))
+* Eirikur Agustsson (github: [relational](https://github.com/relational))
 
 Note that this is not an officially supported Google product.

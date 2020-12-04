@@ -22,7 +22,7 @@ def _tensorflow_pip_impl(ctx):
          "tensorflow?: %s" % include_path.stderr)
 
   if "linux" in ctx.os.name:
-    library_filename = "libtensorflow_framework.so.1"
+    library_filename = "libtensorflow_framework.so.2"
   elif "mac" in ctx.os.name:
     library_filename = "libtensorflow_framework.dylib"
 

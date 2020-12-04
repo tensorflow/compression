@@ -21,6 +21,15 @@ No BUILD entry exists for this file on purpose.
 import tensorflow.compat.v1 as tf
 
 # pylint: disable=wildcard-import
+from tensorflow_compression.python.distributions.deep_factorized_test import *
+from tensorflow_compression.python.distributions.helpers_test import *
+from tensorflow_compression.python.distributions.round_adapters_test import *
+from tensorflow_compression.python.distributions.uniform_noise_test import *
+
+from tensorflow_compression.python.entropy_models.continuous_batched_test import *
+from tensorflow_compression.python.entropy_models.continuous_indexed_test import *
+from tensorflow_compression.python.entropy_models.universal_test import *
+
 from tensorflow_compression.python.layers.entropy_models_test import *
 from tensorflow_compression.python.layers.gdn_test import *
 from tensorflow_compression.python.layers.parameterizers_test import *
@@ -30,7 +39,7 @@ from tensorflow_compression.python.layers.soft_round_test import *
 from tensorflow_compression.python.ops.math_ops_test import *
 from tensorflow_compression.python.ops.padding_ops_test import *
 from tensorflow_compression.python.ops.range_coding_ops_test import *
-from tensorflow_compression.python.ops.round_ops_test import *
+from tensorflow_compression.python.ops.soft_round_ops_test import *
 from tensorflow_compression.python.ops.spectral_ops_test import *
 
 from tensorflow_compression.python.util.packed_tensors_test import *
