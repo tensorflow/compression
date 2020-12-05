@@ -83,7 +83,7 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
                no_variables=False):
     """Initializes the instance.
 
-    Arguments:
+    Args:
       prior: A `tfp.distributions.Distribution` object. A density model fitting
         the marginal distribution of the bottleneck data with additive uniform
         noise, which is shared a priori between the sender and the receiver. For
@@ -167,7 +167,7 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     """Perturbs a tensor with (quantization) noise and estimates bitcost.
 
 
-    Arguments:
+    Args:
       bottleneck: `tf.Tensor` containing the data to be compressed. Must have at
         least `self.coding_rank` dimensions, and the innermost dimensions must
         be broadcastable to `self.prior_shape`.
@@ -209,7 +209,7 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     The gradient of this rounding operation is overridden with the identity
     (straight-through gradient estimator).
 
-    Arguments:
+    Args:
       bottleneck: `tf.Tensor` containing the data to be quantized. The innermost
         dimensions must be broadcastable to `self.prior_shape`.
 
@@ -231,7 +231,7 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     i.e. are compressed into one string each. Any additional dimensions to the
     left are treated as batch dimensions.
 
-    Arguments:
+    Args:
       bottleneck: `tf.Tensor` containing the data to be compressed. Must have at
         least `self.coding_rank` dimensions, and the innermost dimensions must
         be broadcastable to `self.prior_shape`.
@@ -279,7 +279,7 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     Reconstructs the quantized tensor from bit strings produced by `compress()`.
     It is necessary to provide a part of the output shape in `broadcast_shape`.
 
-    Arguments:
+    Args:
       strings: `tf.Tensor` containing the compressed bit strings.
       broadcast_shape: Iterable of ints. The part of the output tensor shape
         between the shape of `strings` on the left and
@@ -338,7 +338,7 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
   def from_config(cls, config):
     """Instantiates an entropy model from a configuration dictionary.
 
-    Arguments:
+    Args:
       config: A `dict`, typically the output of `get_config`.
 
     Returns:

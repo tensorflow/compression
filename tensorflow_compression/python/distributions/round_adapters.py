@@ -44,7 +44,7 @@ class MonotonicAdapter(tfp.distributions.Distribution):
   def __init__(self, base, name="MonotonicAdapter"):
     """Initializer.
 
-    Arguments:
+    Args:
       base: A `tfp.distributions.Distribution` object representing a
         continuous-valued random variable.
       name: String. A name for this distribution.
@@ -196,7 +196,7 @@ class NoisyRoundAdapter(uniform_noise.UniformNoiseAdapter):
   def __init__(self, base, name="NoisyRoundAdapter"):
     """Initializer.
 
-    Arguments:
+    Args:
       base: A `tfp.distributions.Distribution` object representing a
         continuous-valued random variable.
       name: String. A name for this distribution.
@@ -225,7 +225,7 @@ class SoftRoundAdapter(MonotonicAdapter):
   def __init__(self, base, alpha, name="SoftRoundAdapter"):
     """Initializer.
 
-    Arguments:
+    Args:
       base: A `tfp.distributions.Distribution` object representing a
         continuous-valued random variable.
       alpha: Float or tf.Tensor. Controls smoothness of the approximation.
@@ -247,7 +247,7 @@ class NoisySoftRoundAdapter(uniform_noise.UniformNoiseAdapter):
   def __init__(self, base, alpha, name="NoisySoftRoundAdapter"):
     """Initializer.
 
-    Arguments:
+    Args:
       base: A `tfp.distributions.Distribution` object representing a
         continuous-valued random variable.
       alpha: Float or tf.Tensor. Controls smoothness of soft round.

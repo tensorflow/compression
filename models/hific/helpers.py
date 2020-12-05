@@ -85,6 +85,6 @@ def add_tfds_arguments(parser):
       help="Name of the TFDS feature to use.")
 
 
-def parse_tfds_arguments(args) -> TFDSArguments:
+def parse_tfds_arguments(args) -> TFDSArgs:
   return TFDSArguments(args.tfds_dataset_name, args.tfds_features_key,
                        args.tfds_downloads_dir)

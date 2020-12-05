@@ -654,7 +654,7 @@ class FactorizedPriorLayer(tf.keras.layers.Layer):
 def estimate_entropy(entropy_model, inputs, spatial_shape=None) -> EntropyInfo:
   """Compresses `inputs` with the given entropy model and estimates entropy.
 
-  Arguments:
+  Args:
     entropy_model: An `EntropyModel` instance.
     inputs: The input tensor to be fed to the entropy model.
     spatial_shape: Shape of the input image (HxW). Must be provided for

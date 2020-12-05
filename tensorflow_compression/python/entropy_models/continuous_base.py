@@ -51,7 +51,7 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
   ):
     """Initializes the instance.
 
-    Arguments:
+    Args:
       prior: A `tfp.distributions.Distribution` object. A density model fitting
         the marginal distribution of the bottleneck data with additive uniform
         noise, which is shared a priori between the sender and the receiver. For
@@ -226,7 +226,7 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
     `compression=True`, and then distribute the model to a sender and a
     receiver.
 
-    Arguments:
+    Args:
       prior: The `tfp.distributions.Distribution` object (see initializer).
     """
     # TODO(jonycgn, relational): Consider not using offset when soft quantization
@@ -343,7 +343,7 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
   def from_config(cls, config):
     """Instantiates an entropy model from a configuration dictionary.
 
-    Arguments:
+    Args:
       config: A `dict`, typically the output of `get_config`.
 
     Returns:
