@@ -87,15 +87,24 @@ class PackedTensors(object):
 
   def unpack(self, tensors):
     """Unpacks `Tensor` values from this object."""
+    # Check tensor dtype first for a more informative error message.
+    for x in tensors:
+      if not x.dtype.is_integer and x.dtype != tf.string:
+        raise RuntimeError("Unexpected tensor dtype: '{}'.".format(x.dtype))
+
+    # Extact numpy dtypes and call type-based API.
+    np_dtypes = [x.dtype.as_numpy_dtype for x in tensors]
+    return self.unpack_from_np_dtypes(np_dtypes)
+
+  def unpack_from_np_dtypes(self, np_dtypes):
+    """Unpacks values from this object based on numpy dtypes."""
     arrays = []
-    for i, tensor in enumerate(tensors):
+    for i, np_dtype in enumerate(np_dtypes):
       feature = self._example.features.feature[chr(i + 1)]
-      np_dtype = tensor.dtype.as_numpy_dtype
-      if tensor.dtype.is_integer:
+      if np.issubdtype(np_dtype, np.integer):
         arrays.append(np.array(feature.int64_list.value, dtype=np_dtype))
-      elif tensor.dtype == tf.string:
+      elif np_dtype == np.dtype(object) or np.issubdtype(np_dtype, np.bytes_):
         arrays.append(np.array(feature.bytes_list.value, dtype=np_dtype))
       else:
-        raise RuntimeError(
-            "Unexpected tensor dtype: '{}'.".format(tensor.dtype))
+        raise RuntimeError("Unexpected numpy dtype: '{}'.".format(np_dtype))
     return arrays

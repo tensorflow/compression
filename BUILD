@@ -72,3 +72,10 @@ py_binary(
     python_version = "PY3",
     deps = [":tensorflow_compression"],
 )
+
+py_binary(
+    name = "ms2020",
+    srcs = ["models/ms2020.py"],
+    python_version = "PY3",
+    deps = [":tensorflow_compression"],
+)

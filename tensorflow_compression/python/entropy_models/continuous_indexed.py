@@ -542,8 +542,10 @@ class LocationScaleIndexedEntropyModel(ContinuousIndexedEntropyModel):
         somewhat looser, but differentiable *upper* bound on this quantity.
 
     Returns:
-      A `tf.Tensor` having the same shape as `bottleneck` without the
-      `self.coding_rank` innermost dimensions, containing the number of bits.
+      A tuple (bottleneck_perturbed, bits) where `bottleneck_perturbed` is
+      `bottleneck` perturbed with (quantization) noise, and `bits` is the
+      bitcost with the same shape as `bottleneck` without the `self.coding_rank`
+      innermost dimensions.
     """
     if loc is None:
       loc = 0.0

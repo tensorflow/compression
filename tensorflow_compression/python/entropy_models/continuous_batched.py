@@ -178,10 +178,10 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         looser, but differentiable *upper* bound on this quantity.
 
     Returns:
-      A tuple (bottleneck_perturbed, bits),
-      where `bottleneck_perturbed` is `bottleneck` perturbed with (quantization)
-      noise and `bits` is the bitcost with the same shape as `bottleneck`
-      without the `self.coding_rank` innermost dimensions.
+      A tuple (bottleneck_perturbed, bits) where `bottleneck_perturbed` is
+      `bottleneck` perturbed with (quantization) noise, and `bits` is the
+      bitcost with the same shape as `bottleneck` without the `self.coding_rank`
+      innermost dimensions.
     """
     log_prob_fn = functools.partial(self._log_prob_from_prior, self.prior)
     if training:
