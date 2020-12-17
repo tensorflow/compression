@@ -5,20 +5,6 @@ package(
 licenses(["notice"])  # Apache 2.0
 
 py_library(
-    name = "layers",
-    srcs = ["__init__.py"],
-    srcs_version = "PY3",
-    deps = [
-        ":entropy_models",
-        ":gdn",
-        ":initializers",
-        ":parameterizers",
-        ":signal_conv",
-        ":soft_round",
-    ],
-)
-
-py_library(
     name = "entropy_models",
     srcs = ["entropy_models.py"],
     srcs_version = "PY3",
@@ -46,7 +32,6 @@ py_library(
     name = "initializers",
     srcs = ["initializers.py"],
     srcs_version = "PY3",
-    visibility = ["//visibility:private"],
 )
 
 py_library(

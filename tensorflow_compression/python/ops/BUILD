@@ -5,19 +5,6 @@ package(
 licenses(["notice"])  # Apache 2.0
 
 py_library(
-    name = "ops",
-    srcs = ["__init__.py"],
-    srcs_version = "PY3",
-    deps = [
-        ":math_ops",
-        ":padding_ops",
-        ":range_coding_ops",
-        ":soft_round_ops",
-        ":spectral_ops",
-    ],
-)
-
-py_library(
     name = "math_ops",
     srcs = ["math_ops.py"],
     srcs_version = "PY3",

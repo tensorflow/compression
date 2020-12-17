@@ -5,18 +5,6 @@ package(
 licenses(["notice"])  # Apache 2.0
 
 py_library(
-    name = "entropy_models",
-    srcs = ["__init__.py"],
-    srcs_version = "PY3",
-    deps = [
-        ":continuous_base",
-        ":continuous_batched",
-        ":continuous_indexed",
-        ":universal",
-    ],
-)
-
-py_library(
     name = "continuous_base",
     srcs = ["continuous_base.py"],
     srcs_version = "PY3",

@@ -5,18 +5,6 @@ package(
 licenses(["notice"])  # Apache 2.0
 
 py_library(
-    name = "distributions",
-    srcs = ["__init__.py"],
-    srcs_version = "PY3",
-    deps = [
-        ":deep_factorized",
-        ":helpers",
-        ":round_adapters",
-        ":uniform_noise",
-    ],
-)
-
-py_library(
     name = "deep_factorized",
     srcs = ["deep_factorized.py"],
     srcs_version = "PY3",

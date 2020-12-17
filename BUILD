@@ -4,18 +4,29 @@ exports_files(["LICENSE"])
 
 py_library(
     name = "tensorflow_compression",
-    srcs = [
-        "tensorflow_compression/__init__.py",
-        "tensorflow_compression/python/__init__.py",
-    ],
+    srcs = ["tensorflow_compression/__init__.py"],
     srcs_version = "PY3",
     visibility = ["//visibility:public"],
     deps = [
-        "//tensorflow_compression/python/distributions",
-        "//tensorflow_compression/python/entropy_models",
-        "//tensorflow_compression/python/layers",
-        "//tensorflow_compression/python/ops",
-        "//tensorflow_compression/python/util",
+        "//tensorflow_compression/python/distributions:deep_factorized",
+        "//tensorflow_compression/python/distributions:helpers",
+        "//tensorflow_compression/python/distributions:round_adapters",
+        "//tensorflow_compression/python/distributions:uniform_noise",
+        "//tensorflow_compression/python/entropy_models:continuous_batched",
+        "//tensorflow_compression/python/entropy_models:continuous_indexed",
+        "//tensorflow_compression/python/entropy_models:universal",
+        "//tensorflow_compression/python/layers:entropy_models",
+        "//tensorflow_compression/python/layers:gdn",
+        "//tensorflow_compression/python/layers:initializers",
+        "//tensorflow_compression/python/layers:parameterizers",
+        "//tensorflow_compression/python/layers:signal_conv",
+        "//tensorflow_compression/python/layers:soft_round",
+        "//tensorflow_compression/python/ops:math_ops",
+        "//tensorflow_compression/python/ops:padding_ops",
+        "//tensorflow_compression/python/ops:range_coding_ops",
+        "//tensorflow_compression/python/ops:soft_round_ops",
+        "//tensorflow_compression/python/ops:spectral_ops",
+        "//tensorflow_compression/python/util:packed_tensors",
     ],
 )
 
@@ -23,7 +34,7 @@ filegroup(
     name = "pip_src",
     srcs = [
         "MANIFEST.in",
-        "tensorflow_compression/python/all_test.py",
+        "tensorflow_compression/all_tests.py",
     ],
 )
 
@@ -43,39 +54,4 @@ py_binary(
         "//tensorflow_compression/python/util:py_src",
     ],
     python_version = "PY3",
-)
-
-py_binary(
-    name = "generate_docs",
-    srcs = ["tools/generate_docs.py"],
-    python_version = "PY3",
-    deps = [":tensorflow_compression"],
-)
-
-py_binary(
-    name = "tfci",
-    srcs = ["models/tfci.py"],
-    python_version = "PY3",
-    deps = [":tensorflow_compression"],
-)
-
-py_binary(
-    name = "bls2017",
-    srcs = ["models/bls2017.py"],
-    python_version = "PY3",
-    deps = [":tensorflow_compression"],
-)
-
-py_binary(
-    name = "bmshj2018",
-    srcs = ["models/bmshj2018.py"],
-    python_version = "PY3",
-    deps = [":tensorflow_compression"],
-)
-
-py_binary(
-    name = "ms2020",
-    srcs = ["models/ms2020.py"],
-    python_version = "PY3",
-    deps = [":tensorflow_compression"],
 )

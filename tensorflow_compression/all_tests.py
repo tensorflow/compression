@@ -12,10 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for tensorflow_compression/python.
+"""All Python tests for tensorflow_compression.
 
-This is a convenience file to be included in PIP package.
-No BUILD entry exists for this file on purpose.
+This is a convenience file to be included in the pip package.
 """
 
 import tensorflow.compat.v1 as tf

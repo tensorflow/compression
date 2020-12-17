@@ -27,20 +27,23 @@ from tensorflow_compression.python.distributions.deep_factorized import *
 from tensorflow_compression.python.distributions.helpers import *
 from tensorflow_compression.python.distributions.round_adapters import *
 from tensorflow_compression.python.distributions.uniform_noise import *
+
 from tensorflow_compression.python.entropy_models.continuous_batched import *
 from tensorflow_compression.python.entropy_models.continuous_indexed import *
 from tensorflow_compression.python.entropy_models.universal import *
+
 from tensorflow_compression.python.layers.entropy_models import *
 from tensorflow_compression.python.layers.gdn import *
 from tensorflow_compression.python.layers.initializers import *
 from tensorflow_compression.python.layers.parameterizers import *
 from tensorflow_compression.python.layers.signal_conv import *
 from tensorflow_compression.python.layers.soft_round import *
+
 from tensorflow_compression.python.ops.math_ops import *
 from tensorflow_compression.python.ops.padding_ops import *
 from tensorflow_compression.python.ops.range_coding_ops import *
 from tensorflow_compression.python.ops.soft_round_ops import *
 from tensorflow_compression.python.ops.spectral_ops import *
-from tensorflow_compression.python.util.packed_tensors import *
 
+from tensorflow_compression.python.util.packed_tensors import *
 # pylint: enable=wildcard-import

@@ -232,7 +232,7 @@ interpreter would attempt to import `tensorflow_compression` packages from the
 source tree, rather than from the installed package system directory):
 ```bash
 pushd /tmp
-python -m tensorflow_compression.python.all_test
+python -m tensorflow_compression.all_tests
 popd
 ```
 
