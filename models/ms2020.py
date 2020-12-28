@@ -24,6 +24,8 @@ This is meant as 'educational' code - you can use this to get started with your
 own experiments. To reproduce the exact results from the paper, tuning of hyper-
 parameters may be necessary. To compress images with published models, see
 `tfci.py`.
+
+This script requires tensorflow-compression v2.x.
 """
 
 import argparse

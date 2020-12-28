@@ -16,6 +16,8 @@
 
 Use this script to compress images with pre-trained models as published. See the
 'models' subcommand for a list of available models.
+
+Currently, this script requires tensorflow-compression v1.3.
 """
 
 import argparse
