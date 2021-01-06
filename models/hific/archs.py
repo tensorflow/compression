@@ -27,7 +27,7 @@ import tensorflow.compat.v1 as tf
 
 import tensorflow_compression as tfc
 
-from .helpers import ModelMode
+from hific.helpers import ModelMode
 
 SCALES_MIN = 0.11
 SCALES_MAX = 256

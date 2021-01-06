@@ -5,7 +5,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 import tensorflow_compression as tfc
-from . import compression_model
+from toy_sources import compression_model
 
 tfpd = tfp.distributions
 

@@ -14,7 +14,7 @@
 # ==============================================================================
 """Configurations for HiFiC."""
 
-from . import helpers
+from hific import helpers
 
 
 _CONFIGS = {

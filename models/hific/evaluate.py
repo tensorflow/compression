@@ -29,9 +29,9 @@ from PIL import Image
 import tensorflow.compat.v1 as tf
 import tensorflow_compression as tfc
 
-from . import configs
-from . import helpers
-from . import model
+from hific import configs
+from hific import helpers
+from hific import model
 
 
 # Show custom tf.logging calls.

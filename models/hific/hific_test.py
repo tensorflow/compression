@@ -20,10 +20,10 @@ import tempfile
 import numpy as np
 import tensorflow.compat.v1 as tf
 
-from . import configs
-from . import helpers
-from . import model
-from . import train
+from hific import configs
+from hific import helpers
+from hific import model
+from hific import train
 
 
 class FakeHiFiC(model.HiFiC):

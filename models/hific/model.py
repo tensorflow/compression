@@ -21,11 +21,11 @@ from compare_gan.gans import loss_lib as compare_gan_loss_lib
 import tensorflow.compat.v1 as tf
 import tensorflow_datasets as tfds
 
-from . import archs
-from . import helpers
-from .helpers import ModelMode
-from .helpers import ModelType
-from .helpers import TFDSArguments
+from hific import archs
+from hific import helpers
+from hific.helpers import ModelMode
+from hific.helpers import ModelType
+from hific.helpers import TFDSArguments
 
 
 # How many dataset preprocessing processes to use.
