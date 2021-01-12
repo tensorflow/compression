@@ -16,6 +16,28 @@ class CompressionModel(tf.keras.Model, metaclass=abc.ABCMeta):
     self.lmbda = float(lmbda)
     self.distortion_loss = str(distortion_loss)
 
+  ############################################################################
+  # In TF <= 2.4, `Model` doesn't aggregate variables from nested `Module`s.
+  # We fall back to aggregating them the `Module` way. Note: this ignores the
+  # `trainable` attribute of any nested `Layer`s.
+  @property
+  def variables(self):
+    return tf.Module.variables.fget(self)
+
+  @property
+  def trainable_variables(self):
+    return tf.Module.trainable_variables.fget(self)
+
+  weights = variables
+  trainable_weights = trainable_variables
+
+  # This seems to be necessary to prevent a comparison between class objects.
+  _TF_MODULE_IGNORED_PROPERTIES = (
+      tf.keras.Model._TF_MODULE_IGNORED_PROPERTIES.union(
+          ("_compiled_trainable_state",)
+      ))
+  ############################################################################
+
   @property
   def ndim_source(self):
     return self.source.event_shape[0]
