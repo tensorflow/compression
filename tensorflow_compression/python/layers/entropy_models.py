@@ -42,7 +42,7 @@ class EntropyModel(tf.keras.layers.Layer):
                range_coder_precision=16, **kwargs):
     """Initializer.
 
-    Arguments:
+    Args:
       tail_mass: Float, between 0 and 1. The bottleneck layer automatically
         determines the range of input values based on their frequency of
         occurrence. Values occurring in the tails of the distributions will not
@@ -87,7 +87,7 @@ class EntropyModel(tf.keras.layers.Layer):
   def _quantize(self, inputs, mode):
     """Perturb or quantize a `Tensor` and optionally dequantize.
 
-    Arguments:
+    Args:
       inputs: `Tensor`. The input values.
       mode: String. Can take on one of three values: `'noise'` (adds uniform
         noise), `'dequantize'` (quantizes and dequantizes), and `'symbols'`
@@ -105,7 +105,7 @@ class EntropyModel(tf.keras.layers.Layer):
 
     The opposite to `_quantize(inputs, mode='symbols')`.
 
-    Arguments:
+    Args:
       inputs: `Tensor`. The range coder symbols.
       mode: String. Must be `'dequantize'`.
 
@@ -118,7 +118,7 @@ class EntropyModel(tf.keras.layers.Layer):
   def _likelihood(self, inputs):
     """Compute the likelihood of the inputs under the model.
 
-    Arguments:
+    Args:
       inputs: `Tensor`. The input values.
 
     Returns:
@@ -147,7 +147,7 @@ class EntropyModel(tf.keras.layers.Layer):
   def call(self, inputs, training):
     """Pass a tensor through the bottleneck.
 
-    Arguments:
+    Args:
       inputs: The tensor to be passed through the bottleneck.
       training: Boolean. If `True`, returns a differentiable approximation of
         the inputs, and their likelihoods under the modeled probability
@@ -188,7 +188,7 @@ class EntropyModel(tf.keras.layers.Layer):
   def compress(self, inputs):
     """Compress inputs and store their binary representations into strings.
 
-    Arguments:
+    Args:
       inputs: `Tensor` with values to be compressed.
 
     Returns:
@@ -250,7 +250,7 @@ class EntropyModel(tf.keras.layers.Layer):
   def decompress(self, strings, **kwargs):
     """Decompress values from their compressed string representations.
 
-    Arguments:
+    Args:
       strings: A string `Tensor` vector containing the compressed data.
       **kwargs: Model-specific keyword arguments.
 
@@ -341,7 +341,7 @@ class EntropyBottleneck(EntropyModel):
                data_format="channels_last", **kwargs):
     """Initializer.
 
-    Arguments:
+    Args:
       init_scale: Float. A scaling factor determining the initial width of the
         probability densities. This should be chosen big enough so that the
         range of values of the layer inputs roughly falls within the interval
@@ -401,7 +401,7 @@ class EntropyBottleneck(EntropyModel):
   def _logits_cumulative(self, inputs, stop_gradient):
     """Evaluate logits of the cumulative densities.
 
-    Arguments:
+    Args:
       inputs: The values at which to evaluate the cumulative densities, expected
         to be a `Tensor` of shape `(channels, 1, batch)`.
       stop_gradient: Boolean. Whether to add `tf.stop_gradient` calls so
@@ -442,7 +442,7 @@ class EntropyBottleneck(EntropyModel):
     and then uses that to create the probability mass functions and the discrete
     cumulative density functions used by the range coder.
 
-    Arguments:
+    Args:
       input_shape: Shape of the input tensor, used to get the number of
         channels.
 
@@ -686,7 +686,7 @@ class EntropyBottleneck(EntropyModel):
   def decompress(self, strings, shape, channels=None):
     """Decompress values from their compressed string representations.
 
-    Arguments:
+    Args:
       strings: A string `Tensor` vector containing the compressed data.
       shape: A `Tensor` vector of int32 type. Contains the shape of the tensor
         to be decompressed, excluding the batch dimension.
@@ -713,7 +713,7 @@ class SymmetricConditional(EntropyModel):
                scale_bound=None, mean=None, indexes=None, **kwargs):
     """Initializer.
 
-    Arguments:
+    Args:
       scale: `Tensor`, the scale parameters for the conditional distributions.
       scale_table: Iterable of positive floats. For range coding, the scale
         parameters in `scale` can't be used, because the probability tables need
@@ -776,7 +776,7 @@ class SymmetricConditional(EntropyModel):
     Note: This function should be optimized to give the best possible numerical
     accuracy for negative input values.
 
-    Arguments:
+    Args:
       inputs: `Tensor`. The values at which to evaluate the cumulative density.
 
     Returns:
@@ -791,7 +791,7 @@ class SymmetricConditional(EntropyModel):
     This returns the inverse of the standardized cumulative function for a
     scalar.
 
-    Arguments:
+    Args:
       quantile: Float. The values at which to evaluate the quantile function.
 
     Returns:
@@ -808,7 +808,7 @@ class SymmetricConditional(EntropyModel):
     uses this index tensor to determine the starting positions of the PMFs for
     each scale.
 
-    Arguments:
+    Args:
       input_shape: Shape of the input tensor.
 
     Raises:
@@ -945,7 +945,7 @@ class SymmetricConditional(EntropyModel):
   def decompress(self, strings):  # pylint:disable=useless-super-delegation
     """Decompress values from their compressed string representations.
 
-    Arguments:
+    Args:
       strings: A string `Tensor` vector containing the compressed data.
 
     Returns:

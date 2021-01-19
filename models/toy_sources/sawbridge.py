@@ -12,7 +12,7 @@ class Sawbridge(tfp.distributions.Distribution):
                name="sawbridge"):
     """Initializer.
 
-    Arguments:
+    Args:
       index_points: 1-D `Tensor` representing the locations at which to evaluate
         the process. The intent is that all locations are in [0,1], but the
         process has a natural extrapolation outside this range so no error is

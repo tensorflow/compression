@@ -84,7 +84,7 @@ class UniversalBatchedEntropyModel(
                no_variables=False):
     """Initializes the instance.
 
-    Arguments:
+    Args:
       prior: A `tfp.distributions.Distribution` object. A density model fitting
         the marginal distribution of the bottleneck data with additive uniform
         noise, which is shared a priori between the sender and the receiver. For
@@ -182,7 +182,7 @@ class UniversalBatchedEntropyModel(
   def __call__(self, bottleneck, training=True):
     """Perturbs a tensor with additive uniform noise and estimates bitcost.
 
-    Arguments:
+    Args:
       bottleneck: `tf.Tensor` containing a non-perturbed bottleneck. Must have
         at least `self.coding_rank` dimensions.
       training: Boolean. If `False`, computes the bitcost using discretized
@@ -255,7 +255,7 @@ class UniversalIndexedEntropyModel(
                num_noise_levels=15):
     """Initializes the instance.
 
-    Arguments:
+    Args:
       prior_fn: A callable returning a `tfp.distributions.Distribution` object,
         typically a `Distribution` class or factory function. This is a density
         model fitting the marginal distribution of the bottleneck data with
@@ -388,7 +388,7 @@ class UniversalIndexedEntropyModel(
   def __call__(self, bottleneck, indexes, training=True):
     """Perturbs a tensor with additive uniform noise and estimates bitcost.
 
-    Arguments:
+    Args:
       bottleneck: `tf.Tensor` containing a non-perturbed bottleneck. Must have
         at least `self.coding_rank` dimensions.
       indexes: `tf.Tensor` specifying the scalar distribution for each element

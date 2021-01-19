@@ -36,7 +36,7 @@ def _logsum_expbig_minus_expsmall(big, small):
   This assumes `small <= big` and arguments that can be broadcast against each
   other.
 
-  Arguments:
+  Args:
     big: Floating-point `tf.Tensor`.
     small: Floating-point `tf.Tensor`.
 
@@ -73,7 +73,7 @@ class UniformNoiseAdapter(tfp.distributions.Distribution):
   def __init__(self, base, name="UniformNoiseAdapter"):
     """Initializer.
 
-    Arguments:
+    Args:
       base: A `tfp.distributions.Distribution` object representing a
         continuous-valued random variable.
       name: String. A name for this distribution.

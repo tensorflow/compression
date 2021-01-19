@@ -69,7 +69,7 @@ class DeepFactorized(tfp.distributions.Distribution):
                allow_nan_stats=False, dtype=tf.float32, name="DeepFactorized"):
     """Initializer.
 
-    Arguments:
+    Args:
       batch_shape: Iterable of integers. The desired batch shape for the
         `Distribution` (rightmost dimensions which are assumed independent, but
         not identically distributed).
@@ -164,7 +164,7 @@ class DeepFactorized(tfp.distributions.Distribution):
   def _logits_cumulative(self, inputs):
     """Evaluate logits of the cumulative densities.
 
-    Arguments:
+    Args:
       inputs: The values at which to evaluate the cumulative densities.
 
     Returns:

@@ -70,7 +70,7 @@ class StaticParameterizer(Parameterizer):
   def __init__(self, value):
     """Initializer.
 
-    Arguments:
+    Args:
       value: Either a constant or `Tensor` value, or a callable which returns
         such a thing given a shape and dtype argument (for example, an
         initializer).
@@ -102,7 +102,7 @@ class RDFTParameterizer(Parameterizer):
   def __init__(self, dc=True):
     """Initializer.
 
-    Arguments:
+    Args:
       dc: Boolean. If `False`, the DC component of the kernel RDFTs is not
         represented, forcing the filters to be highpass. Defaults to `True`.
     """
@@ -165,7 +165,7 @@ class NonnegativeParameterizer(Parameterizer):
   def __init__(self, minimum=0, reparam_offset=2 ** -18):
     """Initializer.
 
-    Arguments:
+    Args:
       minimum: Float. Lower bound for parameters (defaults to zero).
       reparam_offset: Float. Offset added to the reparameterization of beta and
         gamma. The parameterization of beta and gamma as their square roots lets

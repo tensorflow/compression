@@ -42,7 +42,7 @@ def estimate_tails(func, target, shape, dtype):
   This operation is vectorized. The tensor shape of `x` is given by `shape`, and
   `target` must have a shape that is broadcastable to the output of `func(x)`.
 
-  Arguments:
+  Args:
     func: A callable that computes cumulative distribution function, survival
       function, or similar.
     target: The desired target value.
@@ -107,7 +107,7 @@ def quantization_offset(distribution):
   Note the offset is always in the range [-.5, .5] as it is assumed to be
   combined with a round quantizer.
 
-  Arguments:
+  Args:
     distribution: A `tfp.distributions.Distribution` object.
 
   Returns:
@@ -142,7 +142,7 @@ def lower_tail(distribution, tail_mass):
   functionality of the range coder implementation (using a Golomb-like
   universal code).
 
-  Arguments:
+  Args:
     distribution: A `tfp.distributions.Distribution` object.
     tail_mass: Float between 0 and 1. Desired probability mass for the tails.
 
@@ -178,7 +178,7 @@ def upper_tail(distribution, tail_mass):
   functionality of the range coder implementation (using a Golomb-like
   universal code).
 
-  Arguments:
+  Args:
     distribution: A `tfp.distributions.Distribution` object.
     tail_mass: Float between 0 and 1. Desired probability mass for the tails.
 

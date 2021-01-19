@@ -197,7 +197,7 @@ class _SignalConv(tf.keras.layers.Layer):
                **kwargs):
     """Initializer.
 
-    Arguments:
+    Args:
       filters: Integer. If `not channel_separable`, specifies the total number
         of filters, which is equal to the number of output channels. Otherwise,
         specifies the number of filters per channel, which makes the number of

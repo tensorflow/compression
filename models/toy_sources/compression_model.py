@@ -46,7 +46,7 @@ class CompressionModel(tf.keras.Model, metaclass=abc.ABCMeta):
   def quantize(self, x):
     """Determines an equivalent vector quantizer for `x`.
 
-    Arguments:
+    Args:
       x: A batch of source vectors.
 
     Returns:
@@ -61,7 +61,7 @@ class CompressionModel(tf.keras.Model, metaclass=abc.ABCMeta):
   def train_losses(self, x):
     """Computes the training losses for `x`.
 
-    Arguments:
+    Args:
       x: A batch of source vectors.
 
     Returns:
@@ -74,7 +74,7 @@ class CompressionModel(tf.keras.Model, metaclass=abc.ABCMeta):
   def test_losses(self, x):
     """Computes the rate and distortion for each element of `x`.
 
-    Arguments:
+    Args:
       x: A batch of source vectors.
 
     Returns:

@@ -140,7 +140,7 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
                no_variables=False):
     """Initializes the instance.
 
-    Arguments:
+    Args:
       prior_fn: A callable returning a `tfp.distributions.Distribution` object,
         typically a `Distribution` class or factory function. This is a density
         model fitting the marginal distribution of the bottleneck data with
@@ -285,7 +285,7 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     """Perturbs a tensor with (quantization) noise and estimates bitcost.
 
 
-    Arguments:
+    Args:
       bottleneck: `tf.Tensor` containing the data to be compressed.
       indexes: `tf.Tensor` specifying the scalar distribution for each element
         in `bottleneck`. See class docstring for examples.
@@ -340,7 +340,7 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     The gradient of this rounding operation is overridden with the identity
     (straight-through gradient estimator).
 
-    Arguments:
+    Args:
       bottleneck: `tf.Tensor` containing the data to be quantized.
       indexes: `tf.Tensor` specifying the scalar distribution for each element
         in `bottleneck`. See class docstring for examples.
@@ -365,7 +365,7 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     i.e. are compressed into one string each. Any additional dimensions to the
     left are treated as batch dimensions.
 
-    Arguments:
+    Args:
       bottleneck: `tf.Tensor` containing the data to be compressed.
       indexes: `tf.Tensor` specifying the scalar distribution for each element
         in `bottleneck`. See class docstring for examples.
@@ -412,7 +412,7 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
 
     Reconstructs the quantized tensor from bit strings produced by `compress()`.
 
-    Arguments:
+    Args:
       strings: `tf.Tensor` containing the compressed bit strings.
       indexes: `tf.Tensor` specifying the scalar distribution for each output
         element. See class docstring for examples.
@@ -478,7 +478,7 @@ class LocationScaleIndexedEntropyModel(ContinuousIndexedEntropyModel):
                range_coder_precision=12, no_variables=False):
     """Initializes the instance.
 
-    Arguments:
+    Args:
       prior_fn: A callable returning a `tfp.distributions.Distribution` object,
         typically a `Distribution` class or factory function. This is a density
         model fitting the marginal distribution of the bottleneck data with
@@ -527,7 +527,7 @@ class LocationScaleIndexedEntropyModel(ContinuousIndexedEntropyModel):
   def __call__(self, bottleneck, scale_indexes, loc=None, training=True):
     """Perturbs a tensor with (quantization) noise and estimates bitcost.
 
-    Arguments:
+    Args:
       bottleneck: `tf.Tensor` containing the data to be compressed.
       scale_indexes: `tf.Tensor` indexing the scale parameter for each element
         in `bottleneck`. Must have the same shape as `bottleneck`.
@@ -568,7 +568,7 @@ class LocationScaleIndexedEntropyModel(ContinuousIndexedEntropyModel):
     The gradient of this rounding operation is overridden with the identity
     (straight-through gradient estimator).
 
-    Arguments:
+    Args:
       bottleneck: `tf.Tensor` containing the data to be quantized.
       scale_indexes: `tf.Tensor` indexing the scale parameter for each element
         in `bottleneck`. Must have the same shape as `bottleneck`.
@@ -598,7 +598,7 @@ class LocationScaleIndexedEntropyModel(ContinuousIndexedEntropyModel):
     i.e. are compressed into one string each. Any additional dimensions to the
     left are treated as batch dimensions.
 
-    Arguments:
+    Args:
       bottleneck: `tf.Tensor` containing the data to be compressed.
       scale_indexes: `tf.Tensor` indexing the scale parameter for each element
         in `bottleneck`. Must have the same shape as `bottleneck`.
@@ -622,7 +622,7 @@ class LocationScaleIndexedEntropyModel(ContinuousIndexedEntropyModel):
 
     Reconstructs the quantized tensor from bit strings produced by `compress()`.
 
-    Arguments:
+    Args:
       strings: `tf.Tensor` containing the compressed bit strings.
       scale_indexes: `tf.Tensor` indexing the scale parameter for each output
         element.

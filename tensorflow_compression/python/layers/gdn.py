@@ -65,7 +65,7 @@ class GDN(tf.keras.layers.Layer):
                **kwargs):
     """Initializer.
 
-    Arguments:
+    Args:
       inverse: Boolean. If `False` (default), compute GDN response. If `True`,
         compute IGDN response (one step of fixed point iteration to invert GDN;
         the division is replaced by multiplication).
