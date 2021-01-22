@@ -21,26 +21,36 @@ class NTCModel(compression_model.CompressionModel):
   def __init__(self, analysis, synthesis, prior_type="deep",
                dither=(1, 1, 0, 0), soft_round=(1, 0), guess_offset=False,
                **kwargs):
+    """Initializer.
+
+    Args:
+      analysis: A `Layer` object implementing the analysis transform.
+      synthesis: A `Layer` object implementing the synthesis transform.
+      prior_type: String. Either 'deep' for `DeepFactorized` prior, or
+        'gsm/gmm/lsm/lmm-X' for Gaussian/Logistic Scale Mixture/Mixture Model
+        with X components.
+      dither: Sequence of 4 Booleans. Whether to use dither for: rate term
+        during training, distortion term during training, rate term during
+        testing, distortion term during testing, respectively.
+      soft_round: Sequence of 2 Booleans. Whether to use soft rounding during
+        training or testing, respectively.
+      guess_offset: Boolean. When not using soft rounding, whether to use the
+        mode centering heuristic to determine the quantization offset during
+        testing.
+      **kwargs: Other arguments passed through to `CompressionModel` class.
+    """
     super().__init__(**kwargs)
     self._analysis = analysis
     self._synthesis = synthesis
     self.prior_type = str(prior_type)
-    # train_rate, train_dist, test_rate, test_dist
     self.dither = tuple(bool(i) for i in dither)
-    # train, test
     self.soft_round = tuple(bool(i) for i in soft_round)
     self.guess_offset = bool(guess_offset)
 
     if self.prior_type == "deep":
       self._prior = tfc.DeepFactorized(
           batch_shape=[self.ndim_latent], dtype=self.dtype)
-    elif self.prior_type == "deep_uniform":
-      self._prior = tfc.DeepFactorized(
-          batch_shape=[self.ndim_latent], dtype=self.dtype)
-      self.log_uniform_width = tf.Variable(
-          0, "log_uniform_width", dtype=self.dtype)
-    else:
-      assert self.prior_type[:4] in ("gsm-", "gmm-", "lsm-", "lmm-")
+    elif self.prior_type[:4] in ("gsm-", "gmm-", "lsm-", "lmm-"):
       components = int(self.prior_type[4:])
       shape = (self.ndim_latent, components)
       self.logits = tf.Variable(tf.random.normal(shape, dtype=self.dtype))
@@ -50,6 +60,8 @@ class NTCModel(compression_model.CompressionModel):
         self.loc = 0.
       else:
         self.loc = tf.Variable(tf.random.normal(shape, dtype=self.dtype))
+    else:
+      raise ValueError(f"Unknown prior_type: '{prior_type}'.")
 
     self._logit_alpha = tf.Variable(-3, dtype=self.dtype, name="logit_alpha")
     self._force_alpha = tf.Variable(
@@ -58,8 +70,7 @@ class NTCModel(compression_model.CompressionModel):
   def prior(self, soft_round, scale=None, alpha=None, skip_noise=False):
     if self.prior_type == "deep":
       prior = self._prior
-    else:
-      assert self.prior_type[:4] in ("gsm-", "gmm-", "lsm-", "lmm-")
+    elif self.prior_type[:4] in ("gsm-", "gmm-", "lsm-", "lmm-"):
       cls = tfpd.Normal if self.prior_type.startswith("g") else tfpd.Logistic
       prior = tfpd.MixtureSameFamily(
           mixture_distribution=tfpd.Categorical(logits=self.logits),
@@ -73,6 +84,34 @@ class NTCModel(compression_model.CompressionModel):
     if skip_noise:
       return prior
     return tfc.UniformNoiseAdapter(prior)
+
+  @property
+  def ndim_latent(self):
+    return self._analysis.output_shape[-1]
+
+  def analysis(self, x):
+    y = tf.cast(x, self.dtype)
+    if y.shape[-1] != self.ndim_source:
+      raise ValueError(
+          f"Expected {self.ndim_source} trailing dimensions, "
+          f"received {y.shape[-1]}.")
+    batch_shape = tf.shape(y)[:-1]
+    y = tf.reshape(y, (-1, self.ndim_source))
+    y = self._analysis(y)
+    assert y.shape[-1] == self.ndim_latent
+    return tf.reshape(y, tf.concat([batch_shape, [self.ndim_latent]], 0))
+
+  def synthesis(self, y):
+    x = tf.cast(y, self.dtype)
+    if x.shape[-1] != self.ndim_latent:
+      raise ValueError(
+          f"Expected {self.ndim_latent} trailing dimensions, "
+          f"received {x.shape[-1]}.")
+    batch_shape = tf.shape(x)[:-1]
+    x = tf.reshape(x, (-1, self.ndim_latent))
+    x = self._synthesis(x)
+    assert x.shape[-1] == self.ndim_source
+    return tf.reshape(x, tf.concat([batch_shape, [self.ndim_source]], 0))
 
   @property
   def force_alpha(self):
@@ -100,30 +139,6 @@ class NTCModel(compression_model.CompressionModel):
     self._logit_alpha.assign(
         tf.cond(value < 0, lambda: self._logit_alpha, get_logit_alpha))
 
-  @property
-  def ndim_latent(self):
-    return self._analysis.output_shape[-1]
-
-  def analysis(self, x):
-    y = tf.cast(x, self.dtype)
-    assert y.shape[-1] == self.ndim_source
-    batch_shape = tf.shape(y)[:-1]
-    y = tf.reshape(y, (-1, self.ndim_source))
-    y = self._analysis(y)
-    assert y.shape[-1] == self.ndim_latent
-    y = tf.reshape(y, tf.concat([batch_shape, [self.ndim_latent]], 0))
-    return y
-
-  def synthesis(self, y):
-    x = tf.cast(y, self.dtype)
-    assert x.shape[-1] == self.ndim_latent
-    batch_shape = tf.shape(x)[:-1]
-    x = tf.reshape(x, (-1, self.ndim_latent))
-    x = self._synthesis(x)
-    assert x.shape[-1] == self.ndim_source
-    x = tf.reshape(x, tf.concat([batch_shape, [self.ndim_source]], 0))
-    return x
-
   def encode_decode(self, x, dither_rate, dither_dist, soft_round,
                     guess_offset=None, offset=0., seed=None):
     if guess_offset is None:
@@ -148,6 +163,7 @@ class NTCModel(compression_model.CompressionModel):
     assert x.shape[-1] == self.ndim_source
     y = self.analysis(x)
 
+    rates = 0.
     prior = self.prior(soft_round=soft_round)
 
     y_dist = perturb(y, dither_dist, prior, offset)
@@ -158,7 +174,7 @@ class NTCModel(compression_model.CompressionModel):
 
     x_hat = self.synthesis(y_dist)
     log_probs = prior.log_prob(y_rate)
-    rates = tf.reduce_sum(log_probs, axis=-1) / tf.cast(
+    rates += tf.reduce_sum(log_probs, axis=-1) / tf.cast(
         -tf.math.log(2.), self.dtype)
 
     return y_dist, x_hat, rates
