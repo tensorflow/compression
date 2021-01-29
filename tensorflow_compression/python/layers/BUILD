@@ -69,6 +69,13 @@ py_test(
 )
 
 py_test(
+    name = "initializers_test",
+    srcs = ["initializers_test.py"],
+    python_version = "PY3",
+    deps = [":initializers"],
+)
+
+py_test(
     name = "parameterizers_test",
     srcs = ["parameterizers_test.py"],
     python_version = "PY3",

@@ -14,7 +14,7 @@
 # ==============================================================================
 """Initializers for layer classes."""
 
-import tensorflow.compat.v1 as tf
+import tensorflow as tf
 
 
 __all__ = [
@@ -22,31 +22,34 @@ __all__ = [
 ]
 
 
-class IdentityInitializer(object):
+class IdentityInitializer(tf.keras.initializers.Initializer):
   """Initialize to the identity kernel with the given shape.
 
   This creates an n-D kernel suitable for `SignalConv*` with the requested
   support that produces an output identical to its input (except possibly at the
   signal boundaries).
 
-  Note: The identity initializer in `tf.initializers` is only suitable for
+  Note: The identity initializer in `tf.keras.initializers` is only suitable for
   matrices, not for n-D convolution kernels (i.e., no spatial support).
   """
 
   def __init__(self, gain=1):
-    self.gain = float(gain)
+    super().__init__()
+    self.gain = gain
 
-  def __call__(self, shape, dtype=None, partition_info=None):
-    del partition_info  # unused
-    assert len(shape) > 2, shape
+  def __call__(self, shape, dtype=None, **kwargs):
+    del kwargs  # unused
+    shape = tf.TensorShape(shape)
+    if shape.rank <= 2:
+      raise ValueError(f"shape must be at least rank 3, got {shape}.")
 
-    support = tuple(shape[:-2]) + (1, 1)
+    support = shape.as_list()[:-2] + [1, 1]
     indices = [[s // 2 for s in support]]
     updates = tf.constant([self.gain], dtype=dtype)
-    kernel = tf.scatter_nd(indices, updates, support)
+    spatial_kernel = tf.scatter_nd(indices, updates, support)
+    return spatial_kernel * tf.eye(shape[-2], shape[-1], dtype=dtype)
 
-    assert shape[-2] == shape[-1], shape
-    if shape[-1] != 1:
-      kernel *= tf.eye(shape[-1], dtype=dtype)
-
-    return kernel
+  def get_config(self):
+    config = super().get_config()
+    config.update(gain=self.gain)
+    return config
