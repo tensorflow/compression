@@ -29,7 +29,6 @@ from tensorflow_compression.python.entropy_models.continuous_batched_test import
 from tensorflow_compression.python.entropy_models.continuous_indexed_test import *
 from tensorflow_compression.python.entropy_models.universal_test import *
 
-from tensorflow_compression.python.layers.entropy_models_test import *
 from tensorflow_compression.python.layers.gdn_test import *
 from tensorflow_compression.python.layers.initializers_test import *
 from tensorflow_compression.python.layers.parameterizers_test import *

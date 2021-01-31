@@ -32,7 +32,6 @@ from tensorflow_compression.python.entropy_models.continuous_batched import *
 from tensorflow_compression.python.entropy_models.continuous_indexed import *
 from tensorflow_compression.python.entropy_models.universal import *
 
-from tensorflow_compression.python.layers.entropy_models import *
 from tensorflow_compression.python.layers.gdn import *
 from tensorflow_compression.python.layers.initializers import *
 from tensorflow_compression.python.layers.parameterizers import *

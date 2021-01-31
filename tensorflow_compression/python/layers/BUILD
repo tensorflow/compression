@@ -5,16 +5,6 @@ package(
 licenses(["notice"])
 
 py_library(
-    name = "entropy_models",
-    srcs = ["entropy_models.py"],
-    srcs_version = "PY3",
-    deps = [
-        "//tensorflow_compression/python/ops:math_ops",
-        "//tensorflow_compression/python/ops:range_coding_ops",
-    ],
-)
-
-py_library(
     name = "gdn",
     srcs = ["gdn.py"],
     srcs_version = "PY3",
@@ -59,13 +49,6 @@ py_library(
     srcs = ["soft_round.py"],
     srcs_version = "PY3",
     deps = ["//tensorflow_compression/python/ops:soft_round_ops"],
-)
-
-py_test(
-    name = "entropy_models_test",
-    srcs = ["entropy_models_test.py"],
-    python_version = "PY3",
-    deps = [":entropy_models"],
 )
 
 py_test(

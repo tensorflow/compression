@@ -15,7 +15,6 @@ py_library(
         "//tensorflow_compression/python/entropy_models:continuous_batched",
         "//tensorflow_compression/python/entropy_models:continuous_indexed",
         "//tensorflow_compression/python/entropy_models:universal",
-        "//tensorflow_compression/python/layers:entropy_models",
         "//tensorflow_compression/python/layers:gdn",
         "//tensorflow_compression/python/layers:initializers",
         "//tensorflow_compression/python/layers:parameterizers",
