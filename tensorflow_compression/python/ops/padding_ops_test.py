@@ -15,13 +15,10 @@
 """Tests of padding ops."""
 
 import numpy as np
-import tensorflow.compat.v1 as tf
-
-from tensorflow.python.framework import test_util
+import tensorflow as tf
 from tensorflow_compression.python.ops import padding_ops
 
 
-@test_util.deprecated_graph_mode_only
 class PaddingOpsTest(tf.test.TestCase):
 
   def test_same_padding_corr(self):
@@ -35,8 +32,7 @@ class PaddingOpsTest(tf.test.TestCase):
             tf.reshape(inputs, (1, 1, -1, 1)),
             tf.reshape(kernel, (1, -1, 1, 1)),
             padding="VALID", data_format="NHWC")
-        with self.cached_session() as sess:
-          outputs = np.squeeze(sess.run(outputs))
+        outputs = np.squeeze(outputs.numpy())
         pos_inp = np.squeeze(np.nonzero(inputs))
         pos_out = np.squeeze(np.nonzero(outputs))
         padding = padding_ops.same_padding_for_kernel(kshape, True)
@@ -55,8 +51,7 @@ class PaddingOpsTest(tf.test.TestCase):
             (1, 1, ishape[0] + kshape[0] - 1, 1),
             strides=(1, 1, 1, 1), padding="VALID", data_format="NHWC")
         outputs = outputs[:, :, (kshape[0] - 1):-(kshape[0] - 1), :]
-        with self.cached_session() as sess:
-          outputs = np.squeeze(sess.run(outputs))
+        outputs = np.squeeze(outputs.numpy())
         pos_inp = np.squeeze(np.nonzero(inputs))
         pos_out = np.squeeze(np.nonzero(outputs))
         padding = padding_ops.same_padding_for_kernel(kshape, False)

@@ -14,13 +14,9 @@
 # ==============================================================================
 """Parameterizations for layer classes."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import numpy as np
 from scipy import fftpack
-import tensorflow.compat.v1 as tf
+import tensorflow as tf
 
 
 __all__ = [
@@ -38,7 +34,7 @@ def irdft_matrix(shape, dtype=tf.float32):
 
   ```
   def create_kernel(init):
-    shape = init.shape.as_list()
+    shape = init.shape
     matrix = irdft_matrix(shape[:2])
     init = tf.reshape(init, (shape[0] * shape[1], shape[2] * shape[3]))
     init = tf.matmul(tf.transpose(matrix), init)
@@ -55,10 +51,10 @@ def irdft_matrix(shape, dtype=tf.float32):
   Returns:
     `Tensor` of shape `(prod(shape), prod(shape))` and dtype `dtype`.
   """
-  shape = tuple(int(s) for s in shape)
+  shape = tf.TensorShape(shape)
   dtype = tf.as_dtype(dtype)
-  size = np.prod(shape)
-  rank = len(shape)
+  size = shape.num_elements()
+  rank = shape.rank
   matrix = np.identity(size, dtype=np.float64).reshape((size,) + shape)
   for axis in range(rank):
     matrix = fftpack.rfft(matrix, axis=axis + 1)

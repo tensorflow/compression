@@ -14,11 +14,7 @@
 # ==============================================================================
 """Math operations."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
-import tensorflow.compat.v1 as tf
+import tensorflow as tf
 
 
 __all__ = [
@@ -28,54 +24,8 @@ __all__ = [
 ]
 
 
-@tf.RegisterGradient("IdentityFirstOfTwoInputs")
-def _identity_first_of_two_inputs_grad(op, grad):
-  """Gradient for `lower_bound` or `upper_bound` if `gradient == 'identity'`.
-
-  Args:
-    op: The op for which to calculate a gradient.
-    grad: Gradient with respect to the output of the op.
-
-  Returns:
-    Gradient with respect to the inputs of the op.
-  """
-  del op  # unused
-  return [grad, None]
-
-
-@tf.RegisterGradient("UpperBound")
-def _upper_bound_grad(op, grad):
-  """Gradient for `upper_bound` if `gradient == 'identity_if_towards'`.
-
-  Args:
-    op: The op for which to calculate a gradient.
-    grad: Gradient with respect to the output of the op.
-
-  Returns:
-    Gradient with respect to the inputs of the op.
-  """
-  inputs, bound = op.inputs
-  pass_through_if = tf.logical_or(inputs <= bound, grad > 0)
-  return [tf.cast(pass_through_if, grad.dtype) * grad, None]
-
-
-@tf.RegisterGradient("LowerBound")
-def _lower_bound_grad(op, grad):
-  """Gradient for `lower_bound` if `gradient == 'identity_if_towards'`.
-
-  Args:
-    op: The op for which to calculate a gradient.
-    grad: Gradient with respect to the output of the op.
-
-  Returns:
-    Gradient with respect to the inputs of the op.
-  """
-  inputs, bound = op.inputs
-  pass_through_if = tf.logical_or(inputs >= bound, grad < 0)
-  return [tf.cast(pass_through_if, grad.dtype) * grad, None]
-
-
-def upper_bound(inputs, bound, gradient="identity_if_towards", name=None):
+def upper_bound(inputs, bound, gradient="identity_if_towards",
+                name="upper_bound"):
   """Same as `tf.minimum`, but with helpful gradient for `inputs > bound`.
 
   This function behaves just like `tf.minimum`, but the behavior of the gradient
@@ -110,27 +60,37 @@ def upper_bound(inputs, bound, gradient="identity_if_towards", name=None):
   Raises:
     ValueError: for invalid value of `gradient`.
   """
-  try:
-    gradient = {
-        "identity_if_towards": "UpperBound",
-        "identity": "IdentityFirstOfTwoInputs",
-        "disconnected": None,
-    }[gradient]
-  except KeyError:
-    raise ValueError("Invalid value for `gradient`: '{}'.".format(gradient))
-
-  with tf.name_scope(name, "UpperBound", [inputs, bound]) as scope:
+  with tf.name_scope(name) as scope:
     inputs = tf.convert_to_tensor(inputs, name="inputs")
-    bound = tf.convert_to_tensor(
-        bound, name="bound", dtype=inputs.dtype)
-    if gradient:
-      with tf.get_default_graph().gradient_override_map({"Minimum": gradient}):
-        return tf.minimum(inputs, bound, name=scope)
-    else:
-      return tf.minimum(inputs, bound, name=scope)
+    bound = tf.convert_to_tensor(bound, name="bound", dtype=inputs.dtype)
+
+    def identity_if_towards_grad(grad):
+      """Gradient if gradient == 'identity_if_towards'."""
+      pass_through_if = tf.logical_or(inputs <= bound, grad > 0)
+      return (tf.cast(pass_through_if, grad.dtype) * grad, None)
+
+    def disconnected_grad(grad):
+      """Gradient if gradient == 'disconnected'."""
+      return (tf.cast(inputs <= bound, grad.dtype) * grad, None)
+
+    try:
+      gradient = {
+          "identity_if_towards": identity_if_towards_grad,
+          "identity": lambda grad: (grad, None),
+          "disconnected": disconnected_grad,
+      }[gradient]
+    except KeyError:
+      raise ValueError("Invalid value for `gradient`: '{}'.".format(gradient))
+
+    @tf.custom_gradient
+    def _upper_bound(inputs, bound):
+      return tf.minimum(inputs, bound, name=scope), gradient
+
+    return _upper_bound(inputs, bound)
 
 
-def lower_bound(inputs, bound, gradient="identity_if_towards", name=None):
+def lower_bound(inputs, bound, gradient="identity_if_towards",
+                name="lower_bound"):
   """Same as `tf.maximum`, but with helpful gradient for `inputs < bound`.
 
   This function behaves just like `tf.maximum`, but the behavior of the gradient
@@ -165,24 +125,33 @@ def lower_bound(inputs, bound, gradient="identity_if_towards", name=None):
   Raises:
     ValueError: for invalid value of `gradient`.
   """
-  try:
-    gradient = {
-        "identity_if_towards": "LowerBound",
-        "identity": "IdentityFirstOfTwoInputs",
-        "disconnected": None,
-    }[gradient]
-  except KeyError:
-    raise ValueError("Invalid value for `gradient`: '{}'.".format(gradient))
-
-  with tf.name_scope(name, "LowerBound", [inputs, bound]) as scope:
+  with tf.name_scope(name) as scope:
     inputs = tf.convert_to_tensor(inputs, name="inputs")
-    bound = tf.convert_to_tensor(
-        bound, name="bound", dtype=inputs.dtype)
-    if gradient:
-      with tf.get_default_graph().gradient_override_map({"Maximum": gradient}):
-        return tf.maximum(inputs, bound, name=scope)
-    else:
-      return tf.maximum(inputs, bound, name=scope)
+    bound = tf.convert_to_tensor(bound, name="bound", dtype=inputs.dtype)
+
+    def identity_if_towards_grad(grad):
+      """Gradient if gradient == 'identity_if_towards'."""
+      pass_through_if = tf.logical_or(inputs >= bound, grad < 0)
+      return (tf.cast(pass_through_if, grad.dtype) * grad, None)
+
+    def disconnected_grad(grad):
+      """Gradient if gradient == 'disconnected'."""
+      return (tf.cast(inputs >= bound, grad.dtype) * grad, None)
+
+    try:
+      gradient = {
+          "identity_if_towards": identity_if_towards_grad,
+          "identity": lambda grad: (grad, None),
+          "disconnected": disconnected_grad,
+      }[gradient]
+    except KeyError:
+      raise ValueError("Invalid value for `gradient`: '{}'.".format(gradient))
+
+    @tf.custom_gradient
+    def _lower_bound(inputs, bound):
+      return tf.maximum(inputs, bound, name=scope), gradient
+
+    return _lower_bound(inputs, bound)
 
 
 def perturb_and_apply(f, x, *args, u=None, x_plus_u=None, expected_grads=True):

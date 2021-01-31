@@ -14,45 +14,18 @@
 # ==============================================================================
 """Tests of spectral_ops."""
 
-import numpy as np
-import tensorflow.compat.v1 as tf
-
-from tensorflow.python.framework import test_util
+from absl.testing import parameterized
+import tensorflow as tf
 from tensorflow_compression.python.ops import spectral_ops
 
 
-@test_util.deprecated_graph_mode_only
-class SpectralOpsTest(tf.test.TestCase):
+class SpectralOpsTest(tf.test.TestCase, parameterized.TestCase):
 
-  def test_irdft1_matrix(self):
-    for shape in [(4,), (3,)]:
-      size = shape[0]
-      matrix = spectral_ops.irdft_matrix(shape)
-      # Test that the matrix is orthonormal.
-      result = tf.matmul(matrix, tf.transpose(matrix))
-      with self.cached_session() as sess:
-        result, = sess.run([result])
-        self.assertAllClose(result, np.identity(size))
-
-  def test_irdft2_matrix(self):
-    for shape in [(7, 4), (8, 9)]:
-      size = shape[0] * shape[1]
-      matrix = spectral_ops.irdft_matrix(shape)
-      # Test that the matrix is orthonormal.
-      result = tf.matmul(matrix, tf.transpose(matrix))
-      with self.cached_session() as sess:
-        result, = sess.run([result])
-        self.assertAllClose(result, np.identity(size))
-
-  def test_irdft3_matrix(self):
-    for shape in [(3, 4, 2), (6, 3, 1)]:
-      size = shape[0] * shape[1] * shape[2]
-      matrix = spectral_ops.irdft_matrix(shape)
-      # Test that the matrix is orthonormal.
-      result = tf.matmul(matrix, tf.transpose(matrix))
-      with self.cached_session() as sess:
-        result, = sess.run([result])
-        self.assertAllClose(result, np.identity(size))
+  @parameterized.parameters([4], [8, 9], [5, 3, 1])
+  def test_irdft_matrix_is_orthonormal(self, *shape):
+    matrix = spectral_ops.irdft_matrix(shape)
+    result = tf.matmul(matrix, tf.transpose(matrix))
+    self.assertAllClose(result, tf.eye(tf.TensorShape(shape).num_elements()))
 
 
 if __name__ == "__main__":

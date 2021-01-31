@@ -14,13 +14,10 @@
 # ==============================================================================
 """Range coding tests."""
 
-import tensorflow.compat.v1 as tf
-
-from tensorflow.python.framework import test_util
+import tensorflow as tf
 from tensorflow_compression.python.ops import range_coding_ops
 
 
-@test_util.deprecated_graph_mode_only
 class RangeCodingOpsTest(tf.test.TestCase):
   """Python test for range coding ops.
 
@@ -30,7 +27,7 @@ class RangeCodingOpsTest(tf.test.TestCase):
 
   def test_readme_example(self):
     data = tf.random.uniform((128, 128), 0, 10, dtype=tf.int32)
-    histogram = tf.bincount(data, minlength=10, maxlength=10)
+    histogram = tf.math.bincount(data, minlength=10, maxlength=10)
     cdf = tf.cumsum(histogram, exclusive=False)
     cdf = tf.pad(cdf, [[1, 0]])
     cdf = tf.reshape(cdf, [1, 1, -1])
@@ -40,8 +37,7 @@ class RangeCodingOpsTest(tf.test.TestCase):
     decoded = range_coding_ops.range_decode(
         encoded, tf.shape(data), cdf, precision=14)
 
-    with self.cached_session() as sess:
-      self.assertAllEqual(*sess.run((data, decoded)))
+    self.assertAllEqual(data, decoded)
 
 
 if __name__ == "__main__":

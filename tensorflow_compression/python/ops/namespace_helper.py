@@ -14,10 +14,6 @@
 # ==============================================================================
 """Helps importing C ops with a clean namespace."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 
 def get_ops(module):
   """Returns a dict of ops defined in a module by blacklisting internals."""
