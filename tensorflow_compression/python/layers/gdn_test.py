@@ -25,14 +25,13 @@ class GDNTest(tf.test.TestCase, parameterized.TestCase):
 
   def test_invalid_data_format_raises_error(self):
     with self.assertRaises(ValueError):
-      gdn.GDN(inverse=False, rectify=False, data_format="NHWC")
+      gdn.GDN(data_format="NHWC")
 
-  def test_vector_input_raises_error(self):
-    x = tf.random.uniform((3,), dtype=tf.float32)
+  @parameterized.parameters("channels_first", "channels_last")
+  def test_vector_input_raises_error(self, data_format):
+    x = tf.zeros((3,), dtype=tf.float32)
     with self.assertRaises(ValueError):
-      gdn.GDN(inverse=False, rectify=False, data_format="channels_last")(x)
-    with self.assertRaises(ValueError):
-      gdn.GDN(inverse=True, rectify=True, data_format="channels_first")(x)
+      gdn.GDN(data_format=data_format)(x)
 
   @parameterized.parameters(2, 3, 4, 5, 6)
   def test_channels_last_has_correct_output(self, rank):
@@ -41,7 +40,7 @@ class GDNTest(tf.test.TestCase, parameterized.TestCase):
     x = tf.random.uniform((1, 2, 3, 4, 5, 6)[:rank], dtype=tf.float32)
     y = gdn.GDN(inverse=False, rectify=False, data_format="channels_last")(x)
     self.assertEqual(x.shape, y.shape)
-    self.assertAllClose(y, x / tf.sqrt(1 + .1 * (x ** 2)), rtol=0, atol=1e-6)
+    self.assertAllClose(y, x / (1 + .1 * abs(x)), rtol=0, atol=1e-6)
 
   @parameterized.parameters(2, 3, 4, 5, 6)
   def test_channels_first_has_correct_output(self, rank):
@@ -50,19 +49,27 @@ class GDNTest(tf.test.TestCase, parameterized.TestCase):
     x = tf.random.uniform((6, 5, 4, 3, 2, 1)[:rank], dtype=tf.float32)
     y = gdn.GDN(inverse=False, rectify=False, data_format="channels_first")(x)
     self.assertEqual(x.shape, y.shape)
-    self.assertAllClose(y, x / tf.sqrt(1 + .1 * (x ** 2)), rtol=0, atol=1e-6)
+    self.assertAllClose(y, x / (1 + .1 * abs(x)), rtol=0, atol=1e-6)
 
   def test_igdn_has_correct_output(self):
     x = tf.random.uniform((1, 2, 3, 4), dtype=tf.float32)
     y = gdn.GDN(inverse=True, rectify=False)(x)
     self.assertEqual(x.shape, y.shape)
-    self.assertAllClose(y, x * tf.sqrt(1 + .1 * (x ** 2)), rtol=0, atol=1e-6)
+    self.assertAllClose(y, x * (1 + .1 * abs(x)), rtol=0, atol=1e-6)
 
   def test_rgdn_has_correct_output(self):
     x = tf.random.uniform((1, 2, 3, 4), -.5, .5, dtype=tf.float32)
     y = gdn.GDN(inverse=False, rectify=True)(x)
     self.assertEqual(x.shape, y.shape)
     x = tf.maximum(x, 0)
+    self.assertAllClose(y, x / (1 + .1 * x), rtol=0, atol=1e-6)
+
+  def test_quadratic_gdn_has_correct_output(self):
+    x = tf.random.uniform((1, 2, 3, 4), -.5, .5, dtype=tf.float32)
+    y = gdn.GDN(
+        inverse=False, rectify=False,
+        alpha_parameter=2, epsilon_parameter=.5)(x)
+    self.assertEqual(x.shape, y.shape)
     self.assertAllClose(y, x / tf.sqrt(1 + .1 * (x ** 2)), rtol=0, atol=1e-6)
 
   def test_fixed_gdn_has_correct_output(self):
@@ -71,16 +78,20 @@ class GDNTest(tf.test.TestCase, parameterized.TestCase):
         inverse=False, rectify=False,
         beta_parameter=[0, 0, 0], gamma_parameter=tf.ones((3, 3)))(x)
     self.assertEqual(x.shape, y.shape)
-    expected_y = x / tf.sqrt(tf.reduce_sum(x ** 2, axis=-1, keepdims=True))
+    expected_y = x / tf.reduce_sum(abs(x), axis=-1, keepdims=True)
     self.assertAllClose(y, expected_y, rtol=0, atol=1e-6)
 
   def test_variables_are_enumerated(self):
     layer = gdn.GDN()
+    layer.alpha_parameter = None
+    layer.epsilon_parameter = None
     layer.build((None, 5))
-    self.assertLen(layer.weights, 2)
-    self.assertLen(layer.trainable_weights, 2)
+    self.assertLen(layer.weights, 4)
+    self.assertLen(layer.trainable_weights, 4)
     weight_names = [w.name for w in layer.weights]
-    self.assertSameElements(weight_names, ["reparam_beta:0", "reparam_gamma:0"])
+    self.assertSameElements(weight_names, [
+        "reparam_alpha:0", "reparam_beta:0", "reparam_gamma:0",
+        "reparam_epsilon:0"])
 
   def test_variables_are_not_enumerated_when_overridden(self):
     layer = gdn.GDN()
@@ -107,13 +118,21 @@ class GDNTest(tf.test.TestCase, parameterized.TestCase):
     with self.assertRaises(RuntimeError):
       layer.data_format = "channels_first"
     with self.assertRaises(RuntimeError):
+      layer.alpha_parameter = 5
+    with self.assertRaises(RuntimeError):
       layer.beta_parameter = tf.ones((5,))
     with self.assertRaises(RuntimeError):
       layer.gamma_parameter = tf.ones((5, 5))
     with self.assertRaises(RuntimeError):
+      layer.epsilon_parameter = 1/3
+    with self.assertRaises(RuntimeError):
+      layer.alpha_initializer = "ones"
+    with self.assertRaises(RuntimeError):
       layer.beta_initializer = tf.keras.initializers.Ones()
     with self.assertRaises(RuntimeError):
       layer.gamma_initializer = tf.keras.initializers.Ones()
+    with self.assertRaises(RuntimeError):
+      layer.epsilon_initializer = "ones"
 
   def test_variables_receive_gradients(self):
     x = tf.random.uniform((1, 2), dtype=tf.float32)
@@ -133,13 +152,18 @@ class GDNTest(tf.test.TestCase, parameterized.TestCase):
     model = tf.keras.Model(inputs=inputs, outputs=outputs)
     layer = model.get_layer("gdn")
 
-    self.assertIsInstance(layer, gdn.GDN)
-    self.assertIsInstance(layer.beta_parameter, parameters.GDNParameter)
-    self.assertIsInstance(layer.gamma_parameter, parameters.GDNParameter)
+    with self.subTest(name="layer_created_as_expected"):
+      self.assertIsInstance(layer, gdn.GDN)
+      self.assertIsInstance(layer.alpha_parameter, tf.Tensor)
+      self.assertEmpty(layer.alpha_parameter.shape)
+      self.assertIsInstance(layer.beta_parameter, parameters.GDNParameter)
+      self.assertIsInstance(layer.gamma_parameter, parameters.GDNParameter)
+      self.assertIsInstance(layer.epsilon_parameter, tf.Tensor)
+      self.assertEmpty(layer.epsilon_parameter.shape)
 
     x = tf.random.uniform((5, 5), dtype=tf.float32)
     y = model(x)
-    weights = [w.name for w in model.weights]
+    weight_names = [w.name for w in model.weights]
 
     tempdir = self.create_tempdir()
     model_path = os.path.join(tempdir.full_path, "model")
@@ -149,12 +173,20 @@ class GDNTest(tf.test.TestCase, parameterized.TestCase):
     model = tf.keras.models.load_model(model_path)
 
     layer = model.get_layer("gdn")
-    self.assertIsInstance(layer, gdn.GDN)
-    self.assertIsInstance(layer.beta_parameter, parameters.GDNParameter)
-    self.assertIsInstance(layer.gamma_parameter, parameters.GDNParameter)
+    with self.subTest(name="layer_recreated_as_expected"):
+      self.assertIsInstance(layer, gdn.GDN)
+      self.assertIsInstance(layer.alpha_parameter, tf.Tensor)
+      self.assertEmpty(layer.alpha_parameter.shape)
+      self.assertIsInstance(layer.beta_parameter, parameters.GDNParameter)
+      self.assertIsInstance(layer.gamma_parameter, parameters.GDNParameter)
+      self.assertIsInstance(layer.epsilon_parameter, tf.Tensor)
+      self.assertEmpty(layer.epsilon_parameter.shape)
 
-    self.assertAllEqual(model(x), y)
-    self.assertSameElements(weights, [w.name for w in model.weights])
+    with self.subTest(name="model_outputs_identical"):
+      self.assertAllEqual(model(x), y)
+
+    with self.subTest(name="model_weights_identical"):
+      self.assertSameElements(weight_names, [w.name for w in model.weights])
 
 
 if __name__ == "__main__":
