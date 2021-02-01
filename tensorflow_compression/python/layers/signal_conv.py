@@ -14,11 +14,9 @@
 # ==============================================================================
 """Swiss army tool for convolutions."""
 
-import functools
-
-import tensorflow.compat.v1 as tf
-
-from tensorflow_compression.python.layers import parameterizers
+from typing import Any, Callable, Dict, Optional, Tuple, Union
+import tensorflow as tf
+from tensorflow_compression.python.layers import parameters
 from tensorflow_compression.python.ops import padding_ops
 
 
@@ -27,6 +25,27 @@ __all__ = [
     "SignalConv2D",
     "SignalConv3D",
 ]
+
+
+def _normalize_int_tuple(value, name, rank) -> Tuple[int]:
+  try:
+    return rank * (int(value),)
+  except (ValueError, TypeError):
+    try:
+      value = tuple(int(v) for v in value)
+      assert len(value) == rank
+      return value
+    except (ValueError, TypeError, AssertionError):
+      raise ValueError(
+          f"`{name}` must be an integer or an iterable of integers with length "
+          f"{rank}.")
+
+
+def _greatest_common_factor(iterable) -> int:
+  for f in range(max(iterable), 1, -1):
+    if all(i % f == 0 for i in iterable):
+      return f
+  return 1
 
 
 class _SignalConv(tf.keras.layers.Layer):
@@ -182,224 +201,381 @@ class _SignalConv(tf.keras.layers.Layer):
     upsampled channel-separable convolutions are currently only implemented for
     `filters == 1`. When using `channel_separable`, prefer using identical
     strides in all dimensions to maximize performance.
+
+  Attributes:
+    filters: Integer. If `not channel_separable`, specifies the total number of
+      filters, which is equal to the number of output channels. Otherwise,
+      specifies the number of filters per channel, which makes the number of
+      output channels equal to `filters` times the number of input channels.
+    kernel_support: An integer or iterable of {rank} integers, specifying the
+      length of the convolution/correlation window in each dimension.
+    corr: Boolean. If True, compute cross correlation. If False, convolution.
+    strides_down: An integer or iterable of {rank} integers, specifying an
+      optional downsampling stride after the convolution/correlation.
+    strides_up: An integer or iterable of {rank} integers, specifying an
+      optional upsampling stride before the convolution/correlation.
+    padding: String. One of the supported padding modes (see above).
+    extra_pad_end: Boolean or `None`. When upsampling, use extra skipped samples
+      at the end of each dimension. `None` implies `True` for `same_*` padding
+      modes, and `False` for `valid`. For examples, refer to the discussion of
+      padding modes above.
+    channel_separable: Boolean. If `False`, each output channel is computed by
+      summing over all filtered input channels. If `True`, each output channel
+      is computed from only one input channel, and `filters` specifies the
+      number of filters per channel. The output channels are ordered such that
+      the first block of `filters` channels is computed from the first input
+      channel, the second block from the second input channel, etc.
+    data_format: String, one of `'channels_last'` or `'channels_first'`. The
+      ordering of the input dimensions. `'channels_last'` corresponds to input
+      tensors with shape `(batch, ..., channels)`, while `'channels_first'`
+      corresponds to input tensors with shape `(batch, channels, ...)`.
+    activation: Activation function or `None`.
+    use_bias: Boolean, whether an additive constant will be applied to each
+      output channel.
+    use_explicit: Boolean, whether to use `EXPLICIT` padding mode (supported in
+      TensorFlow >1.14).
+    kernel_parameter: Tensor, `tf.Variable`, callable, or one of the strings
+      `'rdft'`, `'variable'`. A `tf.Tensor` means that the kernel is fixed, a
+      `tf.Variable` that it is trained. A callable can be used to determine the
+      value of the kernel as a function of some other variable or tensor. This
+      can be a `Parameter` object. `'rdft'` means that when the layer is built,
+      a `RDFTParameter` object is created to train the kernel. `'variable'`
+      means that when the layer is built, a `tf.Variable` is created to train
+      the kernel. Note that certain choices here such as `tf.Tensor`s or lambda
+      functions may prevent JSON-style serialization (`Parameter` objects and
+      `tf.Variable`s work).
+    bias_parameter: Tensor, `tf.Variable`, callable, or the string `'variable'`.
+      A `tf.Tensor` means that the bias is fixed, a `tf.Variable` that it is
+      trained. A callable can be used to determine the value of the bias as a
+      function of some other variable or tensor. This can be a `Parameter`
+      object. `'variable'` means that when the layer is built, a `tf.Variable`
+      is created to train the bias. Note that certain choices here such as
+      `tf.Tensor`s or lambda functions may prevent JSON-style serialization
+      (`Parameter` objects and `tf.Variable`s work).
+    kernel_initializer: `Initializer` object for the filter kernel.
+    bias_initializer: `Initializer` object for the bias vector.
+    kernel_regularizer: `Regularizer` object or `None`. Optional regularizer for
+      the filter kernel.
+    bias_regularizer: `Regularizer` object or `None`. Optional regularizer for
+      the bias vector.
+    kernel: `tf.Tensor`. Read-only property always returning the current kernel
+      tensor.
+    bias: `tf.Tensor`. Read-only property always returning the current bias
+      tensor.
   """
 
   def __init__(self, filters, kernel_support,
-               corr=False, strides_down=1, strides_up=1, padding="valid",
-               extra_pad_end=True, channel_separable=False,
+               corr=False,
+               strides_down=1,
+               strides_up=1,
+               padding="valid",
+               extra_pad_end=None,
+               channel_separable=False,
                data_format="channels_last",
-               activation=None, use_bias=False, use_explicit=True,
-               kernel_initializer=tf.initializers.variance_scaling(),
-               bias_initializer=tf.initializers.zeros(),
-               kernel_regularizer=None, bias_regularizer=None,
-               kernel_parameterizer=parameterizers.RDFTParameterizer(),
-               bias_parameterizer=None,
+               activation=None,
+               use_bias=False,
+               use_explicit=True,
+               kernel_parameter="rdft",
+               bias_parameter="variable",
+               kernel_initializer="variance_scaling",
+               bias_initializer="zeros",
+               kernel_regularizer=None,
+               bias_regularizer=None,
                **kwargs):
     """Initializer.
 
     Args:
-      filters: Integer. If `not channel_separable`, specifies the total number
-        of filters, which is equal to the number of output channels. Otherwise,
-        specifies the number of filters per channel, which makes the number of
-        output channels equal to `filters` times the number of input channels.
-      kernel_support: An integer or iterable of {rank} integers, specifying the
-        length of the convolution/correlation window in each dimension.
-      corr: Boolean. If True, compute cross correlation. If False, convolution.
-      strides_down: An integer or iterable of {rank} integers, specifying an
-        optional downsampling stride after the convolution/correlation.
-      strides_up: An integer or iterable of {rank} integers, specifying an
-        optional upsampling stride before the convolution/correlation.
-      padding: String. One of the supported padding modes (see above).
-      extra_pad_end: Boolean. When upsampling, use extra skipped samples at the
-        end of each dimension (default). For examples, refer to the discussion
-        of padding modes above.
-      channel_separable: Boolean. If `False` (default), each output channel is
-        computed by summing over all filtered input channels. If `True`, each
-        output channel is computed from only one input channel, and `filters`
-        specifies the number of filters per channel. The output channels are
-        ordered such that the first block of `filters` channels is computed from
-        the first input channel, the second block from the second input channel,
-        etc.
-      data_format: String, one of `channels_last` (default) or `channels_first`.
-        The ordering of the input dimensions. `channels_last` corresponds to
-        input tensors with shape `(batch, ..., channels)`, while
-        `channels_first` corresponds to input tensors with shape `(batch,
-        channels, ...)`.
-      activation: Activation function or `None`.
-      use_bias: Boolean, whether an additive constant will be applied to each
-        output channel.
-      use_explicit: Boolean, whether to use `EXPLICIT` padding mode (supported
-        in TensorFlow >1.14).
-      kernel_initializer: An initializer for the filter kernel.
-      bias_initializer: An initializer for the bias vector.
-      kernel_regularizer: Optional regularizer for the filter kernel.
-      bias_regularizer: Optional regularizer for the bias vector.
-      kernel_parameterizer: Reparameterization applied to filter kernel. If not
-        `None`, must be a `Parameterizer` object. Defaults to
-        `RDFTParameterizer`.
-      bias_parameterizer: Reparameterization applied to bias. If not `None`,
-        must be a `Parameterizer` object. Defaults to `None`.
-      **kwargs: Other keyword arguments passed to superclass (`Layer`).
+      filters: Integer. Initial value of eponymous attribute.
+      kernel_support: Integer or iterable of integers. Initial value of
+        eponymous attribute.
+      corr: Boolean. Initial value of eponymous attribute.
+      strides_down: Integer or iterable of integers. Initial value of eponymous
+        attribute.
+      strides_up: Integer or iterable of integers. Initial value of eponymous
+        attribute.
+      padding: String. Initial value of eponymous attribute.
+      extra_pad_end: Boolean or `None`. Initial value of eponymous attribute.
+      channel_separable: Boolean. Initial value of eponymous attribute.
+      data_format: String. Initial value of eponymous attribute.
+      activation: Callable or `None`. Initial value of eponymous attribute.
+      use_bias: Boolean. Initial value of eponymous attribute.
+      use_explicit: Boolean. Initial value of eponymous attribute.
+      kernel_parameter: Tensor, `tf.Variable`, callable, `'rdft'`, or
+        `'variable'`. Initial value of eponymous attribute.
+      bias_parameter: Tensor, `tf.Variable`, callable, or `'variable'`. Initial
+        value of eponymous attribute.
+      kernel_initializer: `Initializer` object. Initial value of eponymous
+        attribute.
+      bias_initializer: `Initializer` object. Initial value of eponymous
+        attribute.
+      kernel_regularizer: `Regularizer` object or `None`. Initial value of
+        eponymous attribute.
+      bias_regularizer: `Regularizer` object or `None`. Initial value of
+        eponymous attribute.
+      **kwargs: Keyword arguments passed to superclass (`Layer`).
     """
-    super(_SignalConv, self).__init__(**kwargs)
+    super().__init__(**kwargs)
+    self.input_spec = tf.keras.layers.InputSpec(ndim=self._rank + 2)
+    self.filters = filters
+    self.kernel_support = kernel_support
+    self.corr = corr
+    self.strides_down = strides_down
+    self.strides_up = strides_up
+    self.padding = padding
+    self.extra_pad_end = extra_pad_end
+    self.channel_separable = channel_separable
+    self.data_format = data_format
+    self.activation = activation
+    self.use_bias = use_bias
+    self.use_explicit = use_explicit
+    self.kernel_parameter = kernel_parameter
+    self.bias_parameter = bias_parameter
+    self.kernel_initializer = kernel_initializer
+    self.bias_initializer = bias_initializer
+    self.kernel_regularizer = kernel_regularizer
+    self.bias_regularizer = bias_regularizer
 
-    self._filters = int(filters)
-    self._kernel_support = self._normalized_tuple(
-        kernel_support, "kernel_support")
-    self._corr = bool(corr)
-    self._strides_down = self._normalized_tuple(strides_down, "strides_down")
-    self._strides_up = self._normalized_tuple(strides_up, "strides_up")
-    self._padding = str(padding).lower()
+  @property
+  def filters(self) -> int:
+    return self._filters
+
+  @filters.setter
+  def filters(self, value):
+    self._check_not_built()
+    self._filters = int(value)
+
+  @property
+  def kernel_support(self) -> Tuple[int]:
+    return self._kernel_support
+
+  @kernel_support.setter
+  def kernel_support(self, value):
+    self._check_not_built()
+    self._kernel_support = _normalize_int_tuple(
+        value, "kernel_support", self._rank)
+
+  @property
+  def corr(self) -> bool:
+    return self._corr
+
+  @corr.setter
+  def corr(self, value):
+    self._check_not_built()
+    self._corr = bool(value)
+
+  @property
+  def strides_down(self) -> Tuple[int]:
+    return self._strides_down
+
+  @strides_down.setter
+  def strides_down(self, value):
+    self._check_not_built()
+    self._strides_down = _normalize_int_tuple(
+        value, "strides_down", self._rank)
+
+  @property
+  def strides_up(self) -> Tuple[int]:
+    return self._strides_up
+
+  @strides_up.setter
+  def strides_up(self, value):
+    self._check_not_built()
+    self._strides_up = _normalize_int_tuple(
+        value, "strides_up", self._rank)
+
+  @property
+  def padding(self) -> str:
+    return self._padding
+
+  @padding.setter
+  def padding(self, value):
+    self._check_not_built()
+    value = str(value).lower()
     try:
       self._pad_mode = {
           "valid": None,
           "same_zeros": "CONSTANT",
           "same_reflect": "REFLECT",
-      }[self.padding]
+      }[value]
     except KeyError:
-      raise ValueError("Unsupported padding mode: '{}'".format(padding))
-    self._extra_pad_end = bool(extra_pad_end)
-    self._channel_separable = bool(channel_separable)
-    self._data_format = str(data_format)
-    self._activation = activation
-    self._use_bias = bool(use_bias)
-    self._use_explicit = bool(use_explicit)
-    self._kernel_initializer = kernel_initializer
-    self._bias_initializer = bias_initializer
-    self._kernel_regularizer = kernel_regularizer
-    self._bias_regularizer = bias_regularizer
-    self._kernel_parameterizer = kernel_parameterizer
-    self._bias_parameterizer = bias_parameterizer
-
-    if self.data_format not in ("channels_first", "channels_last"):
-      raise ValueError("Unknown data format: '{}'.".format(self.data_format))
-
-    self.input_spec = tf.keras.layers.InputSpec(ndim=self._rank + 2)
+      raise ValueError(f"Unsupported padding mode: '{value}'.")
+    self._padding = value
 
   @property
-  def filters(self):
-    return self._filters
-
-  @property
-  def kernel_support(self):
-    return self._kernel_support
-
-  @property
-  def corr(self):
-    return self._corr
-
-  @property
-  def strides_down(self):
-    return self._strides_down
-
-  @property
-  def strides_up(self):
-    return self._strides_up
-
-  @property
-  def padding(self):
-    return self._padding
-
-  @property
-  def extra_pad_end(self):
+  def extra_pad_end(self) -> Optional[bool]:
+    if self._extra_pad_end is None:
+      return self.padding.startswith("same_")
     return self._extra_pad_end
 
+  @extra_pad_end.setter
+  def extra_pad_end(self, value):
+    self._check_not_built()
+    self._extra_pad_end = None if value is None else bool(value)
+
   @property
-  def channel_separable(self):
+  def channel_separable(self) -> bool:
     return self._channel_separable
 
+  @channel_separable.setter
+  def channel_separable(self, value):
+    self._check_not_built()
+    self._channel_separable = bool(value)
+
   @property
-  def data_format(self):
+  def data_format(self) -> str:
     return self._data_format
 
+  @data_format.setter
+  def data_format(self, value):
+    self._check_not_built()
+    value = str(value)
+    if value not in ("channels_first", "channels_last"):
+      raise ValueError(f"Unknown data format: '{value}'.")
+    self._data_format = value
+
   @property
-  def activation(self):
+  def activation(self) -> Optional[Callable[[Any], tf.Tensor]]:
     return self._activation
 
+  @activation.setter
+  def activation(self, value):
+    self._check_not_built()
+    self._activation = value
+
   @property
-  def use_bias(self):
+  def use_bias(self) -> bool:
     return self._use_bias
 
+  @use_bias.setter
+  def use_bias(self, value):
+    self._check_not_built()
+    self._use_bias = bool(value)
+
   @property
-  def use_explicit(self):
+  def use_explicit(self) -> bool:
     return self._use_explicit
 
+  @use_explicit.setter
+  def use_explicit(self, value):
+    self._check_not_built()
+    self._use_explicit = bool(value)
+
   @property
-  def kernel_initializer(self):
+  def kernel_parameter(self) -> Union[str, tf.Tensor, Callable[[], tf.Tensor]]:
+    return self._kernel_parameter
+
+  @kernel_parameter.setter
+  def kernel_parameter(self, value):
+    self._check_not_built()
+    # This is necessary to make Keras deserialization via __init__ work.
+    if isinstance(value, dict):
+      value = tf.keras.utils.deserialize_keras_object(value)
+    if isinstance(value, str):
+      if value not in ("variable", "rdft"):
+        raise ValueError(f"Unsupported value for kernel_parameter: '{value}'.")
+    elif not callable(value) and not isinstance(value, tf.Variable):
+      value = tf.convert_to_tensor(value, dtype=self.dtype)
+    self._kernel_parameter = value
+
+  @property
+  def bias_parameter(self) -> Union[str, tf.Tensor, Callable[[], tf.Tensor]]:
+    return self._bias_parameter
+
+  @bias_parameter.setter
+  def bias_parameter(self, value):
+    self._check_not_built()
+    # This is necessary to make Keras deserialization via __init__ work.
+    if isinstance(value, dict):
+      value = tf.keras.utils.deserialize_keras_object(value)
+    if isinstance(value, str):
+      if value != "variable":
+        raise ValueError(f"Unsupported value for bias_parameter: '{value}'.")
+    elif not callable(value) and not isinstance(value, tf.Variable):
+      value = tf.convert_to_tensor(value, dtype=self.dtype)
+    self._bias_parameter = value
+
+  @property
+  def kernel_initializer(self) -> Callable[..., tf.Tensor]:
     return self._kernel_initializer
 
+  @kernel_initializer.setter
+  def kernel_initializer(self, value):
+    self._check_not_built()
+    self._kernel_initializer = tf.keras.initializers.get(value)
+
   @property
-  def bias_initializer(self):
+  def bias_initializer(self) -> Callable[..., tf.Tensor]:
     return self._bias_initializer
 
+  @bias_initializer.setter
+  def bias_initializer(self, value):
+    self._check_not_built()
+    self._bias_initializer = tf.keras.initializers.get(value)
+
   @property
-  def kernel_regularizer(self):
+  def kernel_regularizer(self) -> Optional[Callable[..., tf.Tensor]]:
     return self._kernel_regularizer
 
+  @kernel_regularizer.setter
+  def kernel_regularizer(self, value):
+    self._check_not_built()
+    self._kernel_regularizer = tf.keras.regularizers.get(value)
+
   @property
-  def bias_regularizer(self):
+  def bias_regularizer(self) -> Optional[Callable[..., tf.Tensor]]:
     return self._bias_regularizer
 
-  @property
-  def kernel_parameterizer(self):
-    return self._kernel_parameterizer
+  @bias_regularizer.setter
+  def bias_regularizer(self, value):
+    self._check_not_built()
+    self._bias_regularizer = tf.keras.regularizers.get(value)
 
   @property
-  def bias_parameterizer(self):
-    return self._bias_parameterizer
+  def kernel(self) -> tf.Tensor:
+    if isinstance(self.kernel_parameter, str):
+      raise RuntimeError("Kernel is not initialized yet. Call build().")
+    if callable(self.kernel_parameter):
+      return tf.convert_to_tensor(self.kernel_parameter(), dtype=self.dtype)
+    return self.kernel_parameter
 
   @property
-  def kernel(self):
-    return self._kernel.value()
+  def bias(self) -> tf.Tensor:
+    if isinstance(self.bias_parameter, str):
+      raise RuntimeError("Bias is not initialized yet. Call build().")
+    if callable(self.bias_parameter):
+      return tf.convert_to_tensor(self.bias_parameter(), dtype=self.dtype)
+    return self.bias_parameter
+
+  def _check_not_built(self):
+    if self.built:
+      raise RuntimeError(
+          "Can't modify layer attributes after it has been built.")
 
   @property
-  def bias(self):
-    return self._bias.value()
-
-  @property
-  def _op_data_format(self):
+  def _op_data_format(self) -> str:
     fmt = {"channels_first": "NC{}", "channels_last": "N{}C"}[self.data_format]
     return fmt.format({1: "W", 2: "HW", 3: "DHW"}[self._rank])
 
-  def _padded_tuple(self, iterable, fill):
+  def _padded_tuple(self, iterable, fill) -> Tuple[Any]:
     if self.data_format == "channels_first":
       return (fill, fill) + tuple(iterable)
     else:
       return (fill,) + tuple(iterable) + (fill,)
 
-  def _normalized_tuple(self, value, name):
-    try:
-      return self._rank * (int(value),)
-    except (ValueError, TypeError):
-      try:
-        value = tuple(int(v) for v in value)
-        assert len(value) == self._rank
-        return value
-      except (ValueError, TypeError, AssertionError):
-        raise ValueError(
-            "`{}` must be an integer or an iterable of integers with length {}."
-            .format(name, self._rank))
-
-  def _greatest_common_factor(self, iterable):
-    for f in range(max(iterable), 1, -1):
-      if all(i % f == 0 for i in iterable):
-        return f
-    return 1
-
   def _raise_notimplemented(self):
     raise NotImplementedError(
-        "The provided combination of SignalConv{}D arguments is not currently "
-        "implemented (filters={}, kernel_support={}, corr={}, strides_down={}, "
-        "strides_up={}, channel_separable={}, data_format={}). Try using "
-        "odd-length kernels or turning off separability?".format(
-            self._rank, self.filters, self.kernel_support, self.corr,
-            self.strides_down, self.strides_up, self.channel_separable,
-            self.data_format))
+        f"The provided combination of {type(self).__name__} arguments is not "
+        f"currently implemented (filters={self.filters}, "
+        f"kernel_support={self.kernel_support}, corr={self.corr}, "
+        f"strides_down={self.strides_down}, strides_up={self.strides_up}, "
+        f"channel_separable={self.channel_separable}, "
+        f"data_format={self.data_format}). Try using odd-length kernels or "
+        f"turning off separability?")
 
   def build(self, input_shape):
     input_shape = tf.TensorShape(input_shape)
     channel_axis = {"channels_first": 1, "channels_last": -1}[self.data_format]
-    input_channels = input_shape.as_list()[channel_axis]
+    input_channels = input_shape[channel_axis]
     if input_channels is None:
       raise ValueError("The channel dimension of the inputs must be defined.")
     self.input_spec = tf.keras.layers.InputSpec(
@@ -411,39 +587,35 @@ class _SignalConv(tf.keras.layers.Layer):
     else:
       output_channels = self.filters
 
-    kernel_parameterizer = self.kernel_parameterizer
-    if kernel_parameterizer is None:
-      getter = self.add_weight
-    else:
-      getter = functools.partial(
-          kernel_parameterizer, getter=self.add_weight)
-    self._kernel = getter(
-        name="kernel", shape=kernel_shape, dtype=self.dtype,
-        initializer=self.kernel_initializer,
-        regularizer=self.kernel_regularizer)
+    if isinstance(self.kernel_parameter, str):
+      initial_value = self.kernel_initializer(
+          shape=kernel_shape, dtype=self.dtype)
+      self.kernel_parameter = dict(
+          variable=tf.Variable,
+          rdft=parameters.RDFTParameter,
+      )[self.kernel_parameter](initial_value, name="kernel")
 
-    if self.use_bias:
-      bias_parameterizer = self.bias_parameterizer
-      if bias_parameterizer is None:
-        getter = self.add_weight
-      else:
-        getter = functools.partial(
-            bias_parameterizer, getter=self.add_weight)
-      self._bias = getter(
-          name="bias", shape=(output_channels,), dtype=self.dtype,
-          initializer=self.bias_initializer, regularizer=self.bias_regularizer)
+    if self.use_bias and isinstance(self.bias_parameter, str):
+      initial_value = self.bias_initializer(
+          shape=[output_channels], dtype=self.dtype)
+      self.bias_parameter = dict(
+          variable=tf.Variable,
+      )[self.bias_parameter](initial_value, name="bias")
 
-    super(_SignalConv, self).build(input_shape)
+    if self.kernel_regularizer is not None:
+      self.add_loss(lambda: self.kernel_regularizer(self.kernel))
+
+    if self.use_bias and self.bias_regularizer is not None:
+      self.add_loss(lambda: self.bias_regularizer(self.bias))
+
+    super().build(input_shape)
 
   def _correlate_down_valid(self, inputs, kernel):
     # Computes valid correlation followed by downsampling.
-
     data_format = self._op_data_format
     strides = self._padded_tuple(self.strides_down, 1)
 
-    if 1 <= self._rank <= 3 and not self.channel_separable:
-      # `tf.nn.convolution` computes correlation followed by optional
-      # downsampling.
+    if self._rank <= 3 and not self.channel_separable:
       outputs = tf.nn.convolution(
           inputs, kernel,
           strides=self.strides_down, padding="VALID", data_format=data_format)
@@ -455,18 +627,18 @@ class _SignalConv(tf.keras.layers.Layer):
       data_format = data_format.replace("W", "HW")
       inputs = tf.expand_dims(inputs, extradim)
       kernel = tf.expand_dims(kernel, 0)
-      outputs = tf.nn.depthwise_conv2d_native(
+      outputs = tf.nn.depthwise_conv2d(
           inputs, kernel,
           strides=strides, padding="VALID", data_format=data_format)
       outputs = tf.squeeze(outputs, [extradim])
     elif self._rank == 2 and self.channel_separable:
-      # `tf.nn.depthwise_conv2d_native` performs channel-separable correlations
+      # `tf.nn.depthwise_conv2d` performs channel-separable correlations
       # followed by optional downsampling. All strides must be identical. If
       # not, we downsample by the greatest common factor and then downsample
       # the result further.
-      gcf = self._greatest_common_factor(self.strides_down)
+      gcf = _greatest_common_factor(self.strides_down)
       strides = self._padded_tuple(self._rank * (gcf,), 1)
-      outputs = tf.nn.depthwise_conv2d_native(
+      outputs = tf.nn.depthwise_conv2d(
           inputs, kernel,
           strides=strides, padding="VALID", data_format=data_format)
       # Perform remaining downsampling.
@@ -482,36 +654,26 @@ class _SignalConv(tf.keras.layers.Layer):
     # Computes correlation followed by downsampling, with arbitrary zero
     # padding.
     data_format = self._op_data_format
-    strides = self._padded_tuple(self.strides_down, 1)
     padding = self._padded_tuple(padding, (0, 0))
-    do_cast = inputs.dtype.is_integer
 
     if self._rank == 1 and not self.channel_separable:
       # The 1D correlation op can't do explicit padding, so if that is requested
       # we insert an extra dimension and use the 2D op.
       extradim = {"channels_first": 2, "channels_last": 1}[self.data_format]
+      strides = self._padded_tuple(self.strides_down, 1)
       strides = strides[:extradim] + (strides[extradim],) + strides[extradim:]
       padding = padding[:extradim] + ((0, 0),) + padding[extradim:]
       data_format = data_format.replace("W", "HW")
       inputs = tf.expand_dims(inputs, extradim)
       kernel = tf.expand_dims(kernel, 0)
-      if do_cast:
-        inputs = tf.cast(inputs, tf.float32)
       outputs = tf.nn.conv2d(
           inputs, kernel,
           strides=strides, padding=padding, data_format=data_format)
-      if do_cast:
-        outputs = tf.cast(tf.math.round(outputs), self.accum_dtype)
       outputs = tf.squeeze(outputs, [extradim])
     elif self._rank == 2 and not self.channel_separable:
-      # `tf.nn.conv2d` performs correlations followed by optional downsampling.
-      if do_cast:
-        inputs = tf.cast(inputs, tf.float32)
       outputs = tf.nn.conv2d(
           inputs, kernel,
-          strides=strides, padding=padding, data_format=data_format)
-      if do_cast:
-        outputs = tf.cast(tf.math.round(outputs), self.accum_dtype)
+          strides=self.strides_down, padding=padding, data_format=data_format)
     else:
       self._raise_notimplemented()
 
@@ -555,44 +717,27 @@ class _SignalConv(tf.keras.layers.Layer):
     strides = self._padded_tuple(self.strides_up, 1)
 
     # Compute convolution.
-    if self._rank == 1 and not self.channel_separable:
-      # There's no 1D equivalent to conv2d_backprop_input, so we insert an
-      # extra dimension and use the 2D op.
-      extradim = {"channels_first": 2, "channels_last": 1}[self.data_format]
-      data_format = data_format.replace("W", "HW")
-      strides = strides[:extradim] + (strides[extradim],) + strides[extradim:]
-      temp_shape = temp_shape[:extradim] + [1] + temp_shape[extradim:]
-      kernel = tf.expand_dims(kernel, 0)
-      inputs = tf.expand_dims(inputs, extradim)
-      outputs = tf.nn.conv2d_backprop_input(
-          temp_shape, kernel, inputs,
+    if self._rank <= 3 and not self.channel_separable:
+      outputs = tf.nn.conv_transpose(
+          inputs, kernel, temp_shape,
           strides=strides, padding="VALID", data_format=data_format)
-      outputs = tf.squeeze(outputs, [extradim])
     elif self._rank == 1 and self.channel_separable and self.filters == 1:
-      # There's no 1D equivalent to depthwise_conv2d_native_backprop_input, so
-      # we insert an extra dimension and use the 2D op.
+      # There's no 1D equivalent to `depthwise_conv2d_backprop_input`, so we
+      # insert an extra dimension and use the 2D op.
       extradim = {"channels_first": 2, "channels_last": 1}[self.data_format]
       data_format = data_format.replace("W", "HW")
       strides = strides[:extradim] + (strides[extradim],) + strides[extradim:]
       temp_shape = temp_shape[:extradim] + [1] + temp_shape[extradim:]
       kernel = tf.expand_dims(kernel, 0)
       inputs = tf.expand_dims(inputs, extradim)
-      outputs = tf.nn.depthwise_conv2d_native_backprop_input(
+      outputs = tf.nn.depthwise_conv2d_backprop_input(
           temp_shape, kernel, inputs,
           strides=strides, padding="VALID", data_format=data_format)
       outputs = tf.squeeze(outputs, [extradim])
-    elif self._rank == 2 and not self.channel_separable:
-      outputs = tf.nn.conv2d_backprop_input(
-          temp_shape, kernel, inputs,
-          strides=strides, padding="VALID", data_format=data_format)
     elif (self._rank == 2 and self.channel_separable and
           self.filters == 1 and self.strides_up[0] == self.strides_up[1]):
-      outputs = tf.nn.depthwise_conv2d_native_backprop_input(
+      outputs = tf.nn.depthwise_conv2d_backprop_input(
           temp_shape, kernel, inputs,
-          strides=strides, padding="VALID", data_format=data_format)
-    elif self._rank == 3 and not self.channel_separable:
-      outputs = tf.nn.conv3d_transpose(
-          inputs, kernel, temp_shape,
           strides=strides, padding="VALID", data_format=data_format)
     else:
       self._raise_notimplemented()
@@ -624,14 +769,13 @@ class _SignalConv(tf.keras.layers.Layer):
     # Computes upsampling followed by convolution, via transpose convolution ops
     # in EXPLICIT mode. This is an efficient implementation of upsampled
     # convolutions, where we only compute values that are necessary.
-    do_cast = inputs.dtype.is_integer
 
-    # conv2d_backprop_input expects the output and input channels in reversed
-    # order. We implement this by swapping those dimensions of the kernel.
+    # `conv_transpose` expects the output and input channels in reversed order.
+    # We implement this by swapping those dimensions of the kernel.
     kernel = tf.transpose(
         kernel, list(range(self._rank)) + [self._rank + 1, self._rank])
 
-    # Compute explicit padding corresponding to the equivalent conv2d call,
+    # Compute explicit padding corresponding to the equivalent convolution call,
     # and the shape of the output, taking into account any pre-padding.
     input_shape = tf.shape(inputs)
     padding = (self._rank + 2) * [(0, 0)]
@@ -660,35 +804,27 @@ class _SignalConv(tf.keras.layers.Layer):
           sum(padding[a]))
 
     data_format = self._op_data_format
-    strides = self._padded_tuple(self.strides_up, 1)
 
     # Compute convolution.
     if self._rank == 1 and not self.channel_separable:
-      # There's no 1D equivalent to conv2d_backprop_input, so we insert an
-      # extra dimension and use the 2D op.
+      # `conv1d_transpose` can't do explicit padding, so if that is requested
+      # we insert an extra dimension and use the 2D op.
       extradim = {"channels_first": 2, "channels_last": 1}[self.data_format]
       data_format = data_format.replace("W", "HW")
+      strides = self._padded_tuple(self.strides_up, 1)
       strides = strides[:extradim] + (strides[extradim],) + strides[extradim:]
       padding = padding[:extradim] + [(0, 0)] + padding[extradim:]
       output_shape = output_shape[:extradim] + [1] + output_shape[extradim:]
       kernel = tf.expand_dims(kernel, 0)
       inputs = tf.expand_dims(inputs, extradim)
-      if do_cast:
-        inputs = tf.cast(inputs, tf.float32)
-      outputs = tf.nn.conv2d_backprop_input(
-          output_shape, kernel, inputs,
+      outputs = tf.nn.conv2d_transpose(
+          inputs, kernel, output_shape,
           strides=strides, padding=padding, data_format=data_format)
-      if do_cast:
-        outputs = tf.cast(tf.math.round(outputs), self.accum_dtype)
       outputs = tf.squeeze(outputs, [extradim])
     elif self._rank == 2 and not self.channel_separable:
-      if do_cast:
-        inputs = tf.cast(inputs, tf.float32)
-      outputs = tf.nn.conv2d_backprop_input(
-          output_shape, kernel, inputs,
-          strides=strides, padding=padding, data_format=data_format)
-      if do_cast:
-        outputs = tf.cast(tf.math.round(outputs), self.accum_dtype)
+      outputs = tf.nn.conv2d_transpose(
+          inputs, kernel, output_shape,
+          strides=self.strides_up, padding=padding, data_format=data_format)
     else:
       self._raise_notimplemented()
 
@@ -700,7 +836,7 @@ class _SignalConv(tf.keras.layers.Layer):
 
     return outputs
 
-  def call(self, inputs):
+  def call(self, inputs) -> tf.Tensor:
     inputs = tf.convert_to_tensor(inputs)
     outputs = inputs
 
@@ -801,13 +937,9 @@ class _SignalConv(tf.keras.layers.Layer):
     if self.activation is not None:
       outputs = self.activation(outputs)  # pylint:disable=not-callable
 
-    # Aid shape inference, for some reason shape info is not always available.
-    if not tf.executing_eagerly():
-      outputs.set_shape(self.compute_output_shape(inputs.shape))
-
     return outputs
 
-  def compute_output_shape(self, input_shape):
+  def compute_output_shape(self, input_shape) -> tf.TensorShape:
     input_shape = tf.TensorShape(input_shape)
     input_shape = input_shape.with_rank(self._rank + 2)
     batch = input_shape[0]
@@ -838,12 +970,59 @@ class _SignalConv(tf.keras.layers.Layer):
     else:
       return tf.TensorShape([batch] + spatial + [channels])
 
+  def get_config(self) -> Dict[str, Any]:
+    config = super().get_config()
+
+    # Special-case variables, which can't be serialized but are handled by
+    # get_weights()/set_weights().
+    def try_serialize(parameter, name):
+      try:
+        return tf.keras.utils.serialize_keras_object(parameter)
+      except (ValueError, TypeError):  # Should throw TypeError, but doesn't...
+        if isinstance(parameter, tf.Variable):
+          return "variable"
+        raise TypeError(
+            f"Can't serialize {name} of type '{type(parameter)}'.")
+
+    kernel_parameter = try_serialize(self.kernel_parameter, "kernel")
+    bias_parameter = try_serialize(self.bias_parameter, "bias")
+
+    config.update(
+        filters=self.filters,
+        kernel_support=self.kernel_support,
+        corr=self.corr,
+        strides_down=self.strides_down,
+        strides_up=self.strides_up,
+        padding=self.padding,
+        extra_pad_end=self.extra_pad_end,
+        channel_separable=self.channel_separable,
+        data_format=self.data_format,
+        activation=self.activation,
+        use_bias=self.use_bias,
+        use_explicit=self.use_explicit,
+        kernel_parameter=kernel_parameter,
+        bias_parameter=bias_parameter,
+        kernel_initializer=tf.keras.initializers.serialize(
+            self.kernel_initializer),
+        bias_initializer=tf.keras.initializers.serialize(
+            self.bias_initializer),
+        kernel_regularizer=tf.keras.regularizers.serialize(
+            self.kernel_regularizer),
+        bias_regularizer=tf.keras.regularizers.serialize(
+            self.bias_regularizer),
+    )
+    return config
+
 
 def _conv_class_factory(name, rank):
   """Subclass from _SignalConv, fixing convolution rank."""
-  clsdict = {"_rank": rank,
-             "__doc__": _SignalConv.__doc__.format(rank=rank)}
-  return type(name, (_SignalConv,), clsdict)
+  clsdict = {
+      "_rank": rank,
+      "__doc__": _SignalConv.__doc__.format(rank=rank),
+  }
+  cls = type(name, (_SignalConv,), clsdict)
+  return tf.keras.utils.register_keras_serializable(
+      package="tensorflow_compression")(cls)
 
 
 # pylint:disable=invalid-name

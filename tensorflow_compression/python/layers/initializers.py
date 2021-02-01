@@ -43,7 +43,7 @@ class IdentityInitializer(tf.keras.initializers.Initializer):
     if shape.rank <= 2:
       raise ValueError(f"shape must be at least rank 3, got {shape}.")
 
-    support = shape.as_list()[:-2] + [1, 1]
+    support = shape[:-2] + (1, 1)
     indices = [[s // 2 for s in support]]
     updates = tf.constant([self.gain], dtype=dtype)
     spatial_kernel = tf.scatter_nd(indices, updates, support)

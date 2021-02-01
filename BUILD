@@ -17,7 +17,7 @@ py_library(
         "//tensorflow_compression/python/entropy_models:universal",
         "//tensorflow_compression/python/layers:gdn",
         "//tensorflow_compression/python/layers:initializers",
-        "//tensorflow_compression/python/layers:parameterizers",
+        "//tensorflow_compression/python/layers:parameters",
         "//tensorflow_compression/python/layers:signal_conv",
         "//tensorflow_compression/python/layers:soft_round",
         "//tensorflow_compression/python/ops:math_ops",

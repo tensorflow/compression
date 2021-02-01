@@ -14,18 +14,141 @@
 # ==============================================================================
 """Tests of signal processing convolution layers."""
 
+import os
 import numpy as np
 import scipy.signal
-import tensorflow.compat.v1 as tf
-
-from tensorflow.python.framework import test_util
+import tensorflow as tf
 from tensorflow_compression.python.layers import initializers
-from tensorflow_compression.python.layers import parameterizers
+from tensorflow_compression.python.layers import parameters
 from tensorflow_compression.python.layers import signal_conv
 
 
-@test_util.deprecated_graph_mode_only
-class SignalTest(tf.test.TestCase):
+class SignalConvTest(tf.test.TestCase):
+
+  def test_invalid_data_format_raises_error(self):
+    with self.assertRaises(ValueError):
+      signal_conv.SignalConv1D(2, 1, data_format="NHWC")
+
+  def test_variables_are_enumerated(self):
+    layer = signal_conv.SignalConv2D(3, 1, use_bias=True)
+    layer.build((None, None, 2))
+    self.assertLen(layer.weights, 2)
+    self.assertLen(layer.trainable_weights, 2)
+    weight_names = [w.name for w in layer.weights]
+    self.assertSameElements(weight_names, ["kernel_rdft:0", "bias:0"])
+
+  def test_bias_variable_is_not_unnecessarily_created(self):
+    layer = signal_conv.SignalConv2D(5, 3, use_bias=False)
+    layer.build((None, None, 3))
+    self.assertLen(layer.weights, 1)
+    self.assertLen(layer.trainable_weights, 1)
+    weight_names = [w.name for w in layer.weights]
+    self.assertSameElements(weight_names, ["kernel_rdft:0"])
+
+  def test_variables_are_not_enumerated_when_overridden(self):
+    layer = signal_conv.SignalConv2D(1, 1)
+    layer.kernel_parameter = [[[[1]]]]
+    layer.bias_parameter = [0]
+    layer.build((None, 1))
+    self.assertEmpty(layer.weights)
+    self.assertEmpty(layer.trainable_weights)
+
+  def test_variables_trainable_state_follows_layer(self):
+    layer = signal_conv.SignalConv2D(1, 1, use_bias=True)
+    layer.trainable = False
+    layer.build((None, 1))
+    self.assertLen(layer.weights, 2)
+    self.assertEmpty(layer.trainable_weights)
+
+  def test_attributes_cannot_be_set_after_build(self):
+    layer = signal_conv.SignalConv1D(2, 1)
+    layer.build((None, None, 2))
+    with self.assertRaises(RuntimeError):
+      layer.filters = 3
+    with self.assertRaises(RuntimeError):
+      layer.kernel_support = 3
+    with self.assertRaises(RuntimeError):
+      layer.corr = True
+    with self.assertRaises(RuntimeError):
+      layer.strides_down = 2
+    with self.assertRaises(RuntimeError):
+      layer.strides_up = 2
+    with self.assertRaises(RuntimeError):
+      layer.padding = "valid"
+    with self.assertRaises(RuntimeError):
+      layer.extra_pad_end = True
+    with self.assertRaises(RuntimeError):
+      layer.channel_separable = True
+    with self.assertRaises(RuntimeError):
+      layer.data_format = "channels_first"
+    with self.assertRaises(RuntimeError):
+      layer.activation = tf.nn.relu
+    with self.assertRaises(RuntimeError):
+      layer.use_bias = False
+    with self.assertRaises(RuntimeError):
+      layer.use_explicit = False
+    with self.assertRaises(RuntimeError):
+      layer.kernel_parameter = tf.ones((1, 2, 3))
+    with self.assertRaises(RuntimeError):
+      layer.bias_parameter = tf.ones((3,))
+    with self.assertRaises(RuntimeError):
+      layer.kernel_initializer = tf.keras.initializers.Ones()
+    with self.assertRaises(RuntimeError):
+      layer.bias_initializer = tf.keras.initializers.Ones()
+    with self.assertRaises(RuntimeError):
+      layer.kernel_regularizer = tf.keras.regularizers.L2()
+    with self.assertRaises(RuntimeError):
+      layer.bias_regularizer = tf.keras.regularizers.L2()
+
+  def test_variables_receive_gradients(self):
+    x = tf.random.uniform((1, 5, 2), dtype=tf.float32)
+    layer = signal_conv.SignalConv1D(2, 3, use_bias=True)
+    with tf.GradientTape() as g:
+      y = layer(x)
+    grads = g.gradient(y, layer.trainable_weights)
+    self.assertLen(grads, 2)
+    self.assertNotIn(None, grads)
+    grad_shapes = [tuple(g.shape) for g in grads]
+    weight_shapes = [tuple(w.shape) for w in layer.trainable_weights]
+    self.assertSameElements(grad_shapes, weight_shapes)
+
+  def test_can_be_saved_within_functional_model(self):
+    inputs = tf.keras.Input(shape=(None, 2))
+    outputs = signal_conv.SignalConv1D(1, 3, use_bias=True)(inputs)
+    model = tf.keras.Model(inputs=inputs, outputs=outputs)
+    layer = model.get_layer("signal_conv1d")
+
+    with self.subTest(name="layer_created_as_expected"):
+      self.assertIsInstance(layer, signal_conv.SignalConv1D)
+      self.assertIsInstance(layer.kernel_parameter, parameters.RDFTParameter)
+      self.assertIsInstance(layer.bias_parameter, tf.Variable)
+
+    x = tf.random.uniform((1, 5, 2), dtype=tf.float32)
+    y = model(x)
+    weight_names = [w.name for w in model.weights]
+
+    tempdir = self.create_tempdir()
+    model_path = os.path.join(tempdir.full_path, "model")
+    # This should force the model to be reconstructed via configs.
+    model.save(model_path, save_traces=False)
+
+    model = tf.keras.models.load_model(model_path)
+
+    layer = model.get_layer("signal_conv1d")
+    with self.subTest(name="layer_recreated_as_expected"):
+      self.assertIsInstance(layer, signal_conv.SignalConv1D)
+      self.assertIsInstance(layer.kernel_parameter, parameters.RDFTParameter)
+      self.assertIsInstance(layer.bias_parameter, tf.Variable)
+
+    with self.subTest(name="model_outputs_identical"):
+      self.assertAllEqual(model(x), y)
+
+    with self.subTest(name="model_weights_identical"):
+      self.assertSameElements(weight_names, [w.name for w in model.weights])
+
+
+class ConvolutionsTest(tf.test.TestCase):
+  """Tests SignalConv against scipy.signal."""
 
   def numpy_upsample(self, inputs, strides_up, extra_pad_end):
     """Upsample a numpy array."""
@@ -92,8 +215,7 @@ class SignalTest(tf.test.TestCase):
     # Create kernel array.
     kernel = np.random.randint(16, size=kernel_support + (channels, filters))
     kernel = kernel.astype(np.float32)
-    tf_kernel = parameterizers.StaticParameterizer(
-        tf.constant_initializer(kernel))
+    tf_kernel = tf.constant(kernel)
 
     # Run SignalConv* layer.
     layer_class = {
@@ -105,16 +227,13 @@ class SignalTest(tf.test.TestCase):
         filters, kernel_support, corr=corr, strides_down=strides_down,
         strides_up=strides_up, padding="valid", extra_pad_end=extra_pad_end,
         channel_separable=channel_separable, data_format=data_format,
-        activation=activation, use_bias=use_bias,
-        kernel_parameterizer=tf_kernel)
+        activation=activation, use_bias=use_bias, kernel_parameter=tf_kernel)
     tf_outputs = layer(tf_inputs)
-    with self.cached_session() as sess:
-      sess.run(tf.global_variables_initializer())
-      outputs = sess.run(tf_outputs)
+    outputs = tf_outputs.numpy()
 
     # Check that SignalConv* computes the correct output size.
     predicted_shape = layer.compute_output_shape(tf_inputs.shape)
-    self.assertEqual(outputs.shape, tuple(predicted_shape.as_list()))
+    self.assertEqual(outputs.shape, tuple(predicted_shape))
 
     # If not using channels_first, convert back to it to compare to SciPy.
     if data_format != "channels_first":
@@ -142,8 +261,8 @@ class SignalTest(tf.test.TestCase):
 
     # Create kernel array. This is an identity kernel, so the outputs should
     # be equal to the inputs except for up- and downsampling.
-    tf_kernel = parameterizers.StaticParameterizer(
-        initializers.IdentityInitializer())
+    tf_kernel = initializers.IdentityInitializer()(
+        shape=kernel_support + (1, filters), dtype=tf.float32)
 
     # Run SignalConv* layer.
     layer_class = {
@@ -155,16 +274,12 @@ class SignalTest(tf.test.TestCase):
         1, kernel_support, corr=corr, strides_down=strides_down,
         strides_up=strides_up, padding=padding, extra_pad_end=extra_pad_end,
         channel_separable=channel_separable, data_format=data_format,
-        activation=activation, use_bias=use_bias,
-        kernel_parameterizer=tf_kernel)
-    tf_outputs = layer(tf_inputs)
-    with self.cached_session() as sess:
-      sess.run(tf.global_variables_initializer())
-      outputs = sess.run(tf_outputs)
+        activation=activation, use_bias=use_bias, kernel_parameter=tf_kernel)
+    outputs = layer(tf_inputs).numpy()
 
     # Check that SignalConv* computes the correct output size.
     predicted_shape = layer.compute_output_shape(tf_inputs.shape)
-    self.assertEqual(outputs.shape, tuple(predicted_shape.as_list()))
+    self.assertEqual(outputs.shape, tuple(predicted_shape))
 
     # If not using channels_first, convert back to it to compare to input.
     if data_format != "channels_first":

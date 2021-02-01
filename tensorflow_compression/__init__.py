@@ -34,7 +34,7 @@ from tensorflow_compression.python.entropy_models.universal import *
 
 from tensorflow_compression.python.layers.gdn import *
 from tensorflow_compression.python.layers.initializers import *
-from tensorflow_compression.python.layers.parameterizers import *
+from tensorflow_compression.python.layers.parameters import *
 from tensorflow_compression.python.layers.signal_conv import *
 from tensorflow_compression.python.layers.soft_round import *
 
