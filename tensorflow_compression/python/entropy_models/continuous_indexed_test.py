@@ -26,9 +26,9 @@ class ContinuousIndexedEntropyModelTest(tf.test.TestCase):
 
   def test_can_instantiate_one_dimensional(self):
     em = continuous_indexed.ContinuousIndexedEntropyModel(
-        uniform_noise.NoisyNormal, 64,
+        uniform_noise.NoisyNormal, (64,),
         dict(loc=lambda _: 0, scale=lambda i: tf.exp(i / 8 - 5)), 1,
-        compression=True)
+        compression=True, channel_axis=None)
     self.assertIsInstance(em.prior, uniform_noise.NoisyNormal)
     self.assertEqual(em.coding_rank, 1)
     self.assertEqual(em.tail_mass, 2**-8)

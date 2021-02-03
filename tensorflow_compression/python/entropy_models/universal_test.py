@@ -149,15 +149,6 @@ class UniversalIndexedEntropyModelTest(tf.test.TestCase,
     super().setUp()
     tf.random.set_seed(1234)
 
-  def test_cannot_instantiate_one_dimensional(self):
-    with self.assertRaises(ValueError):
-      universal.UniversalIndexedEntropyModel(
-          uniform_noise.NoisyNormal,
-          coding_rank=1,
-          index_ranges=64,
-          parameter_fns=dict(
-              loc=lambda _: 0, scale=lambda i: tf.exp(i / 8 - 5)))
-
   def test_can_instantiate_n_dimensional(self):
     em = universal.UniversalIndexedEntropyModel(
         uniform_noise.NoisyLogisticMixture,

@@ -59,16 +59,16 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
   each bottleneck tensor element, it selects the appropriate scalar
   distribution.
 
-  The `indexes` tensor must contain only integer values (but may have
-  floating-point type for purposes of backpropagation) in a pre-specified range.
-  If `index_ranges` is a single integer, the index values must be in the range
-  `[0, index_ranges)` and `indexes` must have the same shape as the bottleneck
-  tensor. This only allows a one-dimensional conditional dependency. To make the
-  distribution conditional on `n`-dimensional indexes, `index_ranges` must be
-  specified as an iterable of `n` integers. Then, `indexes` must have the same
+  The `indexes` tensor must contain only integer values in a pre-specified range
+  (but may have floating-point type for purposes of backpropagation). To make
+  the distribution conditional on `n`-dimensional indexes, `index_ranges` must
+  be specified as an iterable of `n` integers. `indexes` must have the same
   shape as the bottleneck tensor with an additional channel dimension of length
   `n`. The position of the channel dimension is given by `channel_axis`. The
-  index values in the `n`th channel must be in the range `[0, index_ranges[n])`.
+  index values in the `k`th channel must be in the range `[0, index_ranges[k])`.
+  If `index_ranges` has only one element (i.e. `n == 1`), `channel_axis` may be
+  `None`. In that case, the additional channel dimension is omitted, and the
+  `indexes` tensor must have the same shape as the bottleneck tensor.
 
   The implied distribution for the bottleneck tensor is determined as:
   ```
@@ -89,12 +89,13 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
   ```
   tfc.ContinuousIndexedEntropyModel(
       prior_fn=tfc.NoisyNormal,
-      index_ranges=64,
+      index_ranges=(64,),
       parameter_fns=dict(
           loc=lambda _: 0.,
           scale=lambda i: tf.exp(i / 8 - 5),
       ),
       coding_rank=1,
+      channel_axis=None,
   )
   ```
   Then, each element of `indexes` in the range `[0, 64)` would indicate that the
@@ -149,12 +150,10 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         since this is the marginal distribution for bottleneck dimensions that
         are constant. The callable will receive keyword arguments as determined
         by `parameter_fns`.
-      index_ranges: Integer or iterable of integers. If a single integer,
-        `indexes` must have the same shape as `bottleneck`, and `channel_axis`
-        is ignored. Its values must be in the range `[0, index_ranges)`. If an
-        iterable of integers, `indexes` must have an additional dimension at
-        position `channel_axis`, and the values of the `n`th channel must be in
-        the range `[0, index_ranges[n])`.
+      index_ranges: Iterable of integers. `indexes` must have the same shape as
+        the bottleneck tensor, with an additional dimension at position
+        `channel_axis`. The values of the `k`th channel must be in the range
+        `[0, index_ranges[k])`.
       parameter_fns: Dict of strings to callables. Functions mapping `indexes`
         to each distribution parameter. For each item, `indexes` is passed to
         the callable, and the string key and return value make up one keyword
@@ -167,9 +166,10 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         assumes eager mode (throws an error if in graph mode or inside a
         `tf.function` call). If set to `False`, these two methods will not be
         accessible.
-      channel_axis: Integer. For iterable `index_ranges`, determines the
-        position of the channel axis in `indexes`. Defaults to the last
-        dimension.
+      channel_axis: Integer or `None`. Determines the position of the channel
+        axis in `indexes`. Defaults to the last dimension. If set to `None`,
+        the index tensor is expected to have the same shape as the bottleneck
+        tensor (only allowed when `index_ranges` has length 1).
       dtype: `tf.dtypes.DType`. The data type of all floating-point
         computations carried out in this class.
       laplace_tail_mass: Float. If positive, will augment the prior with a
@@ -187,19 +187,24 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         `compression=True` and not in eager execution mode.
     """
     if coding_rank <= 0:
-      raise ValueError("`coding_rank` must be larger than 0.")
+      raise ValueError("coding_rank must be larger than 0.")
     if not callable(prior_fn):
-      raise TypeError("`prior_fn` must be a class or factory function.")
+      raise TypeError("prior_fn must be a class or factory function.")
     for name, fn in parameter_fns.items():
       if not isinstance(name, str):
-        raise TypeError("`parameter_fns` must have string keys.")
+        raise TypeError("parameter_fns must have string keys.")
       if not callable(fn):
-        raise TypeError("`parameter_fns['{}']` must be callable.".format(name))
-
-    prior = self._make_range_coding_prior(prior_fn, index_ranges, parameter_fns,
-                                          channel_axis, dtype)
+        raise TypeError(f"parameter_fns['{name}'] must be callable.")
+    self._index_ranges = tuple(int(r) for r in index_ranges)
+    if not self.index_ranges:
+      raise ValueError("index_ranges must have at least one element.")
+    self._channel_axis = None if channel_axis is None else int(channel_axis)
+    if self.channel_axis is None and len(self.index_ranges) > 1:
+      raise ValueError("channel_axis can't be None for len(index_ranges) > 1.")
+    self._prior_fn = prior_fn
+    self._parameter_fns = dict(parameter_fns)
     super().__init__(
-        prior=prior,
+        prior=self._make_range_coding_prior(self.index_ranges, dtype),
         coding_rank=coding_rank,
         compression=compression,
         laplace_tail_mass=laplace_tail_mass,
@@ -208,14 +213,6 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         range_coder_precision=range_coder_precision,
         no_variables=no_variables
     )
-    self._channel_axis = int(channel_axis)
-    self._prior_fn = prior_fn
-    # TODO(relational, jonycgn): Do we need special casing for int index_ranges?
-    try:
-      self._index_ranges = int(index_ranges)
-    except TypeError:
-      self._index_ranges = tuple(int(r) for r in index_ranges)  # pytype:disable=attribute-error
-    self._parameter_fns = dict(parameter_fns)
 
   @property
   def index_ranges(self):
@@ -242,23 +239,23 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     parameters = {k: f(indexes) for k, f in self.parameter_fns.items()}
     return self.prior_fn(**parameters)
 
-  def _make_range_coding_prior(self, prior_fn, index_ranges, parameter_fns,
-                               channel_axis, dtype):
-    del self  # Method does not depend on instance state.
+  def _make_range_coding_prior(self, index_ranges, dtype):
+    """Instantiates the range coding prior."""
     dtype = tf.as_dtype(dtype)
-    if isinstance(index_ranges, int):
-      indexes = tf.range(index_ranges, dtype=dtype)
+    if self.channel_axis is None:
+      index_range, = index_ranges
+      indexes = tf.range(index_range, dtype=dtype)
     else:
       indexes = [tf.range(r, dtype=dtype) for r in index_ranges]
       indexes = tf.meshgrid(*indexes, indexing="ij")
-      indexes = tf.stack(indexes, axis=channel_axis)
-    parameters = {k: f(indexes) for k, f in parameter_fns.items()}
-    return prior_fn(**parameters)
+      indexes = tf.stack(indexes, axis=self.channel_axis)
+    return self._make_prior(indexes, dtype=dtype)
 
   def _normalize_indexes(self, indexes):
     indexes = math_ops.lower_bound(indexes, 0)
-    if isinstance(self.index_ranges, int):
-      bounds = self.index_ranges - 1
+    if self.channel_axis is None:
+      index_range, = self.index_ranges
+      bounds = index_range - 1
     else:
       axes = [1] * indexes.shape.rank
       axes[self.channel_axis] = len(self.index_ranges)
@@ -268,7 +265,7 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
 
   def _flatten_indexes(self, indexes):
     indexes = tf.cast(indexes, tf.int32)
-    if isinstance(self.index_ranges, int):
+    if self.channel_axis is None:
       return indexes
     else:
       strides = tf.math.cumprod(self.index_ranges, exclusive=True, reverse=True)
@@ -509,13 +506,14 @@ class LocationScaleIndexedEntropyModel(ContinuousIndexedEntropyModel):
     num_scales = int(num_scales)
     super().__init__(
         prior_fn=prior_fn,
-        index_ranges=num_scales,
+        index_ranges=(num_scales,),
         parameter_fns=dict(
             loc=lambda _: 0.,
             scale=scale_fn,
         ),
         coding_rank=coding_rank,
         compression=compression,
+        channel_axis=None,
         dtype=dtype,
         tail_mass=tail_mass,
         range_coder_precision=range_coder_precision,

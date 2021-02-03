@@ -65,7 +65,7 @@ class UniversalBatchedEntropyModel(
     continuous_batched.ContinuousBatchedEntropyModel):
   """Batched entropy model model which implements Universal Quantization.
 
-  In contrast to the base class, which uses roundinig for quantization, here
+  In contrast to the base class, which uses rounding for quantization, here
   "quantization" is performed additive uniform noise, which is implemented with
   Universal Quantization.
 
@@ -232,7 +232,7 @@ class UniversalIndexedEntropyModel(
     continuous_indexed.ContinuousIndexedEntropyModel):
   """Indexed entropy model model which implements Universal Quantization.
 
-  In contrast to the base class, which uses roundinig for quantization, here
+  In contrast to the base class, which uses rounding for quantization, here
   "quantization" is performed additive uniform noise, which is implemented with
   Universal Quantization.
 
@@ -268,10 +268,9 @@ class UniversalIndexedEntropyModel(
         since this is the marginal distribution for bottleneck dimensions that
         are constant. The callable will receive keyword arguments as determined
         by `parameter_fns`.
-      index_ranges: Iterable of integers. If (non-empty), compared to
-        `bottleneck`, `indexes` in __call__() must have an additional dimension
-        at position `channel_axis`, and the values of the `n`th channel must be
-        in the range `[0, index_ranges[n])`.
+      index_ranges: Iterable of integers. Compared to `bottleneck`, `indexes`
+        in `__call__()` must have an additional trailing dimension, and the
+        values of the `k`th channel must be in the range `[0, index_ranges[k])`.
       parameter_fns: Dict of strings to callables. Functions mapping `indexes`
         to each distribution parameter. For each item, `indexes` is passed to
         the callable, and the string key and return value make up one keyword
@@ -302,10 +301,6 @@ class UniversalIndexedEntropyModel(
       RuntimeError: when attempting to instantiate an entropy model with
         `compression=True` and not in eager execution mode.
     """
-    if isinstance(index_ranges, int):
-      raise ValueError(
-          "An iterable of integers is only supported for `index_ranges`.")
-
     # Add extra indexes for noise levels.
     index_ranges_with_offsets = tuple([num_noise_levels] +
                                       [int(r) for r in index_ranges])
@@ -342,7 +337,7 @@ class UniversalIndexedEntropyModel(
     return _index_ranges_without_offsets(self.index_ranges)
 
   def _normalize_indexes(self, indexes):
-    """See base  class."""
+    """See base class."""
     num_indexes = indexes.shape[-1]  # Last dim of `indexes` should be static.
     if num_indexes == len(self.index_ranges):
       # Indexes have offsets.
@@ -364,20 +359,10 @@ class UniversalIndexedEntropyModel(
         offset_indexes, self._num_noise_levels, dtype=self.dtype)
     return offset
 
-  def _make_range_coding_prior(self, prior_fn, index_ranges_with_offsets,
-                               parameter_fns, channel_axis, dtype):
-    """Computes the range coding prior."""
-    del self  # Method does not depend on instance state.
-    dtype = tf.as_dtype(dtype)
-    index_ranges_without_offsets = _index_ranges_without_offsets(
-        index_ranges_with_offsets)
-    indexes = [
-        tf.range(r, dtype=dtype) for r in index_ranges_without_offsets
-    ]
-    indexes = tf.meshgrid(*indexes, indexing="ij")
-    indexes = tf.stack(indexes, axis=channel_axis)
-    parameters = {k: f(indexes) for k, f in parameter_fns.items()}
-    return prior_fn(**parameters)
+  def _make_range_coding_prior(self, index_ranges, dtype):
+    """Instantiates the range coding prior."""
+    return super()._make_range_coding_prior(
+        _index_ranges_without_offsets(index_ranges), dtype)
 
   def _offset_from_prior(self, prior):
     return _range_coding_offsets(self._num_noise_levels, self.prior_shape,
