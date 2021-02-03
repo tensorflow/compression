@@ -402,7 +402,7 @@ class _SignalConv(tf.keras.layers.Layer):
     self._padding = value
 
   @property
-  def extra_pad_end(self) -> Optional[bool]:
+  def extra_pad_end(self) -> bool:
     if self._extra_pad_end is None:
       return self.padding.startswith("same_")
     return self._extra_pad_end

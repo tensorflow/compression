@@ -15,13 +15,10 @@
 """Tests of PackedTensors class."""
 
 import numpy as np
-import tensorflow.compat.v1 as tf
-
-from tensorflow.python.framework import test_util
+import tensorflow as tf
 from tensorflow_compression.python.util import packed_tensors
 
 
-@test_util.deprecated_graph_mode_only
 class PackedTensorsTest(tf.test.TestCase):
 
   def test_pack_unpack(self):
@@ -30,8 +27,8 @@ class PackedTensorsTest(tf.test.TestCase):
     shape = np.array([1, 3], dtype=np.int32)
     arrays = [string, shape]
 
-    string_t = tf.placeholder(tf.string, [1])
-    shape_t = tf.placeholder(tf.int32, [2])
+    string_t = tf.zeros([1], dtype=tf.string)
+    shape_t = tf.zeros([2], dtype=tf.int32)
     tensors = [string_t, shape_t]
 
     packed = packed_tensors.PackedTensors()

@@ -10,16 +10,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Entropy models which implement Univiersal Quantization."""
+"""Entropy models which implement universal quantization."""
+
 import functools
-
 import tensorflow as tf
-
 from tensorflow_compression.python.entropy_models import continuous_batched
 from tensorflow_compression.python.entropy_models import continuous_indexed
 from tensorflow_compression.python.ops import math_ops
 
-__all__ = ["UniversalBatchedEntropyModel", "UniversalIndexedEntropyModel"]
+
+__all__ = [
+    "UniversalBatchedEntropyModel",
+    "UniversalIndexedEntropyModel",
+]
 
 
 def _add_offset_indexes(indexes, num_noise_levels):

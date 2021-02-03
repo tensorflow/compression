@@ -2,7 +2,7 @@
 
 import matplotlib.pyplot as plt
 import numpy as np
-import tensorflow.compat.v2 as tf
+import tensorflow as tf
 import tensorflow_probability as tfp
 import tensorflow_compression as tfc
 from toy_sources import compression_model

@@ -14,14 +14,16 @@
 # ==============================================================================
 """Deep fully factorized distribution based on cumulative."""
 
-import tensorflow.compat.v2 as tf
+import tensorflow as tf
 import tensorflow_probability as tfp
-
 from tensorflow_compression.python.distributions import helpers
 from tensorflow_compression.python.distributions import uniform_noise
 
 
-__all__ = ["DeepFactorized", "NoisyDeepFactorized"]
+__all__ = [
+    "DeepFactorized",
+    "NoisyDeepFactorized",
+]
 
 
 def log_expm1(x):

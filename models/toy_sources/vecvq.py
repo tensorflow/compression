@@ -1,6 +1,6 @@
 """Variational entropy-constrained vector quantization."""
 
-import tensorflow.compat.v2 as tf
+import tensorflow as tf
 from toy_sources import compression_model
 
 

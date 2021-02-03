@@ -297,8 +297,8 @@ class GDN(tf.keras.layers.Layer):
     if self.alpha_parameter is None:
       raise RuntimeError("alpha is not initialized yet. Call build().")
     if callable(self.alpha_parameter):
-      return self.alpha_parameter()
-    return tf.convert_to_tensor(self.alpha_parameter, dtype=self.dtype)
+      return tf.convert_to_tensor(self.alpha_parameter(), dtype=self.dtype)
+    return self.alpha_parameter
 
   @property
   def beta(self) -> tf.Tensor:
@@ -321,8 +321,8 @@ class GDN(tf.keras.layers.Layer):
     if self.epsilon_parameter is None:
       raise RuntimeError("epsilon is not initialized yet. Call build().")
     if callable(self.epsilon_parameter):
-      return self.epsilon_parameter()
-    return tf.convert_to_tensor(self.epsilon_parameter, dtype=self.dtype)
+      return tf.convert_to_tensor(self.epsilon_parameter(), dtype=self.dtype)
+    return self.epsilon_parameter
 
   @property
   def _channel_axis(self):

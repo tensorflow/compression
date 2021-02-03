@@ -15,7 +15,7 @@
 """Packed tensors in bit sequences."""
 
 import numpy as np
-import tensorflow.compat.v1 as tf
+import tensorflow as tf
 
 
 __all__ = [
@@ -23,7 +23,7 @@ __all__ = [
 ]
 
 
-class PackedTensors(object):
+class PackedTensors:
   """Packed representation of compressed tensors.
 
   This class can pack and unpack several tensor values into a single string. It
@@ -85,6 +85,7 @@ class PackedTensors(object):
       del self._example.features.feature[chr(i)]
       i += 1
 
+  # TODO(jonycgn): Remove this function once all models are converted.
   def unpack(self, tensors):
     """Unpacks `Tensor` values from this object."""
     # Check tensor dtype first for a more informative error message.

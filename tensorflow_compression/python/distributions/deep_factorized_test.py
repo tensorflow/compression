@@ -15,9 +15,8 @@
 """Tests of deep factorized distribution."""
 
 from absl.testing import parameterized
-import tensorflow.compat.v2 as tf
+import tensorflow as tf
 import tensorflow_probability as tfp
-
 from tensorflow_compression.python.distributions import deep_factorized
 from tensorflow_compression.python.distributions import helpers
 

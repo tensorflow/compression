@@ -14,7 +14,7 @@
 # ==============================================================================
 """Extensions to `tfp.distributions.Distribution` to handle range coding."""
 
-import tensorflow.compat.v2 as tf
+import tensorflow as tf
 
 
 __all__ = [

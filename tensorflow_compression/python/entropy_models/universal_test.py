@@ -12,13 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests of indexed continuous entropy model."""
+"""Tests of universal entropy models."""
 
 from absl.testing import parameterized
 import scipy.stats
 import tensorflow as tf
 import tensorflow_probability as tfp
-
 from tensorflow_compression.python.distributions import deep_factorized
 from tensorflow_compression.python.distributions import uniform_noise
 from tensorflow_compression.python.entropy_models import universal

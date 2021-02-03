@@ -14,9 +14,8 @@
 # ==============================================================================
 """Tests of batched continuous entropy model."""
 
-import tensorflow.compat.v2 as tf
+import tensorflow as tf
 import tensorflow_probability as tfp
-
 from tensorflow_compression.python.distributions import uniform_noise
 from tensorflow_compression.python.entropy_models.continuous_batched import ContinuousBatchedEntropyModel
 
@@ -162,7 +161,7 @@ class ContinuousBatchedEntropyModelTest(tf.test.TestCase):
     # create the entropy model only the first time the function is called, and
     # store it for the second time.
 
-    class Compressor(object):
+    class Compressor:
 
       def compress(self, values):
         if not hasattr(self, "em"):

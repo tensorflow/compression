@@ -14,8 +14,7 @@
 # ==============================================================================
 """Tests of indexed continuous entropy model."""
 
-import tensorflow.compat.v2 as tf
-
+import tensorflow as tf
 from tensorflow_compression.python.distributions import uniform_noise
 from tensorflow_compression.python.entropy_models import continuous_indexed
 

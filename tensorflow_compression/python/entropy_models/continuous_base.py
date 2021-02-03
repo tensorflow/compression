@@ -16,16 +16,16 @@
 
 import abc
 import functools
-
 from absl import logging
-import tensorflow.compat.v2 as tf
+import tensorflow as tf
 import tensorflow_probability as tfp
-
 from tensorflow_compression.python.distributions import helpers
 from tensorflow_compression.python.ops import range_coding_ops
 
 
-__all__ = ["ContinuousEntropyModelBase"]
+__all__ = [
+    "ContinuousEntropyModelBase",
+]
 
 
 class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):

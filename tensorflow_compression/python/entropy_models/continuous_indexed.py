@@ -15,7 +15,6 @@
 """Indexed entropy model for continuous random variables."""
 
 import tensorflow as tf
-
 from tensorflow_compression.python.distributions import helpers
 from tensorflow_compression.python.entropy_models import continuous_base
 from tensorflow_compression.python.ops import math_ops

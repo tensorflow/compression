@@ -13,9 +13,9 @@
 # limitations under the License.
 # ==============================================================================
 """Distribution adapters for (soft) round functions."""
+
 import tensorflow as tf
 import tensorflow_probability as tfp
-
 from tensorflow_compression.python.distributions import deep_factorized
 from tensorflow_compression.python.distributions import helpers
 from tensorflow_compression.python.distributions import uniform_noise
@@ -23,9 +23,13 @@ from tensorflow_compression.python.ops import soft_round_ops
 
 
 __all__ = [
-    "MonotonicAdapter", "RoundAdapter", "NoisyRoundedNormal",
-    "NoisyRoundedDeepFactorized", "SoftRoundAdapter", "NoisySoftRoundedNormal",
-    "NoisySoftRoundedDeepFactorized"
+    "MonotonicAdapter",
+    "RoundAdapter",
+    "NoisyRoundedNormal",
+    "NoisyRoundedDeepFactorized",
+    "SoftRoundAdapter",
+    "NoisySoftRoundedNormal",
+    "NoisySoftRoundedDeepFactorized",
 ]
 
 

@@ -14,13 +14,12 @@
 # ==============================================================================
 """Tests of uniform noise adapter distribution."""
 
-import tensorflow.compat.v2 as tf
-
+import tensorflow as tf
 from tensorflow_compression.python.distributions import helpers
 from tensorflow_compression.python.distributions import uniform_noise
 
 
-class LocationScaleTest(object):
+class LocationScaleTest:
   """Common tests for noisy location-scale family of distributions."""
 
   def test_can_instantiate_scalar(self):
@@ -87,7 +86,7 @@ class NoisyLogisticTest(LocationScaleTest, tf.test.TestCase):
   dist_cls = uniform_noise.NoisyLogistic
 
 
-class MixtureTest(object):
+class MixtureTest:
   """Common tests for noisy mixture distributions."""
 
   def test_can_instantiate_scalar(self):

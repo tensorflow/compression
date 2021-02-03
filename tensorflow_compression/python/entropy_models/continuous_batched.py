@@ -15,9 +15,7 @@
 """Batched entropy model for continuous random variables."""
 
 import functools
-
-import tensorflow.compat.v2 as tf
-
+import tensorflow as tf
 from tensorflow_compression.python.distributions import helpers
 from tensorflow_compression.python.entropy_models import continuous_base
 from tensorflow_compression.python.ops import math_ops

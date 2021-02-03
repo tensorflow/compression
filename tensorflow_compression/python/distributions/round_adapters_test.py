@@ -18,7 +18,6 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-
 from tensorflow_compression.python.distributions import deep_factorized
 from tensorflow_compression.python.distributions import round_adapters
 from tensorflow_compression.python.ops import soft_round_ops
@@ -179,7 +178,7 @@ class NoisySoftRoundedDeepFactorizedTest(tf.test.TestCase):
           values=[1e6, 1e9])
 
 
-class LocationScaleTest(object):
+class LocationScaleTest:
   """Common tests for noisy location-scale family of distributions."""
 
   def test_can_instantiate_scalar(self):
