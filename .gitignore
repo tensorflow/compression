@@ -1,7 +1,38 @@
-.DS_Store
-*.pyc
-*.so
+# backup files
 *~
 
-# Ignore bazel-* symlinks.
+# Python byte code, etc.
+__pycache__/
+*.py[cod]
+*$py.class
+
+# type checkers
+.pyre/
+.pytype/
+
+# C/C++ object files/libraries
+*.slo
+*.lo
+*.o
+*.obj
+*.so
+*.dylib
+*.dll
+*.lai
+*.la
+*.a
+*.lib
+
+# bazel symlinks
 /bazel-*
+
+# Jupyter notebook
+.ipynb_checkpoints
+profile_default/
+ipython_config.py
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
