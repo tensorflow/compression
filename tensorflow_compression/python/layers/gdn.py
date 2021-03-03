@@ -152,7 +152,6 @@ class GDN(tf.keras.layers.Layer):
       **kwargs: Other keyword arguments passed to superclass (`Layer`).
     """
     super().__init__(**kwargs)
-    self.input_spec = tf.keras.layers.InputSpec(min_ndim=2)
     self.inverse = inverse
     self.rectify = rectify
     self.data_format = data_format
@@ -329,14 +328,13 @@ class GDN(tf.keras.layers.Layer):
     return {"channels_first": 1, "channels_last": -1}[self.data_format]
 
   def build(self, input_shape):
-    channel_axis = self._channel_axis
     input_shape = tf.TensorShape(input_shape)
-    num_channels = input_shape[channel_axis]
+    if input_shape.rank is None or input_shape.rank < 2:
+      raise ValueError(f"Input tensor must have at least rank 2, received "
+                       f"shape {input_shape}.")
+    num_channels = input_shape[self._channel_axis]
     if num_channels is None:
-      raise ValueError("The channel dimension of the inputs to `GDN` "
-                       "must be defined.")
-    self.input_spec = tf.keras.layers.InputSpec(
-        min_ndim=2, axes={channel_axis: num_channels})
+      raise ValueError("The channel dimension of the inputs must be defined.")
 
     if self.alpha_parameter is None:
       initial_value = self.alpha_initializer(
@@ -367,8 +365,9 @@ class GDN(tf.keras.layers.Layer):
   def call(self, inputs) -> tf.Tensor:
     inputs = tf.convert_to_tensor(inputs, dtype=self.dtype)
     rank = inputs.shape.rank
-    if rank is None:
-      raise RuntimeError("Input tensor rank must be defined.")
+    if rank is None or rank < 2:
+      raise ValueError(f"Input tensor must have at least rank 2, received "
+                       f"shape {inputs.shape}.")
 
     if self.rectify:
       inputs = tf.nn.relu(inputs)

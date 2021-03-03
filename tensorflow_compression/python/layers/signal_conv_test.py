@@ -31,7 +31,7 @@ class SignalConvTest(tf.test.TestCase):
 
   def test_variables_are_enumerated(self):
     layer = signal_conv.SignalConv2D(3, 1, use_bias=True)
-    layer.build((None, None, 2))
+    layer.build((None, None, None, 2))
     self.assertLen(layer.weights, 2)
     self.assertLen(layer.trainable_weights, 2)
     weight_names = [w.name for w in layer.weights]
@@ -39,7 +39,7 @@ class SignalConvTest(tf.test.TestCase):
 
   def test_bias_variable_is_not_unnecessarily_created(self):
     layer = signal_conv.SignalConv2D(5, 3, use_bias=False)
-    layer.build((None, None, 3))
+    layer.build((None, None, None, 3))
     self.assertLen(layer.weights, 1)
     self.assertLen(layer.trainable_weights, 1)
     weight_names = [w.name for w in layer.weights]
@@ -49,14 +49,14 @@ class SignalConvTest(tf.test.TestCase):
     layer = signal_conv.SignalConv2D(1, 1)
     layer.kernel_parameter = [[[[1]]]]
     layer.bias_parameter = [0]
-    layer.build((None, 1))
+    layer.build((None, None, None, 1))
     self.assertEmpty(layer.weights)
     self.assertEmpty(layer.trainable_weights)
 
   def test_variables_trainable_state_follows_layer(self):
     layer = signal_conv.SignalConv2D(1, 1, use_bias=True)
     layer.trainable = False
-    layer.build((None, 1))
+    layer.build((None, None, None, 1))
     self.assertLen(layer.weights, 2)
     self.assertEmpty(layer.trainable_weights)
 

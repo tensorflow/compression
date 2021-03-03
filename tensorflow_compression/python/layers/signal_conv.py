@@ -315,7 +315,6 @@ class _SignalConv(tf.keras.layers.Layer):
       **kwargs: Keyword arguments passed to superclass (`Layer`).
     """
     super().__init__(**kwargs)
-    self.input_spec = tf.keras.layers.InputSpec(ndim=self._rank + 2)
     self.filters = filters
     self.kernel_support = kernel_support
     self.corr = corr
@@ -574,12 +573,13 @@ class _SignalConv(tf.keras.layers.Layer):
 
   def build(self, input_shape):
     input_shape = tf.TensorShape(input_shape)
+    if input_shape.rank != self._rank + 2:
+      raise ValueError(f"Input tensor must have rank {self._rank + 2}, "
+                       f"received shape {input_shape}.")
     channel_axis = {"channels_first": 1, "channels_last": -1}[self.data_format]
     input_channels = input_shape[channel_axis]
     if input_channels is None:
       raise ValueError("The channel dimension of the inputs must be defined.")
-    self.input_spec = tf.keras.layers.InputSpec(
-        ndim=self._rank + 2, axes={channel_axis: input_channels})
 
     kernel_shape = self.kernel_support + (input_channels, self.filters)
     if self.channel_separable:
@@ -837,7 +837,10 @@ class _SignalConv(tf.keras.layers.Layer):
     return outputs
 
   def call(self, inputs) -> tf.Tensor:
-    inputs = tf.convert_to_tensor(inputs)
+    inputs = tf.convert_to_tensor(inputs, dtype=self.dtype)
+    if inputs.shape.rank != self._rank + 2:
+      raise ValueError(f"Input tensor must have rank {self._rank + 2}, "
+                       f"received shape {inputs.shape}.")
     outputs = inputs
 
     # Not for all possible combinations of (`kernel_support`, `corr`,
