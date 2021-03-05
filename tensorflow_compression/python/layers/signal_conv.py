@@ -439,7 +439,7 @@ class _SignalConv(tf.keras.layers.Layer):
   @activation.setter
   def activation(self, value):
     self._check_not_built()
-    self._activation = value
+    self._activation = tf.keras.activations.get(value)
 
   @property
   def use_bias(self) -> bool:
@@ -938,7 +938,7 @@ class _SignalConv(tf.keras.layers.Layer):
 
     # Finally, pass through activation function if requested.
     if self.activation is not None:
-      outputs = self.activation(outputs)  # pylint:disable=not-callable
+      outputs = self.activation(outputs)
 
     return outputs
 
@@ -979,13 +979,15 @@ class _SignalConv(tf.keras.layers.Layer):
     # Special-case variables, which can't be serialized but are handled by
     # get_weights()/set_weights().
     def try_serialize(parameter, name):
+      if isinstance(parameter, str):
+        return parameter
       try:
         return tf.keras.utils.serialize_keras_object(parameter)
       except (ValueError, TypeError):  # Should throw TypeError, but doesn't...
         if isinstance(parameter, tf.Variable):
           return "variable"
         raise TypeError(
-            f"Can't serialize {name} of type '{type(parameter)}'.")
+            f"Can't serialize {name} of type {type(parameter)}.")
 
     kernel_parameter = try_serialize(self.kernel_parameter, "kernel")
     bias_parameter = try_serialize(self.bias_parameter, "bias")
@@ -1000,7 +1002,7 @@ class _SignalConv(tf.keras.layers.Layer):
         extra_pad_end=self.extra_pad_end,
         channel_separable=self.channel_separable,
         data_format=self.data_format,
-        activation=self.activation,
+        activation=tf.keras.activations.serialize(self.activation),
         use_bias=self.use_bias,
         use_explicit=self.use_explicit,
         kernel_parameter=kernel_parameter,

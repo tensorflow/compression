@@ -15,6 +15,7 @@
 """Tests of signal processing convolution layers."""
 
 import os
+from absl.testing import parameterized
 import numpy as np
 import scipy.signal
 import tensorflow as tf
@@ -23,7 +24,7 @@ from tensorflow_compression.python.layers import parameters
 from tensorflow_compression.python.layers import signal_conv
 
 
-class SignalConvTest(tf.test.TestCase):
+class SignalConvTest(tf.test.TestCase, parameterized.TestCase):
 
   def test_invalid_data_format_raises_error(self):
     with self.assertRaises(ValueError):
@@ -112,9 +113,11 @@ class SignalConvTest(tf.test.TestCase):
     weight_shapes = [tuple(w.shape) for w in layer.trainable_weights]
     self.assertSameElements(grad_shapes, weight_shapes)
 
-  def test_can_be_saved_within_functional_model(self):
+  @parameterized.parameters(False, True)
+  def test_can_be_saved_within_functional_model(self, build):
     inputs = tf.keras.Input(shape=(None, 2))
-    outputs = signal_conv.SignalConv1D(1, 3, use_bias=True)(inputs)
+    outputs = signal_conv.SignalConv1D(
+        1, 3, use_bias=True, activation=tf.nn.relu)(inputs)
     model = tf.keras.Model(inputs=inputs, outputs=outputs)
     layer = model.get_layer("signal_conv1d")
 
@@ -123,12 +126,13 @@ class SignalConvTest(tf.test.TestCase):
       self.assertIsInstance(layer.kernel_parameter, parameters.RDFTParameter)
       self.assertIsInstance(layer.bias_parameter, tf.Variable)
 
-    x = tf.random.uniform((1, 5, 2), dtype=tf.float32)
-    y = model(x)
-    weight_names = [w.name for w in model.weights]
+    if build:
+      x = tf.random.uniform((1, 5, 2), dtype=tf.float32)
+      y = model(x)
+      weight_names = [w.name for w in model.weights]
 
     tempdir = self.create_tempdir()
-    model_path = os.path.join(tempdir.full_path, "model")
+    model_path = os.path.join(tempdir, "model")
     # This should force the model to be reconstructed via configs.
     model.save(model_path, save_traces=False)
 
@@ -140,11 +144,12 @@ class SignalConvTest(tf.test.TestCase):
       self.assertIsInstance(layer.kernel_parameter, parameters.RDFTParameter)
       self.assertIsInstance(layer.bias_parameter, tf.Variable)
 
-    with self.subTest(name="model_outputs_identical"):
-      self.assertAllEqual(model(x), y)
+    if build:
+      with self.subTest(name="model_outputs_identical"):
+        self.assertAllEqual(model(x), y)
 
-    with self.subTest(name="model_weights_identical"):
-      self.assertSameElements(weight_names, [w.name for w in model.weights])
+      with self.subTest(name="model_weights_identical"):
+        self.assertSameElements(weight_names, [w.name for w in model.weights])
 
 
 class ConvolutionsTest(tf.test.TestCase):
@@ -353,7 +358,7 @@ class ConvolutionsTest(tf.test.TestCase):
       except:
         msg = []
         for k in sorted(args):
-          msg.append("{}={}".format(k, args[k]))
+          msg.append(f"{k}={args[k]}")
         print("Failed when it shouldn't have: " + ", ".join(msg))
         raise
     else:
@@ -363,7 +368,7 @@ class ConvolutionsTest(tf.test.TestCase):
       except:
         msg = []
         for k in sorted(args):
-          msg.append("{}={}".format(k, args[k]))
+          msg.append(f"{k}={args[k]}")
         print("Did not fail when it should have: " + ", ".join(msg))
         raise
 

@@ -14,33 +14,25 @@
 # ==============================================================================
 """Tests of PackedTensors class."""
 
-import numpy as np
 import tensorflow as tf
 from tensorflow_compression.python.util import packed_tensors
 
 
 class PackedTensorsTest(tf.test.TestCase):
 
-  def test_pack_unpack(self):
-    """Tests packing and unpacking tensors."""
-    string = np.array(["xyz".encode("ascii")], dtype=object)
-    shape = np.array([1, 3], dtype=np.int32)
-    arrays = [string, shape]
-
-    string_t = tf.zeros([1], dtype=tf.string)
-    shape_t = tf.zeros([2], dtype=tf.int32)
-    tensors = [string_t, shape_t]
-
+  def test_pack_unpack_identity(self):
+    """Tests packing and unpacking tensors returns the same values."""
+    string = tf.constant(["xyz"], dtype=tf.string)
+    shape = tf.constant([1, 3], dtype=tf.int32)
     packed = packed_tensors.PackedTensors()
-    packed.pack(tensors, arrays)
+    packed.pack([string, shape])
     packed = packed_tensors.PackedTensors(packed.string)
-    string_u, shape_u = packed.unpack(tensors)
+    string_unpacked, shape_unpacked = packed.unpack([tf.string, tf.int32])
+    self.assertAllEqual(string_unpacked, string)
+    self.assertAllEqual(shape_unpacked, shape)
 
-    self.assertAllEqual(string_u, string)
-    self.assertAllEqual(shape_u, shape)
-
-  def test_model(self):
-    """Tests setting and getting model."""
+  def test_set_get_model_identity(self):
+    """Tests setting and getting model returns the same value."""
     packed = packed_tensors.PackedTensors()
     packed.model = "xyz"
     packed = packed_tensors.PackedTensors(packed.string)

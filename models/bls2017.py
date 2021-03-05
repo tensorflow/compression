@@ -27,279 +27,318 @@ own experiments. To reproduce the exact results from the paper, tuning of hyper-
 parameters may be necessary. To compress images with published models, see
 `tfci.py`.
 
-Currently, this script requires tensorflow-compression v1.3.
+This script requires TFC v2 (`pip install tensorflow-compression==2.*`).
 """
 
 import argparse
 import glob
 import sys
-
 from absl import app
 from absl.flags import argparse_flags
-import numpy as np
-import tensorflow.compat.v1 as tf
-
+import tensorflow as tf
+import tensorflow_datasets as tfds
 import tensorflow_compression as tfc
 
 
 def read_png(filename):
   """Loads a PNG image file."""
-  string = tf.read_file(filename)
-  image = tf.image.decode_image(string, channels=3)
-  image = tf.cast(image, tf.float32)
-  image /= 255
-  return image
-
-
-def quantize_image(image):
-  image = tf.round(image * 255)
-  image = tf.saturate_cast(image, tf.uint8)
-  return image
+  string = tf.io.read_file(filename)
+  return tf.image.decode_image(string, channels=3)
 
 
 def write_png(filename, image):
   """Saves an image to a PNG file."""
-  image = quantize_image(image)
   string = tf.image.encode_png(image)
-  return tf.write_file(filename, string)
+  tf.io.write_file(filename, string)
 
 
-class AnalysisTransform(tf.keras.layers.Layer):
+class AnalysisTransform(tf.keras.Sequential):
   """The analysis transform."""
 
-  def __init__(self, num_filters, *args, **kwargs):
-    self.num_filters = num_filters
-    super(AnalysisTransform, self).__init__(*args, **kwargs)
-
-  def build(self, input_shape):
-    self._layers = [
-        tfc.SignalConv2D(
-            self.num_filters, (9, 9), name="layer_0", corr=True, strides_down=4,
-            padding="same_zeros", use_bias=True,
-            activation=tfc.GDN(name="gdn_0")),
-        tfc.SignalConv2D(
-            self.num_filters, (5, 5), name="layer_1", corr=True, strides_down=2,
-            padding="same_zeros", use_bias=True,
-            activation=tfc.GDN(name="gdn_1")),
-        tfc.SignalConv2D(
-            self.num_filters, (5, 5), name="layer_2", corr=True, strides_down=2,
-            padding="same_zeros", use_bias=False,
-            activation=None),
-    ]
-    super(AnalysisTransform, self).build(input_shape)
-
-  def call(self, tensor):
-    for layer in self._layers:
-      tensor = layer(tensor)
-    return tensor
+  def __init__(self, num_filters):
+    super().__init__(name="analysis")
+    self.add(tf.keras.layers.Lambda(lambda x: x / 255.))
+    self.add(tfc.SignalConv2D(
+        num_filters, (9, 9), name="layer_0", corr=True, strides_down=4,
+        padding="same_zeros", use_bias=True,
+        activation=tfc.GDN(name="gdn_0")))
+    self.add(tfc.SignalConv2D(
+        num_filters, (5, 5), name="layer_1", corr=True, strides_down=2,
+        padding="same_zeros", use_bias=True,
+        activation=tfc.GDN(name="gdn_1")))
+    self.add(tfc.SignalConv2D(
+        num_filters, (5, 5), name="layer_2", corr=True, strides_down=2,
+        padding="same_zeros", use_bias=False,
+        activation=None))
 
 
-class SynthesisTransform(tf.keras.layers.Layer):
+class SynthesisTransform(tf.keras.Sequential):
   """The synthesis transform."""
 
-  def __init__(self, num_filters, *args, **kwargs):
-    self.num_filters = num_filters
-    super(SynthesisTransform, self).__init__(*args, **kwargs)
+  def __init__(self, num_filters):
+    super().__init__(name="synthesis")
+    self.add(tfc.SignalConv2D(
+        num_filters, (5, 5), name="layer_0", corr=False, strides_up=2,
+        padding="same_zeros", use_bias=True,
+        activation=tfc.GDN(name="igdn_0", inverse=True)))
+    self.add(tfc.SignalConv2D(
+        num_filters, (5, 5), name="layer_1", corr=False, strides_up=2,
+        padding="same_zeros", use_bias=True,
+        activation=tfc.GDN(name="igdn_1", inverse=True)))
+    self.add(tfc.SignalConv2D(
+        3, (9, 9), name="layer_2", corr=False, strides_up=4,
+        padding="same_zeros", use_bias=True,
+        activation=None))
+    self.add(tf.keras.layers.Lambda(lambda x: x * 255.))
 
-  def build(self, input_shape):
-    self._layers = [
-        tfc.SignalConv2D(
-            self.num_filters, (5, 5), name="layer_0", corr=False, strides_up=2,
-            padding="same_zeros", use_bias=True,
-            activation=tfc.GDN(name="igdn_0", inverse=True)),
-        tfc.SignalConv2D(
-            self.num_filters, (5, 5), name="layer_1", corr=False, strides_up=2,
-            padding="same_zeros", use_bias=True,
-            activation=tfc.GDN(name="igdn_1", inverse=True)),
-        tfc.SignalConv2D(
-            3, (9, 9), name="layer_2", corr=False, strides_up=4,
-            padding="same_zeros", use_bias=True,
-            activation=None),
-    ]
-    super(SynthesisTransform, self).build(input_shape)
 
-  def call(self, tensor):
-    for layer in self._layers:
-      tensor = layer(tensor)
-    return tensor
+class BLS2017Model(tf.keras.Model):
+  """Main model class."""
+
+  def __init__(self, lmbda, num_filters):
+    super().__init__()
+    self.lmbda = lmbda
+    self.analysis_transform = AnalysisTransform(num_filters)
+    self.synthesis_transform = SynthesisTransform(num_filters)
+    self.prior = tfc.NoisyDeepFactorized(batch_shape=(num_filters,))
+    self.build((None, None, None, 3))
+
+  ############################################################################
+  # In TF <= 2.4, `Model` doesn't aggregate variables from nested `Module`s.
+  # We fall back to aggregating them the `Module` way. Note: this ignores the
+  # `trainable` attribute of any nested `Layer`s.
+  @property
+  def variables(self):
+    return tf.Module.variables.fget(self)
+
+  @property
+  def trainable_variables(self):
+    return tf.Module.trainable_variables.fget(self)
+
+  weights = variables
+  trainable_weights = trainable_variables
+
+  # This seems to be necessary to prevent a comparison between class objects.
+  _TF_MODULE_IGNORED_PROPERTIES = (
+      tf.keras.Model._TF_MODULE_IGNORED_PROPERTIES.union(
+          ("_compiled_trainable_state",)
+      ))
+  ############################################################################
+
+  def call(self, x, training):
+    """Computes rate and distortion losses."""
+    entropy_model = tfc.ContinuousBatchedEntropyModel(
+        self.prior, coding_rank=3, compression=False)
+    y = self.analysis_transform(x)
+    y_hat, bits = entropy_model(y, training=training)
+    x_hat = self.synthesis_transform(y_hat)
+    # Total number of bits divided by total number of pixels.
+    num_pixels = tf.cast(tf.reduce_prod(tf.shape(x)[:-1]), bits.dtype)
+    bpp = tf.reduce_sum(bits) / num_pixels
+    # Mean squared error across pixels.
+    mse = tf.reduce_mean(tf.math.squared_difference(x, x_hat))
+    # The rate-distortion Lagrangian.
+    loss = bpp + self.lmbda * mse
+    return loss, bpp, mse
+
+  def train_step(self, x):
+    with tf.GradientTape() as tape:
+      loss, bpp, mse = self(x, training=True)
+    variables = self.trainable_variables
+    gradients = tape.gradient(loss, variables)
+    self.optimizer.apply_gradients(zip(gradients, variables))
+    self.loss.update_state(loss)
+    self.bpp.update_state(bpp)
+    self.mse.update_state(mse)
+    return {m.name: m.result() for m in [self.loss, self.bpp, self.mse]}
+
+  def test_step(self, x):
+    loss, bpp, mse = self(x, training=False)
+    self.loss.update_state(loss)
+    self.bpp.update_state(bpp)
+    self.mse.update_state(mse)
+    return {m.name: m.result() for m in [self.loss, self.bpp, self.mse]}
+
+  def predict_step(self, x):
+    raise NotImplementedError("Prediction API is not supported.")
+
+  def compile(self, **kwargs):
+    super().compile(
+        loss=None,
+        metrics=None,
+        loss_weights=None,
+        weighted_metrics=None,
+        **kwargs,
+    )
+    self.loss = tf.keras.metrics.Mean(name="loss")
+    self.bpp = tf.keras.metrics.Mean(name="bpp")
+    self.mse = tf.keras.metrics.Mean(name="mse")
+
+  def fit(self, *args, **kwargs):
+    retval = super().fit(*args, **kwargs)
+    # After training, fix range coding tables.
+    self.entropy_model = tfc.ContinuousBatchedEntropyModel(
+        self.prior, coding_rank=3, compression=True)
+    return retval
+
+  @tf.function(input_signature=[
+      tf.TensorSpec(shape=(None, None, 3), dtype=tf.uint8),
+  ])
+  def compress(self, x):
+    """Compresses an image."""
+    # Add batch dimension and cast to float.
+    x = tf.expand_dims(x, 0)
+    x = tf.cast(x, dtype=tf.float32)
+    y = self.analysis_transform(x)
+    # Preserve spatial shapes of both image and latents.
+    x_shape = tf.shape(x)[1:-1]
+    y_shape = tf.shape(y)[1:-1]
+    return self.entropy_model.compress(y), x_shape, y_shape
+
+  @tf.function(input_signature=[
+      tf.TensorSpec(shape=(1,), dtype=tf.string),
+      tf.TensorSpec(shape=(2,), dtype=tf.int32),
+      tf.TensorSpec(shape=(2,), dtype=tf.int32),
+  ])
+  def decompress(self, string, x_shape, y_shape):
+    """Decompresses an image."""
+    y_hat = self.entropy_model.decompress(string, y_shape)
+    x_hat = self.synthesis_transform(y_hat)
+    # Remove batch dimension, and crop away any extraneous padding.
+    x_hat = x_hat[0, :x_shape[0], :x_shape[1], :]
+    # Then cast back to 8-bit integer.
+    return tf.saturate_cast(tf.round(x_hat), tf.uint8)
+
+
+def check_image_size(image, patchsize):
+  shape = tf.shape(image)
+  return shape[0] >= patchsize and shape[1] >= patchsize and shape[-1] == 3
+
+
+def crop_image(image, patchsize):
+  image = tf.image.random_crop(image, (patchsize, patchsize, 3))
+  return tf.cast(image, tf.float32)
+
+
+def get_dataset(name, split, args):
+  """Creates input data pipeline from a TF Datasets dataset."""
+  with tf.device("/cpu:0"):
+    dataset = tfds.load(name, split=split, shuffle_files=True)
+    if split == "train":
+      dataset = dataset.repeat()
+    dataset = dataset.filter(
+        lambda x: check_image_size(x["image"], args.patchsize))
+    dataset = dataset.map(
+        lambda x: crop_image(x["image"], args.patchsize))
+    dataset = dataset.batch(args.batchsize, drop_remainder=True)
+  return dataset
+
+
+def get_custom_dataset(split, args):
+  """Creates input data pipeline from custom PNG images."""
+  with tf.device("/cpu:0"):
+    files = glob.glob(args.train_glob)
+    if not files:
+      raise RuntimeError(f"No training images found with glob "
+                         f"'{args.train_glob}'.")
+    dataset = tf.data.Dataset.from_tensor_slices(files)
+    dataset = dataset.shuffle(len(files), reshuffle_each_iteration=True)
+    if split == "train":
+      dataset = dataset.repeat()
+    dataset = dataset.map(
+        lambda x: crop_image(read_png(x), args.patchsize),
+        num_parallel_calls=args.preprocess_threads)
+    dataset = dataset.batch(args.batchsize, drop_remainder=True)
+  return dataset
 
 
 def train(args):
-  """Trains the model."""
+  """Instantiates and trains the model."""
+  if args.check_numerics:
+    tf.debugging.enable_check_numerics()
 
-  if args.verbose:
-    tf.logging.set_verbosity(tf.logging.INFO)
+  model = BLS2017Model(args.lmbda, args.num_filters)
+  model.compile(
+      optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4),
+  )
 
-  # Create input data pipeline.
-  with tf.device("/cpu:0"):
-    train_files = glob.glob(args.train_glob)
-    if not train_files:
-      raise RuntimeError(
-          "No training images found with glob '{}'.".format(args.train_glob))
-    train_dataset = tf.data.Dataset.from_tensor_slices(train_files)
-    train_dataset = train_dataset.shuffle(buffer_size=len(train_files)).repeat()
-    train_dataset = train_dataset.map(
-        read_png, num_parallel_calls=args.preprocess_threads)
-    train_dataset = train_dataset.map(
-        lambda x: tf.random_crop(x, (args.patchsize, args.patchsize, 3)))
-    train_dataset = train_dataset.batch(args.batchsize)
-    train_dataset = train_dataset.prefetch(32)
+  if args.train_glob:
+    train_dataset = get_custom_dataset("train", args)
+    validation_dataset = get_custom_dataset("validation", args)
+  else:
+    train_dataset = get_dataset("clic", "train", args)
+    validation_dataset = get_dataset("clic", "validation", args)
+  validation_dataset = validation_dataset.take(args.max_validation_steps)
 
-  num_pixels = args.batchsize * args.patchsize ** 2
-
-  # Get training patch from dataset.
-  x = train_dataset.make_one_shot_iterator().get_next()
-
-  # Instantiate model.
-  analysis_transform = AnalysisTransform(args.num_filters)
-  entropy_bottleneck = tfc.EntropyBottleneck()
-  synthesis_transform = SynthesisTransform(args.num_filters)
-
-  # Build autoencoder.
-  y = analysis_transform(x)
-  y_tilde, likelihoods = entropy_bottleneck(y, training=True)
-  x_tilde = synthesis_transform(y_tilde)
-
-  # Total number of bits divided by number of pixels.
-  train_bpp = tf.reduce_sum(tf.log(likelihoods)) / (-np.log(2) * num_pixels)
-
-  # Mean squared error across pixels.
-  train_mse = tf.reduce_mean(tf.squared_difference(x, x_tilde))
-  # Multiply by 255^2 to correct for rescaling.
-  train_mse *= 255 ** 2
-
-  # The rate-distortion cost.
-  train_loss = args.lmbda * train_mse + train_bpp
-
-  # Minimize loss and auxiliary loss, and execute update op.
-  step = tf.train.create_global_step()
-  main_optimizer = tf.train.AdamOptimizer(learning_rate=1e-4)
-  main_step = main_optimizer.minimize(train_loss, global_step=step)
-
-  aux_optimizer = tf.train.AdamOptimizer(learning_rate=1e-3)
-  aux_step = aux_optimizer.minimize(entropy_bottleneck.losses[0])
-
-  train_op = tf.group(main_step, aux_step, entropy_bottleneck.updates[0])
-
-  tf.summary.scalar("loss", train_loss)
-  tf.summary.scalar("bpp", train_bpp)
-  tf.summary.scalar("mse", train_mse)
-
-  tf.summary.image("original", quantize_image(x))
-  tf.summary.image("reconstruction", quantize_image(x_tilde))
-
-  hooks = [
-      tf.train.StopAtStepHook(last_step=args.last_step),
-      tf.train.NanTensorHook(train_loss),
-  ]
-  with tf.train.MonitoredTrainingSession(
-      hooks=hooks, checkpoint_dir=args.checkpoint_dir,
-      save_checkpoint_secs=300, save_summaries_secs=60) as sess:
-    while not sess.should_stop():
-      sess.run(train_op)
+  model.fit(
+      train_dataset.prefetch(8),
+      epochs=args.epochs,
+      steps_per_epoch=args.steps_per_epoch,
+      validation_data=validation_dataset.cache(),
+      validation_freq=1,
+      callbacks=[
+          tf.keras.callbacks.TerminateOnNaN(),
+          tf.keras.callbacks.TensorBoard(
+              log_dir=args.train_path,
+              histogram_freq=1, update_freq="epoch"),
+          tf.keras.callbacks.experimental.BackupAndRestore(args.train_path),
+      ],
+      verbose=int(args.verbose),
+  )
+  model.save(args.model_path)
 
 
 def compress(args):
   """Compresses an image."""
-
-  # Load input image and add batch dimension.
+  # Load model and use it to compress the image.
+  model = tf.keras.models.load_model(args.model_path)
   x = read_png(args.input_file)
-  x = tf.expand_dims(x, 0)
-  x.set_shape([1, None, None, 3])
-  x_shape = tf.shape(x)
+  tensors = model.compress(x)
 
-  # Instantiate model.
-  analysis_transform = AnalysisTransform(args.num_filters)
-  entropy_bottleneck = tfc.EntropyBottleneck()
-  synthesis_transform = SynthesisTransform(args.num_filters)
+  # Write a binary file with the shape information and the compressed string.
+  packed = tfc.PackedTensors()
+  packed.pack(tensors)
+  with open(args.output_file, "wb") as f:
+    f.write(packed.string)
 
-  # Transform and compress the image.
-  y = analysis_transform(x)
-  string = entropy_bottleneck.compress(y)
+  # If requested, decompress the image and measure performance.
+  if args.verbose:
+    x_hat = model.decompress(*tensors)
 
-  # Transform the quantized image back (if requested).
-  y_hat, likelihoods = entropy_bottleneck(y, training=False)
-  x_hat = synthesis_transform(y_hat)
-  x_hat = x_hat[:, :x_shape[1], :x_shape[2], :]
+    # Cast to float in order to compute metrics.
+    x = tf.cast(x, tf.float32)
+    x_hat = tf.cast(x_hat, tf.float32)
+    mse = tf.reduce_mean(tf.math.squared_difference(x, x_hat))
+    psnr = tf.squeeze(tf.image.psnr(x, x_hat, 255))
+    msssim = tf.squeeze(tf.image.ssim_multiscale(x, x_hat, 255))
+    msssim_db = -10. * tf.math.log(1 - msssim) / tf.math.log(10.)
 
-  num_pixels = tf.cast(tf.reduce_prod(tf.shape(x)[:-1]), dtype=tf.float32)
+    # The actual bits per pixel including entropy coding overhead.
+    num_pixels = tf.reduce_prod(tf.shape(x)[:-1])
+    bpp = len(packed.string) * 8 / num_pixels
 
-  # Total number of bits divided by number of pixels.
-  eval_bpp = tf.reduce_sum(tf.log(likelihoods)) / (-np.log(2) * num_pixels)
-
-  # Bring both images back to 0..255 range.
-  x *= 255
-  x_hat = tf.clip_by_value(x_hat, 0, 1)
-  x_hat = tf.round(x_hat * 255)
-
-  mse = tf.reduce_mean(tf.squared_difference(x, x_hat))
-  psnr = tf.squeeze(tf.image.psnr(x_hat, x, 255))
-  msssim = tf.squeeze(tf.image.ssim_multiscale(x_hat, x, 255))
-
-  with tf.Session() as sess:
-    # Load the latest model checkpoint, get the compressed string and the tensor
-    # shapes.
-    latest = tf.train.latest_checkpoint(checkpoint_dir=args.checkpoint_dir)
-    tf.train.Saver().restore(sess, save_path=latest)
-    tensors = [string, tf.shape(x)[1:-1], tf.shape(y)[1:-1]]
-    arrays = sess.run(tensors)
-
-    # Write a binary file with the shape information and the compressed string.
-    packed = tfc.PackedTensors()
-    packed.pack(tensors, arrays)
-    with open(args.output_file, "wb") as f:
-      f.write(packed.string)
-
-    # If requested, transform the quantized image back and measure performance.
-    if args.verbose:
-      eval_bpp, mse, psnr, msssim, num_pixels = sess.run(
-          [eval_bpp, mse, psnr, msssim, num_pixels])
-
-      # The actual bits per pixel including overhead.
-      bpp = len(packed.string) * 8 / num_pixels
-
-      print("Mean squared error: {:0.4f}".format(mse))
-      print("PSNR (dB): {:0.2f}".format(psnr))
-      print("Multiscale SSIM: {:0.4f}".format(msssim))
-      print("Multiscale SSIM (dB): {:0.2f}".format(-10 * np.log10(1 - msssim)))
-      print("Information content in bpp: {:0.4f}".format(eval_bpp))
-      print("Actual bits per pixel: {:0.4f}".format(bpp))
+    print(f"Mean squared error: {mse:0.4f}")
+    print(f"PSNR (dB): {psnr:0.2f}")
+    print(f"Multiscale SSIM: {msssim:0.4f}")
+    print(f"Multiscale SSIM (dB): {msssim_db:0.2f}")
+    print(f"Bits per pixel: {bpp:0.4f}")
 
 
 def decompress(args):
   """Decompresses an image."""
+  # Load the model and determine the dtypes of tensors required to decompress.
+  model = tf.keras.models.load_model(args.model_path)
+  dtypes = [t.dtype for t in model.decompress.input_signature]
 
-  # Read the shape information and compressed string from the binary file.
-  string = tf.placeholder(tf.string, [1])
-  x_shape = tf.placeholder(tf.int32, [2])
-  y_shape = tf.placeholder(tf.int32, [2])
+  # Read the shape information and compressed string from the binary file,
+  # and decompress the image using the model.
   with open(args.input_file, "rb") as f:
     packed = tfc.PackedTensors(f.read())
-  tensors = [string, x_shape, y_shape]
-  arrays = packed.unpack(tensors)
-
-  # Instantiate model.
-  entropy_bottleneck = tfc.EntropyBottleneck(dtype=tf.float32)
-  synthesis_transform = SynthesisTransform(args.num_filters)
-
-  # Decompress and transform the image back.
-  y_shape = tf.concat([y_shape, [args.num_filters]], axis=0)
-  y_hat = entropy_bottleneck.decompress(
-      string, y_shape, channels=args.num_filters)
-  x_hat = synthesis_transform(y_hat)
-
-  # Remove batch dimension, and crop away any extraneous padding on the bottom
-  # or right boundaries.
-  x_hat = x_hat[0, :x_shape[0], :x_shape[1], :]
+  tensors = packed.unpack(dtypes)
+  x_hat = model.decompress(*tensors)
 
   # Write reconstructed image out as a PNG file.
-  op = write_png(args.output_file, x_hat)
-
-  # Load the latest model checkpoint, and perform the above actions.
-  with tf.Session() as sess:
-    latest = tf.train.latest_checkpoint(checkpoint_dir=args.checkpoint_dir)
-    tf.train.Saver().restore(sess, save_path=latest)
-    sess.run(op, feed_dict=dict(zip(tensors, arrays)))
+  write_png(args.output_file, x_hat)
 
 
 def parse_args(argv):
@@ -310,13 +349,10 @@ def parse_args(argv):
   # High-level options.
   parser.add_argument(
       "--verbose", "-V", action="store_true",
-      help="Report bitrate and distortion when training or compressing.")
+      help="Report progress and metrics when training or compressing.")
   parser.add_argument(
-      "--num_filters", type=int, default=128,
-      help="Number of filters per layer.")
-  parser.add_argument(
-      "--checkpoint_dir", default="train",
-      help="Directory where to save/load model checkpoints.")
+      "--model_path", default="bls2017",
+      help="Path where to save/load the trained model.")
   subparsers = parser.add_subparsers(
       title="commands", dest="command",
       help="What to do: 'train' loads training data and trains (or continues "
@@ -330,27 +366,56 @@ def parse_args(argv):
   train_cmd = subparsers.add_parser(
       "train",
       formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-      description="Trains (or continues to train) a new model.")
-  train_cmd.add_argument(
-      "--train_glob", default="images/*.png",
-      help="Glob pattern identifying training data. This pattern must expand "
-           "to a list of RGB images in PNG format.")
-  train_cmd.add_argument(
-      "--batchsize", type=int, default=8,
-      help="Batch size for training.")
-  train_cmd.add_argument(
-      "--patchsize", type=int, default=256,
-      help="Size of image patches for training.")
+      description="Trains (or continues to train) a new model. Note that this "
+                  "model trains on a continuous stream of patches drawn from "
+                  "the training image dataset. An epoch is always defined as "
+                  "the same number of batches given by --steps_per_epoch. "
+                  "The purpose of validation is mostly to evaluate the "
+                  "rate-distortion performance of the model using actual "
+                  "quantization rather than the differentiable proxy loss. "
+                  "Note that when using custom training images, the validation "
+                  "set is simply a random sampling of patches from the "
+                  "training set.")
   train_cmd.add_argument(
       "--lambda", type=float, default=0.01, dest="lmbda",
       help="Lambda for rate-distortion tradeoff.")
   train_cmd.add_argument(
-      "--last_step", type=int, default=1000000,
-      help="Train up to this number of steps.")
+      "--train_glob", type=str, default=None,
+      help="Glob pattern identifying custom training data. This pattern must "
+           "expand to a list of RGB images in PNG format. If unspecified, the "
+           "CLIC dataset from TensorFlow Datasets is used.")
+  train_cmd.add_argument(
+      "--num_filters", type=int, default=128,
+      help="Number of filters per layer.")
+  train_cmd.add_argument(
+      "--train_path", default="/tmp/train_bls2017",
+      help="Path where to log training metrics for TensorBoard and back up "
+           "intermediate model checkpoints.")
+  train_cmd.add_argument(
+      "--batchsize", type=int, default=8,
+      help="Batch size for training and validation.")
+  train_cmd.add_argument(
+      "--patchsize", type=int, default=256,
+      help="Size of image patches for training and validation.")
+  train_cmd.add_argument(
+      "--epochs", type=int, default=1000,
+      help="Train up to this number of epochs. (One epoch is here defined as "
+           "the number of steps given by --steps_per_epoch, not iterations "
+           "over the full training dataset.)")
+  train_cmd.add_argument(
+      "--steps_per_epoch", type=int, default=1000,
+      help="Perform validation and produce logs after this many batches.")
+  train_cmd.add_argument(
+      "--max_validation_steps", type=int, default=16,
+      help="Maximum number of batches to use for validation. If -1, use one "
+           "patch from each image in the training set.")
   train_cmd.add_argument(
       "--preprocess_threads", type=int, default=16,
       help="Number of CPU threads to use for parallel decoding of training "
            "images.")
+  train_cmd.add_argument(
+      "--check_numerics", action="store_true",
+      help="Enable TF support for catching NaN and Inf in tensors.")
 
   # 'compress' subcommand.
   compress_cmd = subparsers.add_parser(
@@ -372,8 +437,8 @@ def parse_args(argv):
         help="Input filename.")
     cmd.add_argument(
         "output_file", nargs="?",
-        help="Output filename (optional). If not provided, appends '{}' to "
-             "the input filename.".format(ext))
+        help=f"Output filename (optional). If not provided, appends '{ext}' to "
+             f"the input filename.")
 
   # Parse arguments.
   args = parser.parse_args(argv[1:])

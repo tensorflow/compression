@@ -423,6 +423,8 @@ class GDN(tf.keras.layers.Layer):
 
     # Since alpha and epsilon are scalar, allow fixed values to be serialized.
     def try_serialize(parameter, name):
+      if parameter is None:
+        return None
       try:
         return tf.keras.utils.serialize_keras_object(parameter)
       except (ValueError, TypeError):  # Should throw TypeError, but doesn't...
@@ -430,7 +432,7 @@ class GDN(tf.keras.layers.Layer):
           return float(parameter)
         except TypeError:
           raise TypeError(
-              f"Can't serialize {name} of type '{type(parameter)}'.")
+              f"Can't serialize {name} of type {type(parameter)}.")
 
     alpha_parameter = try_serialize(
         self.alpha_parameter, "alpha_parameter")

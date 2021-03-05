@@ -97,7 +97,7 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         `compress()` and `decompress()` will be built on instantiation. If set
         to `False`, these two methods will not be accessible.
       laplace_tail_mass: Float. If positive, will augment the prior with a
-        laplace mixture for training stability. (experimental)
+        Laplace mixture for training stability. (experimental)
       expected_grads: If True, will use analytical expected gradients during
         backpropagation w.r.t. additive uniform noise.
       tail_mass: Float. Approximate probability mass which is range encoded with
@@ -163,7 +163,6 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
   @tf.Module.with_name_scope
   def __call__(self, bottleneck, training=True):
     """Perturbs a tensor with (quantization) noise and estimates bitcost.
-
 
     Args:
       bottleneck: `tf.Tensor` containing the data to be compressed. Must have at
@@ -280,9 +279,8 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     Args:
       strings: `tf.Tensor` containing the compressed bit strings.
       broadcast_shape: Iterable of ints. The part of the output tensor shape
-        between the shape of `strings` on the left and
-        `self.prior_shape` on the right. This must match the shape
-        of the input to `compress()`.
+        between the shape of `strings` on the left and `self.prior_shape` on the
+        right. This must match the shape of the input to `compress()`.
 
     Returns:
       A `tf.Tensor` of shape `strings.shape + broadcast_shape +

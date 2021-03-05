@@ -146,7 +146,8 @@ class GDNTest(tf.test.TestCase, parameterized.TestCase):
     weight_shapes = [tuple(w.shape) for w in layer.trainable_weights]
     self.assertSameElements(grad_shapes, weight_shapes)
 
-  def test_can_be_saved_within_functional_model(self):
+  @parameterized.parameters(False, True)
+  def test_can_be_saved_within_functional_model(self, build):
     inputs = tf.keras.Input(shape=(5,))
     outputs = gdn.GDN()(inputs)
     model = tf.keras.Model(inputs=inputs, outputs=outputs)
@@ -161,12 +162,13 @@ class GDNTest(tf.test.TestCase, parameterized.TestCase):
       self.assertIsInstance(layer.epsilon_parameter, tf.Tensor)
       self.assertEmpty(layer.epsilon_parameter.shape)
 
-    x = tf.random.uniform((5, 5), dtype=tf.float32)
-    y = model(x)
-    weight_names = [w.name for w in model.weights]
+    if build:
+      x = tf.random.uniform((5, 5), dtype=tf.float32)
+      y = model(x)
+      weight_names = [w.name for w in model.weights]
 
     tempdir = self.create_tempdir()
-    model_path = os.path.join(tempdir.full_path, "model")
+    model_path = os.path.join(tempdir, "model")
     # This should force the model to be reconstructed via configs.
     model.save(model_path, save_traces=False)
 
@@ -182,11 +184,12 @@ class GDNTest(tf.test.TestCase, parameterized.TestCase):
       self.assertIsInstance(layer.epsilon_parameter, tf.Tensor)
       self.assertEmpty(layer.epsilon_parameter.shape)
 
-    with self.subTest(name="model_outputs_identical"):
-      self.assertAllEqual(model(x), y)
+    if build:
+      with self.subTest(name="model_outputs_identical"):
+        self.assertAllEqual(model(x), y)
 
-    with self.subTest(name="model_weights_identical"):
-      self.assertSameElements(weight_names, [w.name for w in model.weights])
+      with self.subTest(name="model_weights_identical"):
+        self.assertSameElements(weight_names, [w.name for w in model.weights])
 
 
 if __name__ == "__main__":
