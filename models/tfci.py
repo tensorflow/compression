@@ -17,19 +17,18 @@
 Use this script to compress images with pre-trained models as published. See the
 'models' subcommand for a list of available models.
 
-Currently, this script requires tensorflow-compression v1.3.
+This script requires TFC v2 (`pip install tensorflow-compression==2.*`).
 """
 
 import argparse
 import os
 import sys
 import urllib
-
 from absl import app
 from absl.flags import argparse_flags
-import tensorflow.compat.v1 as tf
-
+import tensorflow as tf
 import tensorflow_compression as tfc  # pylint:disable=unused-import
+
 
 # Default URL to fetch metagraphs from.
 URL_PREFIX = "https://storage.googleapis.com/tensorflow_compression/metagraphs"
@@ -38,22 +37,21 @@ METAGRAPH_CACHE = "/tmp/tfc_metagraphs"
 
 
 def read_png(filename):
-  """Creates graph to load a PNG image file."""
+  """Loads a PNG image file."""
   string = tf.io.read_file(filename)
   image = tf.image.decode_image(string)
-  image = tf.expand_dims(image, 0)
-  return image
+  return tf.expand_dims(image, 0)
 
 
 def write_png(filename, image):
-  """Creates graph to write a PNG image file."""
+  """Writes a PNG image file."""
   image = tf.squeeze(image, 0)
   if image.dtype.is_floating:
     image = tf.round(image)
   if image.dtype != tf.uint8:
     image = tf.saturate_cast(image, tf.uint8)
   string = tf.image.encode_png(image)
-  return tf.io.write_file(filename, string)
+  tf.io.write_file(filename, string)
 
 
 def load_cached(filename):
@@ -63,9 +61,9 @@ def load_cached(filename):
     with tf.io.gfile.GFile(pathname, "rb") as f:
       string = f.read()
   except tf.errors.NotFoundError:
-    url = URL_PREFIX + "/" + filename
+    url = f"{URL_PREFIX}/{filename}"
+    request = urllib.request.urlopen(url)
     try:
-      request = urllib.request.urlopen(url)
       string = request.read()
     finally:
       request.close()
@@ -75,50 +73,29 @@ def load_cached(filename):
   return string
 
 
-def import_metagraph(model):
-  """Imports a trained model metagraph into the current graph."""
+def instantiate_model_signature(model, signature):
+  """Imports a trained model and returns one of its signatures as a function."""
   string = load_cached(model + ".metagraph")
-  metagraph = tf.MetaGraphDef()
+  metagraph = tf.compat.v1.MetaGraphDef()
   metagraph.ParseFromString(string)
-  tf.train.import_meta_graph(metagraph)
-  return metagraph.signature_def
-
-
-def instantiate_signature(signature_def):
-  """Fetches tensors defined in a signature from the graph."""
-  graph = tf.get_default_graph()
-  inputs = {
-      k: graph.get_tensor_by_name(v.name)
-      for k, v in signature_def.inputs.items()
-  }
-  outputs = {
-      k: graph.get_tensor_by_name(v.name)
-      for k, v in signature_def.outputs.items()
-  }
-  return inputs, outputs
+  wrapped_import = tf.compat.v1.wrap_function(
+      lambda: tf.compat.v1.train.import_meta_graph(metagraph), [])
+  graph = wrapped_import.graph
+  inputs = metagraph.signature_def[signature].inputs
+  outputs = metagraph.signature_def[signature].outputs
+  inputs = [graph.as_graph_element(inputs[k].name) for k in sorted(inputs)]
+  outputs = [graph.as_graph_element(outputs[k].name) for k in sorted(outputs)]
+  return wrapped_import.prune(inputs, outputs)
 
 
 def compress_image(model, input_image):
-  """Compresses an image array into a bitstring."""
-  with tf.Graph().as_default():
-    # Load model metagraph.
-    signature_defs = import_metagraph(model)
-    inputs, outputs = instantiate_signature(signature_defs["sender"])
-
-    # Just one input tensor.
-    inputs = inputs["input_image"]
-    # Multiple output tensors, ordered alphabetically, without names.
-    outputs = [outputs[k] for k in sorted(outputs) if k.startswith("channel:")]
-
-    # Run encoder.
-    with tf.Session() as sess:
-      arrays = sess.run(outputs, feed_dict={inputs: input_image})
-
-    # Pack data into bitstring.
-    packed = tfc.PackedTensors()
-    packed.model = model
-    packed.pack(outputs, arrays)
-    return packed.string
+  """Compresses an image tensor into a bitstring."""
+  sender = instantiate_model_signature(model, "sender")
+  tensors = sender(input_image)
+  packed = tfc.PackedTensors()
+  packed.model = model
+  packed.pack(tensors)
+  return packed.string
 
 
 def compress(model, input_file, output_file, target_bpp=None, bpp_strict=False):
@@ -127,10 +104,8 @@ def compress(model, input_file, output_file, target_bpp=None, bpp_strict=False):
     output_file = input_file + ".tfci"
 
   # Load image.
-  with tf.Graph().as_default():
-    with tf.Session() as sess:
-      input_image = sess.run(read_png(input_file))
-      num_pixels = input_image.shape[-2] * input_image.shape[-3]
+  input_image = read_png(input_file)
+  num_pixels = input_image.shape[-2] * input_image.shape[-3]
 
   if not target_bpp:
     # Just compress with a specific model.
@@ -175,27 +150,12 @@ def decompress(input_file, output_file):
   """Decompresses a TFCI file and writes a PNG file."""
   if not output_file:
     output_file = input_file + ".png"
-
-  with tf.Graph().as_default():
-    # Unserialize packed data from disk.
-    with tf.io.gfile.GFile(input_file, "rb") as f:
-      packed = tfc.PackedTensors(f.read())
-
-    # Load model metagraph.
-    signature_defs = import_metagraph(packed.model)
-    inputs, outputs = instantiate_signature(signature_defs["receiver"])
-
-    # Multiple input tensors, ordered alphabetically, without names.
-    inputs = [inputs[k] for k in sorted(inputs) if k.startswith("channel:")]
-    # Just one output operation.
-    outputs = write_png(output_file, outputs["output_image"])
-
-    # Unpack data.
-    arrays = packed.unpack(inputs)
-
-    # Run decoder.
-    with tf.Session() as sess:
-      sess.run(outputs, feed_dict=dict(zip(inputs, arrays)))
+  with tf.io.gfile.GFile(input_file, "rb") as f:
+    packed = tfc.PackedTensors(f.read())
+  receiver = instantiate_model_signature(packed.model, "receiver")
+  tensors = packed.unpack([t.dtype for t in receiver.inputs])
+  output_image, = receiver(*tensors)
+  write_png(output_file, output_image)
 
 
 def list_models():
