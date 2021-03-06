@@ -29,23 +29,17 @@ py_library(
     ],
 )
 
-filegroup(
-    name = "pip_src",
-    srcs = [
-        "MANIFEST.in",
-        "tensorflow_compression/all_tests.py",
-    ],
-)
-
 py_binary(
     name = "build_pip_pkg",
     srcs = ["build_pip_pkg.py"],
     data = [
         "LICENSE",
         "README.md",
-        ":pip_src",
+        "MANIFEST.in",
+        "requirements.txt",
+        "tensorflow_compression/all_tests.py",
         ":tensorflow_compression",
-        # The following targets are for Python test files.
+        # The following targets are for Python unit tests.
         "//tensorflow_compression/python/distributions:py_src",
         "//tensorflow_compression/python/entropy_models:py_src",
         "//tensorflow_compression/python/layers:py_src",

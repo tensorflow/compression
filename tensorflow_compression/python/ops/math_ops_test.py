@@ -54,7 +54,6 @@ class MathTest(tf.test.TestCase, parameterized.TestCase):
       outputs = math_ops.lower_bound(inputs, 0, gradient=gradient)
     pgrads = tape.gradient(outputs, inputs, tf.ones_like(inputs))
     ngrads = tape.gradient(outputs, inputs, -tf.ones_like(inputs))
-    print(ngrads)
     self.assertAllEqual(outputs, [0, 1])
     if gradient == "disconnected":
       self.assertAllEqual(pgrads, [0, 1])

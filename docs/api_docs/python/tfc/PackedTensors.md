@@ -1,8 +1,8 @@
+description: Packed representation of compressed tensors.
+
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfc.PackedTensors" />
 <meta itemprop="path" content="Stable" />
-<meta itemprop="property" content="model"/>
-<meta itemprop="property" content="string"/>
 <meta itemprop="property" content="__init__"/>
 <meta itemprop="property" content="pack"/>
 <meta itemprop="property" content="unpack"/>
@@ -10,27 +10,27 @@
 
 # tfc.PackedTensors
 
+<!-- Insert buttons and diff -->
 
-<table class="tfo-notebook-buttons tfo-api" align="left">
-
+<table class="tfo-notebook-buttons tfo-api nocontent" align="left">
 <td>
-  <a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/util/packed_tensors.py">
+  <a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/util/packed_tensors.py#L25-L96">
     <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
     View source on GitHub
   </a>
-</td></table>
+</td>
+</table>
 
 
-
-## Class `PackedTensors`
 
 Packed representation of compressed tensors.
 
+<pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
+<code>tfc.PackedTensors(
+    string=None
+)
+</code></pre>
 
-
-### Aliases:
-
-* Class `tfc.python.util.packed_tensors.PackedTensors`
 
 
 <!-- Placeholder for "Used in" -->
@@ -41,30 +41,29 @@ can also optionally store a model identifier.
 The tensors currently must be rank 1 (vectors) and either have integer or
 string type.
 
-<h2 id="__init__"><code>__init__</code></h2>
-
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/util/packed_tensors.py">View source</a>
-
-``` python
-__init__(string=None)
-```
-
-Initialize self.  See help(type(self)) for accurate signature.
 
 
+<!-- Tabular view -->
+ <table class="responsive fixed orange">
+<colgroup><col width="214px"><col></colgroup>
+<tr><th colspan="2"><h2 class="add-link">Attributes</h2></th></tr>
 
-
-## Properties
-
-<h3 id="model"><code>model</code></h3>
-
+<tr>
+<td>
+`model`
+</td>
+<td>
 A model identifier.
-
-
-<h3 id="string"><code>string</code></h3>
-
+</td>
+</tr><tr>
+<td>
+`string`
+</td>
+<td>
 The string representation of this object.
-
+</td>
+</tr>
+</table>
 
 
 
@@ -72,27 +71,28 @@ The string representation of this object.
 
 <h3 id="pack"><code>pack</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/util/packed_tensors.py">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/util/packed_tensors.py#L64-L82">View source</a>
 
-``` python
-pack(
-    tensors,
-    arrays
+<pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
+<code>pack(
+    tensors
 )
-```
+</code></pre>
 
 Packs `Tensor` values into this object.
 
 
 <h3 id="unpack"><code>unpack</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/util/packed_tensors.py">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/util/packed_tensors.py#L84-L96">View source</a>
 
-``` python
-unpack(tensors)
-```
+<pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
+<code>unpack(
+    dtypes
+)
+</code></pre>
 
-Unpacks `Tensor` values from this object.
+Unpacks values from this object based on dtypes.
 
 
 

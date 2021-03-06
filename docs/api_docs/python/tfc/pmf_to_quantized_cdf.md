@@ -1,3 +1,5 @@
+description: Converts PMF to quantized CDF. This op uses floating-point operations
+
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfc.pmf_to_quantized_cdf" />
 <meta itemprop="path" content="Stable" />
@@ -5,28 +7,21 @@
 
 # tfc.pmf_to_quantized_cdf
 
+<!-- Insert buttons and diff -->
 
-<table class="tfo-notebook-buttons tfo-api" align="left">
+<table class="tfo-notebook-buttons tfo-api nocontent" align="left">
+
 </table>
-
-Defined in generated file: `python/ops/gen_range_coding_ops.py`
 
 
 
 Converts PMF to quantized CDF. This op uses floating-point operations
 
-### Aliases:
-
-* `tfc.python.ops.range_coding_ops.pmf_to_quantized_cdf`
-
-
-``` python
-tfc.pmf_to_quantized_cdf(
-    pmf,
-    precision,
-    name=None
+<pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
+<code>tfc.pmf_to_quantized_cdf(
+    pmf, precision, name=None
 )
-```
+</code></pre>
 
 
 
@@ -44,14 +39,46 @@ Note that the input PMF is pre-quantization. The input PMF is not normalized
 by this op prior to quantization. Therefore the user is responsible for
 normalizing PMF if necessary.
 
-#### Args:
+<!-- Tabular view -->
+ <table class="responsive fixed orange">
+<colgroup><col width="214px"><col></colgroup>
+<tr><th colspan="2"><h2 class="add-link">Args</h2></th></tr>
+
+<tr>
+<td>
+`pmf`
+</td>
+<td>
+A `Tensor` of type `float32`.
+</td>
+</tr><tr>
+<td>
+`precision`
+</td>
+<td>
+An `int` that is `>= 1`.
+</td>
+</tr><tr>
+<td>
+`name`
+</td>
+<td>
+A name for the operation (optional).
+</td>
+</tr>
+</table>
 
 
-* <b>`pmf`</b>: A `Tensor` of type `float32`.
-* <b>`precision`</b>: An `int` that is `>= 1`.
-* <b>`name`</b>: A name for the operation (optional).
 
-
-#### Returns:
-
+<!-- Tabular view -->
+ <table class="responsive fixed orange">
+<colgroup><col width="214px"><col></colgroup>
+<tr><th colspan="2"><h2 class="add-link">Returns</h2></th></tr>
+<tr class="alt">
+<td colspan="2">
 A `Tensor` of type `int32`.
+</td>
+</tr>
+
+</table>
+

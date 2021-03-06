@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Data compression tools."""
+"""Data compression in TensorFlow."""
 
 try:
   import tensorflow as _tensorflow

@@ -1,3 +1,5 @@
+description: Using the provided cumulative distribution functions (CDF) inside cdf, returns
+
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfc.range_encode" />
 <meta itemprop="path" content="Stable" />
@@ -5,30 +7,21 @@
 
 # tfc.range_encode
 
+<!-- Insert buttons and diff -->
 
-<table class="tfo-notebook-buttons tfo-api" align="left">
+<table class="tfo-notebook-buttons tfo-api nocontent" align="left">
+
 </table>
-
-Defined in generated file: `python/ops/gen_range_coding_ops.py`
 
 
 
 Using the provided cumulative distribution functions (CDF) inside `cdf`, returns
 
-### Aliases:
-
-* `tfc.python.ops.range_coding_ops.range_encode`
-
-
-``` python
-tfc.range_encode(
-    data,
-    cdf,
-    precision,
-    debug_level=1,
-    name=None
+<pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
+<code>tfc.range_encode(
+    data, cdf, precision, debug_level=1, name=None
 )
-```
+</code></pre>
 
 
 
@@ -81,19 +74,63 @@ are incorrect. For this reason, the range coder uses integer arithmetics and
 avoids using any floating point operations internally, and `cdf` should contain
 integers representing quantized probability mass rather than floating points.
 
-#### Args:
+<!-- Tabular view -->
+ <table class="responsive fixed orange">
+<colgroup><col width="214px"><col></colgroup>
+<tr><th colspan="2"><h2 class="add-link">Args</h2></th></tr>
+
+<tr>
+<td>
+`data`
+</td>
+<td>
+A `Tensor` of type `int16`. An int16 tensor.
+</td>
+</tr><tr>
+<td>
+`cdf`
+</td>
+<td>
+A `Tensor` of type `int32`.
+An int32 tensor representing the CDF's of `data`. Each integer is divided
+by `2^precision` to represent a fraction.
+</td>
+</tr><tr>
+<td>
+`precision`
+</td>
+<td>
+An `int` that is `>= 1`.
+The number of bits for probability quantization. Must be <= 16.
+</td>
+</tr><tr>
+<td>
+`debug_level`
+</td>
+<td>
+An optional `int`. Defaults to `1`. Either 0 or 1.
+</td>
+</tr><tr>
+<td>
+`name`
+</td>
+<td>
+A name for the operation (optional).
+</td>
+</tr>
+</table>
 
 
-* <b>`data`</b>: A `Tensor` of type `int16`. An int16 tensor.
-* <b>`cdf`</b>: A `Tensor` of type `int32`.
-  An int32 tensor representing the CDF's of `data`. Each integer is divided
-  by `2^precision` to represent a fraction.
-* <b>`precision`</b>: An `int` that is `>= 1`.
-  The number of bits for probability quantization. Must be <= 16.
-* <b>`debug_level`</b>: An optional `int`. Defaults to `1`. Either 0 or 1.
-* <b>`name`</b>: A name for the operation (optional).
 
-
-#### Returns:
-
+<!-- Tabular view -->
+ <table class="responsive fixed orange">
+<colgroup><col width="214px"><col></colgroup>
+<tr><th colspan="2"><h2 class="add-link">Returns</h2></th></tr>
+<tr class="alt">
+<td colspan="2">
 A `Tensor` of type `string`. A range-coded scalar string.
+</td>
+</tr>
+
+</table>
+

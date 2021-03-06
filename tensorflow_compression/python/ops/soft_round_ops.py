@@ -17,7 +17,11 @@
 import tensorflow as tf
 
 
-__all__ = ["soft_round", "soft_round_inverse", "soft_round_conditional_mean"]
+__all__ = [
+    "soft_round",
+    "soft_round_inverse",
+    "soft_round_conditional_mean",
+]
 
 
 def soft_round(x, alpha, eps=1e-3):

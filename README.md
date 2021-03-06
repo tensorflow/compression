@@ -1,6 +1,6 @@
-# Introduction
+# TensorFlow Compression
 
-This project contains data compression ops and layers for TensorFlow.
+TensorFlow Compression (TFC) contains data compression tools for TensorFlow.
 
 You can use this library to build your own ML models with end-to-end optimized
 data compression built in. It's useful to find storage-efficient representations
@@ -31,25 +31,22 @@ question or answer more easily later.
 
 Refer to [the API
 documentation](https://tensorflow.github.io/compression/docs/api_docs/python/tfc.html)
-for a complete description of the Keras layers and TensorFlow ops this package
-implements.
-***Note: the API docs have not been updated for the current beta release yet.***
+for a complete description of the classes and functions this package implements.
 
 ## Installation
 
 ***Note: Precompiled packages are currently only provided for Linux and
 Darwin/Mac OS. To use these packages on Windows, consider using a [TensorFlow
 Docker image](https://www.tensorflow.org/install/docker) and installing
-tensorflow-compression using pip inside the Docker container.***
+TensorFlow Compression using pip inside the Docker container.***
 
 Set up an environment in which you can install precompiled binary Python
 packages using the `pip` command. Refer to the
 [TensorFlow installation instructions](https://www.tensorflow.org/install/pip)
 for more information on how to set up such a Python environment.
 
-The current stable version of TFC (1.3) requires TensorFlow 1.15. The current
-beta release of TFC (2.0b2) is built for TensorFlow 2.4. For versions compatible
-with TensorFlow 1.14 or earlier, see our [previous
+The current version of TFC (v2.0) requires TensorFlow v2.4. For versions
+compatible with TensorFlow v1, see our [previous
 releases](https://github.com/tensorflow/compression/releases).
 
 ### pip
@@ -57,32 +54,18 @@ releases](https://github.com/tensorflow/compression/releases).
 To install TF and TFC via `pip`, run the following command:
 
 ```bash
-pip install tensorflow-gpu==1.15 tensorflow-compression==1.3
+pip install tensorflow-gpu==2.4.* tensorflow-compression==2.0
 ```
 
-for the stable release, or
+If you don't need GPU support, you can drop the `-gpu` part.
 
-```bash
-pip install tensorflow-gpu==2.4 tensorflow-probability==0.12.1 tensorflow-compression==2.0b2
-```
-
-for the beta release. If you don't need GPU support, you can drop the `-gpu`
-part.
-
-To test that the installation works correctly, you can run the unit tests with
-(respectively):
-
-```bash
-python -m tensorflow_compression.python.all_test
-```
-
-or
+To test that the installation works correctly, you can run the unit tests with:
 
 ```bash
 python -m tensorflow_compression.all_tests
 ```
 
-Once the command finishes, you should see a message ```OK (skipped=12)``` or
+Once the command finishes, you should see a message ```OK (skipped=29)``` or
 similar in the last line.
 
 ### Docker
@@ -94,16 +77,8 @@ and then run the `pip install` command inside the Docker container, not on the
 host. For instance, you can use a command line like this:
 
 ```bash
-docker run tensorflow/tensorflow:1.15.0-py3 bash -c \
-    "pip install tensorflow-compression==1.3 &&
-     python -m tensorflow_compression.python.all_test"
-```
-
-or (for the beta version):
-
-```bash
-docker run tensorflow/tensorflow:2.4.0 bash -c \
-    "pip install tensorflow-probability==0.12.1 tensorflow-compression==2.0b2 &&
+docker run tensorflow/tensorflow:2.4.1 bash -c \
+    "pip install tensorflow-compression==2.0 &&
      python -m tensorflow_compression.all_tests"
 ```
 
@@ -116,13 +91,13 @@ It seems that [Anaconda](https://www.anaconda.com/distribution/) ships its own
 binary version of TensorFlow which is incompatible with our pip package. To
 solve this, always install TensorFlow via `pip` rather than `conda`. For
 example, this creates an Anaconda environment with Python 3.6 and CUDA
-libraries, and then installs TensorFlow and tensorflow-compression with GPU
+libraries, and then installs TensorFlow and TensorFlow Compression with GPU
 support:
 
 ```bash
 conda create --name ENV_NAME python=3.6 cudatoolkit=10.0 cudnn
 conda activate ENV_NAME
-pip install tensorflow-gpu==1.15 tensorflow-compression==1.3
+pip install tensorflow-gpu==2.4.* tensorflow-compression==2.0
 ```
 
 ## Usage
@@ -166,33 +141,40 @@ appended (any existing extensions will not be removed).
 
 The
 [models directory](https://github.com/tensorflow/compression/tree/master/models)
-contains an implementation of the image compression model described in:
+contains several implementations of published image compression models to enable
+easy experimentation. The instructions below talk about a re-implementation of
+the model published in:
 
 > "End-to-end optimized image compression"<br />
 > J. Ballé, V. Laparra, E. P. Simoncelli<br />
 > https://arxiv.org/abs/1611.01704
 
-To see a list of options, download the file `bls2017.py` and run:
+Note that the models directory is not contained in the pip package. The models
+are meant to be downloaded individually. Download the file `bls2017.py` and run:
 
 ```bash
 python bls2017.py -h
 ```
 
-To train the model, you need to supply it with a dataset of RGB training images.
-They should be provided in PNG format. Training can be as simple as the
-following command:
+This will list the available command line options for the implementation.
+Training can be as simple as the following command:
 
 ```bash
-python bls2017.py --verbose train --train_glob="images/*.png"
+python bls2017.py -V train
 ```
 
-This will use the default settings. The most important parameter is `--lambda`,
-which controls the trade-off between bitrate and distortion that the model will
-be optimized for. The number of channels per layer is important, too: models
-tuned for higher bitrates (or, equivalently, lower distortion) tend to require
-transforms with a greater approximation capacity (i.e. more channels), so to
-optimize performance, you want to make sure that the number of channels is large
-enough (or larger). This is described in more detail in:
+This will use the default settings. Note that unless a custom training dataset
+is provided via `--train_glob`, the
+[CLIC dataset](https://www.tensorflow.org/datasets/catalog/clic) will be
+downloaded using TensorFlow Datasets.
+
+The most important training parameter is `--lambda`, which controls the
+trade-off between bitrate and distortion that the model will be optimized for.
+The number of channels per layer is important, too: models tuned for higher
+bitrates (or, equivalently, lower distortion) tend to require transforms with a
+greater approximation capacity (i.e. more channels), so to optimize performance,
+you want to make sure that the number of channels is large enough (or larger).
+This is described in more detail in:
 
 > "Efficient nonlinear transforms for lossy image compression"<br />
 > J. Ballé<br />
@@ -203,12 +185,14 @@ Tensorboard instance in the background before starting the training, then point
 your web browser to [port 6006 on your machine](http://localhost:6006):
 
 ```bash
-tensorboard --logdir=. &
+tensorboard --logdir=/tmp/train_bls2017 &
 ```
 
-When training has finished, the Python script can be used to compress and
-decompress images as follows. The same model checkpoint must be accessible to
-both commands.
+When training has finished, the Python script saves the trained model to the
+directory specified with `--model_path` (by default, `bls2017` in the current
+directory) in TensorFlow's `SavedModel` format. The script can then be used to
+compress and decompress images as follows. The same saved model must be
+accessible to both commands.
 
 ```bash
 python bls2017.py [options] compress original.png compressed.tfci
@@ -218,7 +202,7 @@ python bls2017.py [options] decompress compressed.tfci reconstruction.png
 ## Building pip packages
 
 This section describes the necessary steps to build your own pip packages of
-tensorflow-compression. This may be necessary to install it on platforms for
+TensorFlow Compression. This may be necessary to install it on platforms for
 which we don't provide precompiled binaries (currently only Linux and Darwin).
 
 We use the custom-op Docker images (e.g.
@@ -231,7 +215,7 @@ instructions](https://github.com/tensorflow/custom-op).
 
 Inside a Docker container from the image, the following steps need to be taken.
 
-1. Clone the `tensorflow-compression` repo from GitHub.
+1. Clone the `tensorflow/compression` repo from GitHub.
 2. Run `:build_pip_pkg` inside the cloned repo.
 
 For example:
@@ -255,9 +239,9 @@ pip install /tmp/tensorflow_compression/tensorflow_compression-*.whl
 ```
 
 Then run the unit tests (Do not run the tests in the workspace directory where
-`WORKSPACE` of `tensorflow_compression` repo lives. In that case, the Python
-interpreter would attempt to import `tensorflow_compression` packages from the
-source tree, rather than from the installed package system directory):
+the `WORKSPACE` file lives. In that case, the Python interpreter would attempt
+to import `tensorflow_compression` packages from the source tree, rather than
+from the installed package system directory):
 
 ```bash
 pushd /tmp

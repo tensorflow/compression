@@ -12,16 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Generates docs for the TensorFlow compression library."""
+"""Generates docs for the TensorFlow Compression library."""
 
 import os
 import sys
-
 from absl import app
 from absl import flags
-
 from tensorflow_docs.api_generator import generate_lib
-
 import tensorflow_compression as tfc
 
 FLAGS = flags.FLAGS
@@ -29,15 +26,18 @@ FLAGS = flags.FLAGS
 
 def main(_):
   doc_generator = generate_lib.DocGenerator(
-      root_title="TensorFlow/compression",
+      root_title="TensorFlow Compression",
       py_modules=[("tfc", tfc)],
       base_dir=os.path.dirname(tfc.__file__),
       private_map={
-          "tfc.python.ops": ["gen_range_coding_ops", "namespace_helper"],
+          # soft_round_ops module seems to trigger a bug.
+          "tfc": ["python", "soft_round_ops"],
       },
       code_url_prefix="https://github.com/tensorflow/compression/tree/master/"
                       "tensorflow_compression",
       api_cache=False,
+      yaml_toc=False,
+      gen_redirects=False,
   )
   sys.exit(doc_generator.build(FLAGS.output_dir))
 
@@ -46,5 +46,4 @@ if __name__ == "__main__":
   flags.DEFINE_string(
       "output_dir", "/tmp/tensorflow_compression/api_docs/python",
       "Output directory.")
-
   app.run(main)

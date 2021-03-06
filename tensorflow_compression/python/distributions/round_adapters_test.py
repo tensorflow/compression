@@ -33,10 +33,6 @@ def _test_log_prob_gradient_is_bounded(self, dist_cls, values, params=()):
     idx = (p < -32.0)
     p = tf.maximum(p, -32.0)
   dx = g.gradient(p, x)
-  print(f"x: {x}")
-  print(f"p: {p}")
-  print(f"dx: {dx}")
-  print(f"idx: {idx}")
   self.assertAllEqual(dx[idx], np.zeros_like(dx[idx]))
   self.assertTrue(np.all(np.isfinite(dx)), f"dx has non-finite value: {dx}")
 
