@@ -77,13 +77,14 @@ class SoftRoundTest(tf.test.TestCase, parameterized.TestCase):
       y = soft_round_ops.soft_round_inverse(x, alpha=alpha)
     dy = tape.gradient(y, x)
     self.assertAllEqual(tf.math.is_finite(y), tf.ones(x.shape, dtype=bool))
+    is_finite = tf.math.is_finite(dy)
+    expected_finite = tf.ones(dy.shape, dtype=bool)
     if alpha > 15:
-      # We allow non-finite values for large alphas, since the function simply
-      # is extremely steep there.
-      expected_finite = tf.one_hot(5, 11, False, True)
-    else:
-      expected_finite = tf.ones(x.shape, dtype=bool)
-    self.assertAllEqual(tf.math.is_finite(dy), expected_finite)
+      # We allow non-finite values at 0 for large alphas, since the function
+      # simply is extremely steep there.
+      expected_finite = tf.tensor_scatter_nd_update(
+          expected_finite, [[5]], [is_finite[5]])
+    self.assertAllEqual(is_finite, expected_finite)
 
 
 if __name__ == "__main__":
