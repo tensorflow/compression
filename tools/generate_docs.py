@@ -30,8 +30,7 @@ def main(_):
       py_modules=[("tfc", tfc)],
       base_dir=os.path.dirname(tfc.__file__),
       private_map={
-          # soft_round_ops module seems to trigger a bug.
-          "tfc": ["python", "soft_round_ops"],
+          "tfc": ["python"],
       },
       code_url_prefix="https://github.com/tensorflow/compression/tree/master/"
                       "tensorflow_compression",

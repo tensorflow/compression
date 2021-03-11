@@ -13,9 +13,16 @@
 # limitations under the License.
 # ==============================================================================
 """Layers for soft rounding."""
-import tensorflow as tf
 
+import tensorflow as tf
 from tensorflow_compression.python.ops import soft_round_ops
+
+
+__all__ = [
+    "Round",
+    "SoftRound",
+    "SoftRoundConditionalMean",
+]
 
 
 class Round(tf.keras.layers.Layer):
