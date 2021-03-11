@@ -28,8 +28,7 @@ __all__ = [
 ]
 
 
-# TODO(jonycgn): Inherit from tf.Module once TF 2.5 is released.
-class Parameter(tf.keras.layers.Layer, metaclass=abc.ABCMeta):
+class Parameter(tf.Module, metaclass=abc.ABCMeta):
   """Reparameterized `Layer` variable.
 
   This object represents a parameter of a `tf.keras.layer.Layer` object which
@@ -128,8 +127,7 @@ class RDFTParameter(Parameter):
   def shape(self) -> tf.TensorShape:
     return self._shape
 
-  # TODO(jonycgn): Enable once TF 2.5 is released.
-  # @tf.Module.with_name_scope
+  @tf.Module.with_name_scope
   def __call__(self) -> tf.Tensor:
     """Computes and returns the convolution kernel as a `tf.Tensor`."""
     return tf.reshape(tf.linalg.matmul(self._matrix, self.rdft), self.shape)
@@ -202,8 +200,7 @@ class GDNParameter(Parameter):
       name = f"reparam_{name}"
     self.variable = tf.Variable(initial_value, name=name)
 
-  # TODO(jonycgn): Enable once TF 2.5 is released.
-  # @tf.Module.with_name_scope
+  @tf.Module.with_name_scope
   def __call__(self) -> tf.Tensor:
     """Computes and returns the non-negative value as a `tf.Tensor`."""
     reparam_value = math_ops.lower_bound(self.variable, self._bound)

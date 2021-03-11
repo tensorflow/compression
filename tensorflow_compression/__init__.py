@@ -14,14 +14,6 @@
 # ==============================================================================
 """Data compression in TensorFlow."""
 
-try:
-  import tensorflow as _tensorflow
-  _tf_version = [int(v) for v in _tensorflow.version.VERSION.split(".")]
-  assert _tf_version[0] == 2 and _tf_version[1] == 4
-except (ImportError, AssertionError):
-  raise RuntimeError(
-      "For tensorflow_compression, please install TensorFlow 2.4.")
-
 # pylint: disable=wildcard-import
 from tensorflow_compression.python.distributions.deep_factorized import *
 from tensorflow_compression.python.distributions.helpers import *

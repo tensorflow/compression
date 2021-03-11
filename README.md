@@ -36,28 +36,30 @@ for a complete description of the classes and functions this package implements.
 ## Installation
 
 ***Note: Precompiled packages are currently only provided for Linux and
-Darwin/Mac OS. To use these packages on Windows, consider using a [TensorFlow
-Docker image](https://www.tensorflow.org/install/docker) and installing
-TensorFlow Compression using pip inside the Docker container.***
+Darwin/Mac OS and Python 3.6-3.8. To use these packages on Windows, consider
+using a [TensorFlow Docker image](https://www.tensorflow.org/install/docker) and
+installing TensorFlow Compression using pip inside the Docker container.***
 
 Set up an environment in which you can install precompiled binary Python
 packages using the `pip` command. Refer to the
 [TensorFlow installation instructions](https://www.tensorflow.org/install/pip)
 for more information on how to set up such a Python environment.
 
-The current version of TFC (v2.0) requires TensorFlow v2.4. For versions
-compatible with TensorFlow v1, see our [previous
+The current version of TensorFlow Compression requires TensorFlow 2. For
+versions compatible with TensorFlow 1, see our [previous
 releases](https://github.com/tensorflow/compression/releases).
+***Note: Because TFC currently relies on features and fixes designated for
+TF 2.5, the pip package currently depends on tf-nightly packages. Once TF 2.5 is
+released (likely in April 2021), we will resume depending on the stable version
+of TF.***
 
 ### pip
 
-To install TF and TFC via `pip`, run the following command:
+To install TFC via `pip`, run the following command:
 
 ```bash
-pip install tensorflow-gpu==2.4.* tensorflow-compression==2.0
+pip install tensorflow-compression
 ```
-
-If you don't need GPU support, you can drop the `-gpu` part.
 
 To test that the installation works correctly, you can run the unit tests with:
 
@@ -77,8 +79,8 @@ and then run the `pip install` command inside the Docker container, not on the
 host. For instance, you can use a command line like this:
 
 ```bash
-docker run tensorflow/tensorflow:2.4.1 bash -c \
-    "pip install tensorflow-compression==2.0 &&
+docker run tensorflow/tensorflow:nightly bash -c \
+    "pip install tensorflow-compression &&
      python -m tensorflow_compression.all_tests"
 ```
 
@@ -91,13 +93,12 @@ It seems that [Anaconda](https://www.anaconda.com/distribution/) ships its own
 binary version of TensorFlow which is incompatible with our pip package. To
 solve this, always install TensorFlow via `pip` rather than `conda`. For
 example, this creates an Anaconda environment with Python 3.6 and CUDA
-libraries, and then installs TensorFlow and TensorFlow Compression with GPU
-support:
+libraries, and then installs TensorFlow and TensorFlow Compression:
 
 ```bash
-conda create --name ENV_NAME python=3.6 cudatoolkit=10.0 cudnn
+conda create --name ENV_NAME python=3.8 cudatoolkit=10.0 cudnn
 conda activate ENV_NAME
-pip install tensorflow-gpu==2.4.* tensorflow-compression==2.0
+pip install tensorflow-compression
 ```
 
 ## Usage

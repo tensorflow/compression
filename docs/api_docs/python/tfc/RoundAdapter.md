@@ -151,6 +151,13 @@ May be partially defined or unknown.
 </td>
 </tr><tr>
 <td>
+`experimental_is_sharded`
+</td>
+<td>
+`True` for distributions which parallel-sum `log_prob` across devices.
+</td>
+</tr><tr>
+<td>
 `name`
 </td>
 <td>

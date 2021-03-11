@@ -154,28 +154,6 @@ class BMSHJ2018Model(tf.keras.Model):
     self.hyperprior = tfc.NoisyDeepFactorized(batch_shape=(num_filters,))
     self.build((None, None, None, 3))
 
-  ############################################################################
-  # In TF <= 2.4, `Model` doesn't aggregate variables from nested `Module`s.
-  # We fall back to aggregating them the `Module` way. Note: this ignores the
-  # `trainable` attribute of any nested `Layer`s.
-  @property
-  def variables(self):
-    return tf.Module.variables.fget(self)
-
-  @property
-  def trainable_variables(self):
-    return tf.Module.trainable_variables.fget(self)
-
-  weights = variables
-  trainable_weights = trainable_variables
-
-  # This seems to be necessary to prevent a comparison between class objects.
-  _TF_MODULE_IGNORED_PROPERTIES = (
-      tf.keras.Model._TF_MODULE_IGNORED_PROPERTIES.union(
-          ("_compiled_trainable_state",)
-      ))
-  ############################################################################
-
   def call(self, x, training):
     """Computes rate and distortion losses."""
     entropy_model = tfc.LocationScaleIndexedEntropyModel(
