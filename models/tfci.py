@@ -39,7 +39,7 @@ METAGRAPH_CACHE = "/tmp/tfc_metagraphs"
 def read_png(filename):
   """Loads a PNG image file."""
   string = tf.io.read_file(filename)
-  image = tf.image.decode_image(string)
+  image = tf.image.decode_image(string, channels=3)
   return tf.expand_dims(image, 0)
 
 
