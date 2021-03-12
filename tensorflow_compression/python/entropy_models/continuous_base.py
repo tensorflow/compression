@@ -20,7 +20,7 @@ from absl import logging
 import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow_compression.python.distributions import helpers
-from tensorflow_compression.python.ops import range_coding_ops
+from tensorflow_compression.python.ops import gen_ops
 
 
 __all__ = [
@@ -274,7 +274,7 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
         prob = prob[:length]
         overflow = tf.math.maximum(1 - tf.reduce_sum(prob, keepdims=True), 0.)
         prob = tf.concat([prob, overflow], axis=0)
-        cdf = range_coding_ops.pmf_to_quantized_cdf(
+        cdf = gen_ops.pmf_to_quantized_cdf(
             prob, precision=self.range_coder_precision)
         return tf.pad(
             cdf, [[0, max_length - length]], mode="CONSTANT", constant_values=0)

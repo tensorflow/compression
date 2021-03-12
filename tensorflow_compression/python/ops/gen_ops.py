@@ -12,16 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Range coding operations."""
+"""Generated operations from C++."""
 
 from tensorflow.python.framework import load_library
 from tensorflow.python.platform import resource_loader
-from tensorflow_compression.python.ops import namespace_helper
 
+ops = load_library.load_op_library(resource_loader.get_path_to_datafile(
+    "../../cc/libtensorflow_compression.so"))
+globals().update({n: getattr(ops, n) for n in dir(ops)})
 
-ops = namespace_helper.get_ops(load_library.load_op_library(
-    resource_loader.get_path_to_datafile(
-        "../../cc/libtensorflow_compression.so")))
-
-globals().update(ops)
-__all__ = list(ops)
+# pylint:disable=undefined-all-variable
+__all__ = [
+    "PmfToQuantizedCdf",
+    "RangeDecode",
+    "RangeEncode",
+    "UnboundedIndexRangeDecode",
+    "UnboundedIndexRangeEncode",
+    "pmf_to_quantized_cdf",
+    "range_decode",
+    "range_encode",
+    "unbounded_index_range_decode",
+    "unbounded_index_range_encode",
+]
+# pylint:enable=undefined-all-variable

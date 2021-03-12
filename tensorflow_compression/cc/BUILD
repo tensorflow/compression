@@ -7,7 +7,7 @@ cc_binary(
             "**/*.h",
             "**/*.cc",
         ],
-        exclude = ["**/*test.cc"],
+        exclude = ["**/*_test.cc"],
     ),
     copts = [
         "-pthread",

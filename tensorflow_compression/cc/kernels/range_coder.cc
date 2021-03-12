@@ -20,10 +20,8 @@ limitations under the License.
 // held in Southampton, July 24-27, 1979.
 //
 #include "tensorflow_compression/cc/kernels/range_coder.h"
-
 #include <limits>
 #include <string>
-
 #include "absl/types/span.h"
 #include "tensorflow/core/platform/logging.h"
 #include "tensorflow/core/platform/types.h"

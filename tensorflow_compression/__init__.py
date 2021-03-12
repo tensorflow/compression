@@ -30,9 +30,9 @@ from tensorflow_compression.python.layers.parameters import *
 from tensorflow_compression.python.layers.signal_conv import *
 from tensorflow_compression.python.layers.soft_round import *
 
+from tensorflow_compression.python.ops.gen_ops import *
 from tensorflow_compression.python.ops.math_ops import *
 from tensorflow_compression.python.ops.padding_ops import *
-from tensorflow_compression.python.ops.range_coding_ops import *
 from tensorflow_compression.python.ops.soft_round_ops import *
 from tensorflow_compression.python.ops.spectral_ops import *
 

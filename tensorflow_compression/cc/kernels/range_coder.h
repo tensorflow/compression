@@ -18,7 +18,6 @@ limitations under the License.
 
 #include <limits>
 #include <string>
-
 #include "absl/types/span.h"
 #include "tensorflow/core/platform/types.h"
 

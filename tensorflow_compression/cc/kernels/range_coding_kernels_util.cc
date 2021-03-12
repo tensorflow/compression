@@ -13,14 +13,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
+#include "tensorflow_compression/cc/kernels/range_coding_kernels_util.h"
 #include <vector>
-
 #include "tensorflow/core/framework/tensor_shape.h"
 #include "tensorflow/core/lib/core/status.h"
 #include "tensorflow/core/platform/macros.h"
 #include "tensorflow/core/platform/types.h"
-
-#include "tensorflow_compression/cc/kernels/range_coding_kernels_util.h"
 
 namespace tensorflow_compression {
 using tensorflow::Status;

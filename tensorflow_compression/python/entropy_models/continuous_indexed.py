@@ -17,8 +17,8 @@
 import tensorflow as tf
 from tensorflow_compression.python.distributions import helpers
 from tensorflow_compression.python.entropy_models import continuous_base
+from tensorflow_compression.python.ops import gen_ops
 from tensorflow_compression.python.ops import math_ops
-from tensorflow_compression.python.ops import range_coding_ops
 
 
 __all__ = [
@@ -390,7 +390,7 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       cdf_length = self.cdf_length
       cdf_offset = self.cdf_offset
       def loop_body(args):
-        return range_coding_ops.unbounded_index_range_encode(
+        return gen_ops.unbounded_index_range_encode(
             args[0], args[1], cdf, cdf_length, cdf_offset,
             precision=self.range_coder_precision,
             overflow_width=4, debug_level=1)
@@ -433,7 +433,7 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       cdf_length = self.cdf_length
       cdf_offset = self.cdf_offset
       def loop_body(args):
-        return range_coding_ops.unbounded_index_range_decode(
+        return gen_ops.unbounded_index_range_decode(
             args[0], args[1], cdf, cdf_length, cdf_offset,
             precision=self.range_coder_precision,
             overflow_width=4, debug_level=1)

@@ -13,16 +13,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
+#include "tensorflow_compression/cc/kernels/range_coder.h"
 #include <cmath>
 #include <random>
-
 #include "tensorflow/core/lib/random/distribution_sampler.h"
 #include "tensorflow/core/lib/random/philox_random.h"
 #include "tensorflow/core/lib/random/simple_philox.h"
 #include "tensorflow/core/platform/stacktrace_handler.h"
 #include "tensorflow/core/platform/test.h"
-
-#include "tensorflow_compression/cc/kernels/range_coder.h"
 
 namespace tensorflow_compression {
 namespace {

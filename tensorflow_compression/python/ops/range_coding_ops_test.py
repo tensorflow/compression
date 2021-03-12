@@ -15,7 +15,7 @@
 """Range coding tests."""
 
 import tensorflow as tf
-from tensorflow_compression.python.ops import range_coding_ops
+from tensorflow_compression.python.ops import gen_ops
 
 
 class RangeCodingOpsTest(tf.test.TestCase):
@@ -33,9 +33,8 @@ class RangeCodingOpsTest(tf.test.TestCase):
     cdf = tf.reshape(cdf, [1, 1, -1])
 
     data = tf.cast(data, tf.int16)
-    encoded = range_coding_ops.range_encode(data, cdf, precision=14)
-    decoded = range_coding_ops.range_decode(
-        encoded, tf.shape(data), cdf, precision=14)
+    encoded = gen_ops.range_encode(data, cdf, precision=14)
+    decoded = gen_ops.range_decode(encoded, tf.shape(data), cdf, precision=14)
 
     self.assertAllEqual(data, decoded)
 
