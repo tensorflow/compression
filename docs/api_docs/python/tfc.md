@@ -92,16 +92,6 @@ Data compression in TensorFlow.
 
 ## Functions
 
-[`PmfToQuantizedCdf(...)`](./tfc/PmfToQuantizedCdf.md): Converts PMF to quantized CDF. This op uses floating-point operations
-
-[`RangeDecode(...)`](./tfc/RangeDecode.md): Decodes a range-coded `code` into an int32 tensor of shape `shape`.
-
-[`RangeEncode(...)`](./tfc/RangeEncode.md): Using the provided cumulative distribution functions (CDF) inside `cdf`, returns
-
-[`UnboundedIndexRangeDecode(...)`](./tfc/UnboundedIndexRangeDecode.md): This is the reverse op of `UnboundedIndexRangeEncode`, and decodes the range
-
-[`UnboundedIndexRangeEncode(...)`](./tfc/UnboundedIndexRangeEncode.md): Range encodes unbounded integer `data` using an indexed probability table.
-
 [`estimate_tails(...)`](./tfc/estimate_tails.md): Estimates approximate tail quantiles.
 
 [`irdft_matrix(...)`](./tfc/irdft_matrix.md): Matrix for implementing kernel reparameterization with `tf.matmul`.
@@ -112,13 +102,13 @@ Data compression in TensorFlow.
 
 [`perturb_and_apply(...)`](./tfc/perturb_and_apply.md): Perturbs the inputs of a pointwise function.
 
-[`pmf_to_quantized_cdf(...)`](./tfc/pmf_to_quantized_cdf.md): Converts PMF to quantized CDF. This op uses floating-point operations
+[`pmf_to_quantized_cdf(...)`](./tfc/pmf_to_quantized_cdf.md): Converts a PMF into a quantized CDF for range coding.
 
 [`quantization_offset(...)`](./tfc/quantization_offset.md): Computes distribution-dependent quantization offset.
 
-[`range_decode(...)`](./tfc/range_decode.md): Decodes a range-coded `code` into an int32 tensor of shape `shape`.
+[`range_decode(...)`](./tfc/range_decode.md): Range-decodes `code` into an int32 tensor of shape `shape`.
 
-[`range_encode(...)`](./tfc/range_encode.md): Using the provided cumulative distribution functions (CDF) inside `cdf`, returns
+[`range_encode(...)`](./tfc/range_encode.md): Range encodes integer `data` with a finite alphabet.
 
 [`same_padding_for_kernel(...)`](./tfc/same_padding_for_kernel.md): Determine correct amount of padding for `same` convolution.
 
@@ -128,7 +118,7 @@ Data compression in TensorFlow.
 
 [`soft_round_inverse(...)`](./tfc/soft_round_inverse.md): Inverse of soft_round().
 
-[`unbounded_index_range_decode(...)`](./tfc/unbounded_index_range_decode.md): This is the reverse op of `UnboundedIndexRangeEncode`, and decodes the range
+[`unbounded_index_range_decode(...)`](./tfc/unbounded_index_range_decode.md): Range decodes `encoded` using an indexed probability table.
 
 [`unbounded_index_range_encode(...)`](./tfc/unbounded_index_range_encode.md): Range encodes unbounded integer `data` using an indexed probability table.
 

@@ -92,7 +92,7 @@ the pip package and then run the unit tests to confirm that it works.
 It seems that [Anaconda](https://www.anaconda.com/distribution/) ships its own
 binary version of TensorFlow which is incompatible with our pip package. To
 solve this, always install TensorFlow via `pip` rather than `conda`. For
-example, this creates an Anaconda environment with Python 3.6 and CUDA
+example, this creates an Anaconda environment with Python 3.8 and CUDA
 libraries, and then installs TensorFlow and TensorFlow Compression:
 
 ```bash

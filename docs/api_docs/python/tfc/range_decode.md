@@ -1,4 +1,4 @@
-description: Decodes a range-coded code into an int32 tensor of shape shape.
+description: Range-decodes code into an int32 tensor of shape shape.
 
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfc.range_decode" />
@@ -15,7 +15,7 @@ description: Decodes a range-coded code into an int32 tensor of shape shape.
 
 
 
-Decodes a range-coded `code` into an int32 tensor of shape `shape`.
+Range-decodes `code` into an int32 tensor of shape `shape`.
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>tfc.range_decode(
@@ -27,8 +27,8 @@ Decodes a range-coded `code` into an int32 tensor of shape `shape`.
 
 <!-- Placeholder for "Used in" -->
 
-This is the reverse op of RangeEncode. The shape of the tensor that was encoded
-should be known by the caller.
+This is the reverse op of `RangeEncode`. The shape of the tensor that was
+encoded should be known by the caller.
 
 #### Implementation notes:
 

@@ -1,4 +1,4 @@
-description: Using the provided cumulative distribution functions (CDF) inside cdf, returns
+description: Range encodes integer data with a finite alphabet.
 
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfc.range_encode" />
@@ -15,7 +15,7 @@ description: Using the provided cumulative distribution functions (CDF) inside c
 
 
 
-Using the provided cumulative distribution functions (CDF) inside `cdf`, returns
+Range encodes integer `data` with a finite alphabet.
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>tfc.range_encode(
@@ -27,9 +27,8 @@ Using the provided cumulative distribution functions (CDF) inside `cdf`, returns
 
 <!-- Placeholder for "Used in" -->
 
-a range-code of `data`.
-
-The shape of `cdf` should have one more axis than the shape of `data`, and the
+The op uses the provided cumulative distribution functions (CDF) in `cdf`. The
+shape of `cdf` should have one more axis than the shape of `data`, and the
 prefix `cdf.shape[:-1]` should be broadcastable to `data.shape`. That is, for
 every `i = 0,...,rank(data) - 1`, the op requires that either
 `cdf.shape[i] == 1` or `cdf.shape[i] == data.shape[i]`. Note that this

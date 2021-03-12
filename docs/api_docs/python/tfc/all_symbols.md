@@ -24,10 +24,7 @@
 *  <a href="../tfc/NoisySoftRoundedNormal.md"><code>tfc.NoisySoftRoundedNormal</code></a>
 *  <a href="../tfc/PackedTensors.md"><code>tfc.PackedTensors</code></a>
 *  <a href="../tfc/Parameter.md"><code>tfc.Parameter</code></a>
-*  <a href="../tfc/PmfToQuantizedCdf.md"><code>tfc.PmfToQuantizedCdf</code></a>
 *  <a href="../tfc/RDFTParameter.md"><code>tfc.RDFTParameter</code></a>
-*  <a href="../tfc/RangeDecode.md"><code>tfc.RangeDecode</code></a>
-*  <a href="../tfc/RangeEncode.md"><code>tfc.RangeEncode</code></a>
 *  <a href="../tfc/Round.md"><code>tfc.Round</code></a>
 *  <a href="../tfc/RoundAdapter.md"><code>tfc.RoundAdapter</code></a>
 *  <a href="../tfc/SignalConv1D.md"><code>tfc.SignalConv1D</code></a>
@@ -36,8 +33,6 @@
 *  <a href="../tfc/SoftRound.md"><code>tfc.SoftRound</code></a>
 *  <a href="../tfc/SoftRoundAdapter.md"><code>tfc.SoftRoundAdapter</code></a>
 *  <a href="../tfc/SoftRoundConditionalMean.md"><code>tfc.SoftRoundConditionalMean</code></a>
-*  <a href="../tfc/UnboundedIndexRangeDecode.md"><code>tfc.UnboundedIndexRangeDecode</code></a>
-*  <a href="../tfc/UnboundedIndexRangeEncode.md"><code>tfc.UnboundedIndexRangeEncode</code></a>
 *  <a href="../tfc/UniformNoiseAdapter.md"><code>tfc.UniformNoiseAdapter</code></a>
 *  <a href="../tfc/UniversalBatchedEntropyModel.md"><code>tfc.UniversalBatchedEntropyModel</code></a>
 *  <a href="../tfc/UniversalIndexedEntropyModel.md"><code>tfc.UniversalIndexedEntropyModel</code></a>

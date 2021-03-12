@@ -1,4 +1,4 @@
-description: This is the reverse op of UnboundedIndexRangeEncode, and decodes the range
+description: Range decodes encoded using an indexed probability table.
 
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfc.unbounded_index_range_decode" />
@@ -15,7 +15,7 @@ description: This is the reverse op of UnboundedIndexRangeEncode, and decodes th
 
 
 
-This is the reverse op of `UnboundedIndexRangeEncode`, and decodes the range
+Range decodes `encoded` using an indexed probability table.
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>tfc.unbounded_index_range_decode(
@@ -28,9 +28,10 @@ This is the reverse op of `UnboundedIndexRangeEncode`, and decodes the range
 
 <!-- Placeholder for "Used in" -->
 
-encoded stream `code` into an int32 tensor `decoded`. The other inputs `index`,
-`cdf`, `cdf_size`, and `offset` should be the identical tensors passed to the
-`UnboundedIndexRangeEncode` op that generated the `decoded` tensor.
+This is the reverse op of `UnboundedIndexRangeEncode`, and decodes the range
+encoded stream `encoded` into an int32 tensor `decoded`. The other inputs
+`index`, `cdf`, `cdf_size`, and `offset` should be the identical tensors passed
+to the `UnboundedIndexRangeEncode` op that generated the `decoded` tensor.
 
 #### Implementation notes:
 

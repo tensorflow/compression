@@ -1,4 +1,4 @@
-description: Converts PMF to quantized CDF. This op uses floating-point operations
+description: Converts a PMF into a quantized CDF for range coding.
 
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfc.pmf_to_quantized_cdf" />
@@ -15,7 +15,7 @@ description: Converts PMF to quantized CDF. This op uses floating-point operatio
 
 
 
-Converts PMF to quantized CDF. This op uses floating-point operations
+Converts a PMF into a quantized CDF for range coding.
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>tfc.pmf_to_quantized_cdf(
@@ -27,10 +27,11 @@ Converts PMF to quantized CDF. This op uses floating-point operations
 
 <!-- Placeholder for "Used in" -->
 
-internally. Therefore the quantized output may not be consistent across multiple
-platforms. For entropy encoders and decoders to have the same quantized CDF on
-different platforms, the quantized CDF should be produced once and saved, then
-the saved quantized CDF should be used everywhere.
+This op uses floating-point operations internally. Therefore the quantized
+output may not be consistent across multiple platforms. For entropy encoders and
+decoders to have the same quantized CDF on different platforms, the quantized
+CDF should be produced once and saved, then the saved quantized CDF should be
+used everywhere.
 
 After quantization, if PMF does not sum to 2^precision, then some values of PMF
 are increased or decreased to adjust the sum to equal to 2^precision.

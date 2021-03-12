@@ -34,10 +34,10 @@ REGISTER_OP("RangeEncode")
     .Attr("debug_level: int = 1")
     .SetShapeFn(shape_inference::ScalarShape)
     .Doc(R"doc(
-Using the provided cumulative distribution functions (CDF) inside `cdf`, returns
-a range-code of `data`.
+Range encodes integer `data` with a finite alphabet.
 
-The shape of `cdf` should have one more axis than the shape of `data`, and the
+The op uses the provided cumulative distribution functions (CDF) in `cdf`. The
+shape of `cdf` should have one more axis than the shape of `data`, and the
 prefix `cdf.shape[:-1]` should be broadcastable to `data.shape`. That is, for
 every `i = 0,...,rank(data) - 1`, the op requires that either
 `cdf.shape[i] == 1` or `cdf.shape[i] == data.shape[i]`. Note that this
@@ -102,10 +102,10 @@ REGISTER_OP("RangeDecode")
       return Status::OK();
     })
     .Doc(R"doc(
-Decodes a range-coded `code` into an int32 tensor of shape `shape`.
+Range-decodes `code` into an int32 tensor of shape `shape`.
 
-This is the reverse op of RangeEncode. The shape of the tensor that was encoded
-should be known by the caller.
+This is the reverse op of `RangeEncode`. The shape of the tensor that was
+encoded should be known by the caller.
 
 Implementation notes:
 
@@ -217,10 +217,12 @@ REGISTER_OP("UnboundedIndexRangeDecode")
       return Status::OK();
     })
     .Doc(R"doc(
+Range decodes `encoded` using an indexed probability table.
+
 This is the reverse op of `UnboundedIndexRangeEncode`, and decodes the range
-encoded stream `code` into an int32 tensor `decoded`. The other inputs `index`,
-`cdf`, `cdf_size`, and `offset` should be the identical tensors passed to the
-`UnboundedIndexRangeEncode` op that generated the `decoded` tensor.
+encoded stream `encoded` into an int32 tensor `decoded`. The other inputs
+`index`, `cdf`, `cdf_size`, and `offset` should be the identical tensors passed
+to the `UnboundedIndexRangeEncode` op that generated the `decoded` tensor.
 
 Implementation notes:
 
@@ -258,11 +260,13 @@ REGISTER_OP("PmfToQuantizedCdf")
       return Status::OK();
     })
     .Doc(R"doc(
-Converts PMF to quantized CDF. This op uses floating-point operations
-internally. Therefore the quantized output may not be consistent across multiple
-platforms. For entropy encoders and decoders to have the same quantized CDF on
-different platforms, the quantized CDF should be produced once and saved, then
-the saved quantized CDF should be used everywhere.
+Converts a PMF into a quantized CDF for range coding.
+
+This op uses floating-point operations internally. Therefore the quantized
+output may not be consistent across multiple platforms. For entropy encoders and
+decoders to have the same quantized CDF on different platforms, the quantized
+CDF should be produced once and saved, then the saved quantized CDF should be
+used everywhere.
 
 After quantization, if PMF does not sum to 2^precision, then some values of PMF
 are increased or decreased to adjust the sum to equal to 2^precision.
