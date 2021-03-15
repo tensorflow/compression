@@ -8,6 +8,7 @@ py_library(
     srcs_version = "PY3",
     visibility = ["//visibility:public"],
     deps = [
+        "//tensorflow_compression/python/datasets:y4m_dataset",
         "//tensorflow_compression/python/distributions:deep_factorized",
         "//tensorflow_compression/python/distributions:helpers",
         "//tensorflow_compression/python/distributions:round_adapters",
@@ -40,6 +41,7 @@ py_binary(
         "tensorflow_compression/all_tests.py",
         ":tensorflow_compression",
         # The following targets are for Python unit tests.
+        "//tensorflow_compression/python/datasets:py_src",
         "//tensorflow_compression/python/distributions:py_src",
         "//tensorflow_compression/python/entropy_models:py_src",
         "//tensorflow_compression/python/layers:py_src",

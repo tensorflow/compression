@@ -15,6 +15,8 @@
 """Data compression in TensorFlow."""
 
 # pylint: disable=wildcard-import
+from tensorflow_compression.python.datasets.y4m_dataset import *
+
 from tensorflow_compression.python.distributions.deep_factorized import *
 from tensorflow_compression.python.distributions.helpers import *
 from tensorflow_compression.python.distributions.round_adapters import *

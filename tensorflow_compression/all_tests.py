@@ -20,6 +20,8 @@ This is a convenience file to be included in the pip package.
 import tensorflow as tf
 
 # pylint: disable=wildcard-import
+from tensorflow_compression.python.datasets.y4m_dataset_test import *
+
 from tensorflow_compression.python.distributions.deep_factorized_test import *
 from tensorflow_compression.python.distributions.helpers_test import *
 from tensorflow_compression.python.distributions.round_adapters_test import *
