@@ -21,11 +21,13 @@ This script requires TFC v2 (`pip install tensorflow-compression==2.*`).
 """
 
 import argparse
+import io
 import os
 import sys
 import urllib
 from absl import app
 from absl.flags import argparse_flags
+import numpy as np
 import tensorflow as tf
 import tensorflow_compression as tfc  # pylint:disable=unused-import
 
@@ -73,7 +75,7 @@ def load_cached(filename):
   return string
 
 
-def instantiate_model_signature(model, signature):
+def instantiate_model_signature(model, signature, outputs=None):
   """Imports a trained model and returns one of its signatures as a function."""
   string = load_cached(model + ".metagraph")
   metagraph = tf.compat.v1.MetaGraphDef()
@@ -82,9 +84,12 @@ def instantiate_model_signature(model, signature):
       lambda: tf.compat.v1.train.import_meta_graph(metagraph), [])
   graph = wrapped_import.graph
   inputs = metagraph.signature_def[signature].inputs
-  outputs = metagraph.signature_def[signature].outputs
   inputs = [graph.as_graph_element(inputs[k].name) for k in sorted(inputs)]
-  outputs = [graph.as_graph_element(outputs[k].name) for k in sorted(outputs)]
+  if outputs is None:
+    outputs = metagraph.signature_def[signature].outputs
+    outputs = [graph.as_graph_element(outputs[k].name) for k in sorted(outputs)]
+  else:
+    outputs = [graph.as_graph_element(t) for t in outputs]
   return wrapped_import.prune(inputs, outputs)
 
 
@@ -159,12 +164,43 @@ def decompress(input_file, output_file):
 
 
 def list_models():
+  """Lists available models in web storage with a description."""
   url = URL_PREFIX + "/models.txt"
+  request = urllib.request.urlopen(url)
   try:
-    request = urllib.request.urlopen(url)
     print(request.read().decode("utf-8"))
   finally:
     request.close()
+
+
+def list_tensors(model):
+  """Lists all internal tensors of the sender signature of a given model."""
+  sender = instantiate_model_signature(model, "sender")
+  tensors = sorted(
+      (t.name, t.dtype.name, t.shape)
+      for o in sender.graph.get_operations()
+      for t in o.outputs
+  )
+  for name, dtype, shape in tensors:
+    print(f"{name} (dtype={dtype}, shape={shape})")
+
+
+def dump_tensor(model, tensors, input_file, output_file):
+  """Dumps the given tensors of a model in .npz format."""
+  if not output_file:
+    output_file = input_file + ".npz"
+  sender = instantiate_model_signature(model, "sender", outputs=tensors)
+  input_image = read_png(input_file)
+  # Replace special characters in tensor names with underscores.
+  table = str.maketrans(r"^./-:", r"_____")
+  tensors = [t.translate(table) for t in tensors]
+  values = [t.numpy() for t in sender(input_image)]
+  assert len(tensors) == len(values)
+  # Write to buffer first, since GFile might not be random accessible.
+  with io.BytesIO() as buf:
+    np.savez(buf, **dict(zip(tensors, values)))
+    with tf.io.gfile.GFile(output_file, mode="wb") as f:
+      f.write(buf.getvalue())
 
 
 def parse_args(argv):
@@ -214,22 +250,47 @@ def parse_args(argv):
       description="Reads a TFCI file, reconstructs the image using the model "
                   "it was compressed with, and writes back a PNG file.")
 
-  # Arguments for both 'compress' and 'decompress'.
-  for cmd, ext in ((compress_cmd, ".tfci"), (decompress_cmd, ".png")):
-    cmd.add_argument(
-        "input_file",
-        help="Input filename.")
-    cmd.add_argument(
-        "output_file", nargs="?",
-        help="Output filename (optional). If not provided, appends '{}' to "
-             "the input filename.".format(ext))
-
   # 'models' subcommand.
   subparsers.add_parser(
       "models",
       formatter_class=argparse.ArgumentDefaultsHelpFormatter,
       description="Lists available trained models. Requires an internet "
                   "connection.")
+
+  tensors_cmd = subparsers.add_parser(
+      "tensors",
+      formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+      description="Lists names of internal tensors of a given model.")
+  tensors_cmd.add_argument(
+      "model",
+      help="Unique model identifier. See 'models' command for options.")
+
+  dump_cmd = subparsers.add_parser(
+      "dump",
+      formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+      description="Dumps values of given internal tensors of a model in "
+                  "NumPy's .npz format.")
+  dump_cmd.add_argument(
+      "model",
+      help="Unique model identifier. See 'models' command for options.")
+  dump_cmd.add_argument(
+      "--tensor", "-t", nargs="+",
+      help="Name(s) of tensor(s) to dump. Must provide at least one. See "
+           "'tensors' command for options.")
+
+  # Arguments for 'compress', 'decompress', and 'dump'.
+  for cmd, ext in (
+      (compress_cmd, ".tfci"),
+      (decompress_cmd, ".png"),
+      (dump_cmd, ".npz"),
+  ):
+    cmd.add_argument(
+        "input_file",
+        help="Input filename.")
+    cmd.add_argument(
+        "output_file", nargs="?",
+        help=f"Output filename (optional). If not provided, appends '{ext}' to "
+             f"the input filename.")
 
   # Parse arguments.
   args = parser.parse_args(argv[1:])
@@ -249,10 +310,16 @@ def main(args):
   if args.command == "compress":
     compress(args.model, args.input_file, args.output_file,
              args.target_bpp, args.bpp_strict)
-  if args.command == "decompress":
+  elif args.command == "decompress":
     decompress(args.input_file, args.output_file)
-  if args.command == "models":
+  elif args.command == "models":
     list_models()
+  elif args.command == "tensors":
+    list_tensors(args.model)
+  elif args.command == "dump":
+    if not args.tensor:
+      raise ValueError("Must provide at least one tensor to dump.")
+    dump_tensor(args.model, args.tensor, args.input_file, args.output_file)
 
 
 if __name__ == "__main__":
