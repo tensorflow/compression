@@ -75,7 +75,7 @@ def load_cached(filename):
   return string
 
 
-def instantiate_model_signature(model, signature, outputs=None):
+def instantiate_model_signature(model, signature, inputs=None, outputs=None):
   """Imports a trained model and returns one of its signatures as a function."""
   string = load_cached(model + ".metagraph")
   metagraph = tf.compat.v1.MetaGraphDef()
@@ -83,8 +83,11 @@ def instantiate_model_signature(model, signature, outputs=None):
   wrapped_import = tf.compat.v1.wrap_function(
       lambda: tf.compat.v1.train.import_meta_graph(metagraph), [])
   graph = wrapped_import.graph
-  inputs = metagraph.signature_def[signature].inputs
-  inputs = [graph.as_graph_element(inputs[k].name) for k in sorted(inputs)]
+  if inputs is None:
+    inputs = metagraph.signature_def[signature].inputs
+    inputs = [graph.as_graph_element(inputs[k].name) for k in sorted(inputs)]
+  else:
+    inputs = [graph.as_graph_element(t) for t in inputs]
   if outputs is None:
     outputs = metagraph.signature_def[signature].outputs
     outputs = [graph.as_graph_element(outputs[k].name) for k in sorted(outputs)]
@@ -174,13 +177,22 @@ def list_models():
 
 
 def list_tensors(model):
-  """Lists all internal tensors of the sender signature of a given model."""
+  """Lists all internal tensors of a given model."""
+  def get_names_dtypes_shapes(function):
+    for op in function.graph.get_operations():
+      for tensor in op.outputs:
+        yield tensor.name, tensor.dtype.name, tensor.shape
+
   sender = instantiate_model_signature(model, "sender")
-  tensors = sorted(
-      (t.name, t.dtype.name, t.shape)
-      for o in sender.graph.get_operations()
-      for t in o.outputs
-  )
+  tensors = sorted(get_names_dtypes_shapes(sender))
+  print("Sender-side tensors:")
+  for name, dtype, shape in tensors:
+    print(f"{name} (dtype={dtype}, shape={shape})")
+  print()
+
+  receiver = instantiate_model_signature(model, "receiver")
+  tensors = sorted(get_names_dtypes_shapes(receiver))
+  print("Receiver-side tensors:")
   for name, dtype, shape in tensors:
     print(f"{name} (dtype={dtype}, shape={shape})")
 
@@ -189,6 +201,8 @@ def dump_tensor(model, tensors, input_file, output_file):
   """Dumps the given tensors of a model in .npz format."""
   if not output_file:
     output_file = input_file + ".npz"
+  # Note: if receiver-side tensors are requested, this is no problem, as the
+  # metagraph contains the union of the sender and receiver graphs.
   sender = instantiate_model_signature(model, "sender", outputs=tensors)
   input_image = read_png(input_file)
   # Replace special characters in tensor names with underscores.
