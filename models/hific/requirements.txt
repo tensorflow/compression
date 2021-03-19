@@ -1,4 +1,4 @@
 -e git+https://github.com/google/compare_gan#egg=elasticutils
 tensorflow-gpu~=1.15.2
 tensorflow-compression==1.3
-Pillow~=7.1.2
+Pillow~=8.1.1
