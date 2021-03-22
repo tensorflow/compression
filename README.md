@@ -58,7 +58,8 @@ of TF.***
 To install TFC via `pip`, run the following command:
 
 ```bash
-pip install tensorflow-compression
+pip uninstall -y tensorflow
+pip install tf-nightly==2.5.0.dev20210312 tensorflow-compression
 ```
 
 To test that the installation works correctly, you can run the unit tests with:
@@ -80,7 +81,7 @@ host. For instance, you can use a command line like this:
 
 ```bash
 docker run tensorflow/tensorflow:nightly bash -c \
-    "pip install tensorflow-compression &&
+    "pip install tf-nightly==2.5.0.dev20210312 tensorflow-compression &&
      python -m tensorflow_compression.all_tests"
 ```
 
@@ -98,7 +99,7 @@ libraries, and then installs TensorFlow and TensorFlow Compression:
 ```bash
 conda create --name ENV_NAME python=3.8 cudatoolkit=10.0 cudnn
 conda activate ENV_NAME
-pip install tensorflow-compression
+pip install tf-nightly==2.5.0.dev20210312 tensorflow-compression
 ```
 
 ## Usage
