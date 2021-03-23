@@ -38,7 +38,7 @@ Use `tfci.py` for locally running our models to encode and decode images:
 
 ```bash
 git clone https://github.com/tensorflow/compression
-cd compression/compression/models
+cd compression/models
 python tfci.py compress <model> <PNG file>
 ```
 
@@ -49,22 +49,19 @@ where `model` can be one of `"hific-lo", "hific-mi", "hific-hi"`.
 
 ## Using the code
 
+To use the code, create a conda environment using Python 3.7, and the packages
+listed in
+[requirements.txt](https://github.com/tensorflow/compression/blob/master/models/hific/requirements.txt).
 
-To use the code, create a conda environment using Python 3.6
-(newer is not supported at the moment), and the following packages.
-
-**NOTE**: We only support CUDA 10.0, Python 3.6, and TensorFlow 1.15.
-TensorFlow must be installed via pip, not conda.
-Any other setup is not going to work (we tested newer versions of Tensorflow
-and Python and they don't work). We're working on a fix.
+**NOTE**: At the moment, we only support CUDA 10.0, Python 3.6-3.7, TensorFlow
+1.15, and Tensorflow Compression 1.3. TensorFlow must be installed via pip, not
+conda. Unfortunately, newer versions of Tensorflow or Python will not work due
+to various constraints in the dependencies and in the TF binary API.
 
 ```bash
-conda create --name hific python=3.6 cudatoolkit=10.0 cudnn
+conda create --name hific python=3.7 cudatoolkit=10.0 cudnn
 conda activate hific
-pip install tensorflow-gpu==1.15  # Make sure to install TF via pip, not conda!
-pip install git+git://github.com/google/compare_gan@19922d3004b675c1a49c4d7515c06f6f75acdcc8
-pip install tensorflow-compression==1.3
-pip install Pillow
+pip install -r hific/requirements.txt
 ```
 
 #### Note on CUDNN Errors
@@ -115,7 +112,7 @@ python -m hific.train --config mselpips --ckpt_dir ckpts/mse_lpips \
 
 # Once that finishes, train a GAN model:
 python -m hific.train --config hific --ckpt_dir ckpts/hific \
-                --init_autoencoder_from_ckpt_dir ckpts/mselpips \
+                --init_autoencoder_from_ckpt_dir ckpts/mse_lpips \
                 --num_steps 1M \
                 --tfds_dataset_name coco2014
 ```
