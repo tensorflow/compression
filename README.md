@@ -23,11 +23,12 @@ compression](https://www.youtube.com/watch?v=x_q7cZviXkY).
 
 ## Documentation & getting help
 
-Please post all questions or comments in our [Google
-group](https://groups.google.com/forum/#!forum/tensorflow-compression). Only
-file Github issues for actual bugs or feature requests. If you post to the group
-instead, you may get a faster answer, and you help other people find the
-question or answer more easily later.
+Please post all questions or comments on
+[Discussions](https://github.com/tensorflow/compression/discussions) or on the
+[Google Group](https://groups.google.com/g/tensorflow-compression). Only file
+[Issues](https://github.com/tensorflow/compression/issues) for actual bugs or
+feature requests. On Discussions, you may get a faster answer, and you help
+other people find the question or answer more easily later.
 
 Refer to [the API
 documentation](https://tensorflow.github.io/compression/docs/api_docs/python/tfc.html)
