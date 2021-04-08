@@ -38,10 +38,7 @@ py_library(
     name = "parameters",
     srcs = ["parameters.py"],
     srcs_version = "PY3",
-    deps = [
-        "//tensorflow_compression/python/ops:math_ops",
-        "//tensorflow_compression/python/ops:spectral_ops",
-    ],
+    deps = ["//tensorflow_compression/python/ops:math_ops"],
 )
 
 py_test(

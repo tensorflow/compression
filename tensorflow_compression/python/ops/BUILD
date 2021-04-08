@@ -60,19 +60,6 @@ py_test(
     deps = [":soft_round_ops"],
 )
 
-py_library(
-    name = "spectral_ops",
-    srcs = ["spectral_ops.py"],
-    srcs_version = "PY3",
-)
-
-py_test(
-    name = "spectral_ops_test",
-    srcs = ["spectral_ops_test.py"],
-    python_version = "PY3",
-    deps = [":spectral_ops"],
-)
-
 filegroup(
     name = "py_src",
     srcs = glob(["*.py"]),

@@ -25,7 +25,6 @@ py_library(
         "//tensorflow_compression/python/ops:math_ops",
         "//tensorflow_compression/python/ops:padding_ops",
         "//tensorflow_compression/python/ops:soft_round_ops",
-        "//tensorflow_compression/python/ops:spectral_ops",
         "//tensorflow_compression/python/util:packed_tensors",
     ],
 )

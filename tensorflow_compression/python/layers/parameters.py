@@ -18,7 +18,6 @@ import abc
 from typing import Any, Dict
 import tensorflow as tf
 from tensorflow_compression.python.ops import math_ops
-from tensorflow_compression.python.ops import spectral_ops
 
 
 __all__ = [
@@ -78,12 +77,12 @@ class RDFTParameter(Parameter):
   (see https://en.wikipedia.org/wiki/Discrete_Fourier_transform)
 
   Attributes:
-    dc: Boolean. The `dc` parameter provided on initialization.
     shape: `tf.TensorShape`. The shape of the convolution kernel.
-    rdft: `tf.Variable`. The RDFT of the kernel.
+    real: `tf.Variable`. The real part of the RDFT of the kernel.
+    imag: `tf.Variable`. The imaginary part of the RDFT of the kernel.
   """
 
-  def __init__(self, initial_value, name=None, dc=True, shape=None, dtype=None):
+  def __init__(self, initial_value, name=None, shape=None, dtype=None):
     """Initializer.
 
     Args:
@@ -91,15 +90,12 @@ class RDFTParameter(Parameter):
         not provided, its `shape` must be given, and the initial value of the
         parameter will be undefined.
       name: String. The name of the kernel.
-      dc: Boolean. If `False`, the DC component of the kernel RDFTs is not
-        represented, forcing the filters to be highpass. Defaults to `True`.
       shape: `tf.TensorShape` or compatible. Ignored unless `initial_value is
         None`.
       dtype: `tf.dtypes.DType` or compatible. DType of this parameter. If not
         given, inferred from `initial_value`.
     """
     super().__init__(name=name)
-    self._dc = bool(dc)
     if initial_value is None:
       if shape is None:
         raise ValueError("If initial_value is None, shape must be specified.")
@@ -107,21 +103,38 @@ class RDFTParameter(Parameter):
     else:
       initial_value = tf.convert_to_tensor(initial_value, dtype=dtype)
     self._shape = initial_value.shape
-    self._matrix = spectral_ops.irdft_matrix(
-        self.shape[:-2], dtype=initial_value.dtype)
-    if not self.dc:
-      self._matrix = self._matrix[:, 1:]
-    initial_value = tf.reshape(
-        initial_value, (-1, self.shape[-2] * self.shape[-1]))
-    initial_value = tf.linalg.matmul(
-        self._matrix, initial_value, transpose_a=True)
+    self._dtype = initial_value.dtype
+
+    if self.shape.rank == 3:
+      initial_value = tf.transpose(initial_value, (1, 2, 0))
+      initial_value = tf.signal.rfft(initial_value)
+    elif self.shape.rank == 4:
+      initial_value = tf.transpose(initial_value, (2, 3, 0, 1))
+      initial_value = tf.signal.rfft2d(initial_value)
+    elif self.shape.rank == 5:
+      initial_value = tf.transpose(initial_value, (3, 4, 0, 1, 2))
+      initial_value = tf.signal.rfft3d(initial_value)
+    else:
+      raise ValueError(
+          f"Expected kernel tensor of rank 3, 4, or 5; received shape "
+          f"{self._shape}.")
+    self._norm = tf.constant(
+        self.shape[:-2].num_elements() ** .5, initial_value.dtype)
+    initial_value /= self._norm
+    # We split the variable into real and imaginary parts to avoid issues with
+    # complex-valued variables being unsupported when saving models, etc.
+    real = tf.math.real(initial_value)
+    imag = tf.math.imag(initial_value)
+    real_name = imag_name = None
     if name is not None:
-      name = f"{name}_rdft"
-    self.rdft = tf.Variable(initial_value, name=name)
+      real_name = f"{name}_real"
+      imag_name = f"{name}_imag"
+    self.real = tf.Variable(real, name=real_name)
+    self.imag = tf.Variable(imag, name=imag_name)
 
   @property
-  def dc(self) -> bool:
-    return self._dc
+  def dtype(self) -> tf.dtypes.DType:
+    return self._dtype
 
   @property
   def shape(self) -> tf.TensorShape:
@@ -130,15 +143,24 @@ class RDFTParameter(Parameter):
   @tf.Module.with_name_scope
   def __call__(self) -> tf.Tensor:
     """Computes and returns the convolution kernel as a `tf.Tensor`."""
-    return tf.reshape(tf.linalg.matmul(self._matrix, self.rdft), self.shape)
+    rdft = tf.dtypes.complex(self.real, self.imag) * self._norm
+    if self.shape.rank == 3:
+      kernel = tf.signal.irfft(rdft, fft_length=self.shape[:-2])
+      return tf.transpose(kernel, (2, 0, 1))
+    elif self.shape.rank == 4:
+      kernel = tf.signal.irfft2d(rdft, fft_length=self.shape[:-2])
+      return tf.transpose(kernel, (2, 3, 0, 1))
+    else:
+      assert self.shape.rank == 5, self.shape
+      kernel = tf.signal.irfft3d(rdft, fft_length=self.shape[:-2])
+      return tf.transpose(kernel, (2, 3, 4, 0, 1))
 
   def get_config(self) -> Dict[str, Any]:
     config = super().get_config()
     config.update(
         initial_value=None,
-        dc=self.dc,
-        shape=tuple(self.shape),
-        dtype=self.rdft.dtype.name,
+        shape=tuple(map(int, self.shape)),
+        dtype=self.dtype.name,
     )
     return config
 
@@ -220,7 +242,7 @@ class GDNParameter(Parameter):
         initial_value=None,
         minimum=self.minimum,
         offset=self.offset,
-        shape=tuple(self.variable.shape),
+        shape=tuple(map(int, self.variable.shape)),
         dtype=self.variable.dtype.name,
     )
     return config

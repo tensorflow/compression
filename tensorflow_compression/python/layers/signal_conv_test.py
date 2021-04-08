@@ -33,18 +33,19 @@ class SignalConvTest(tf.test.TestCase, parameterized.TestCase):
   def test_variables_are_enumerated(self):
     layer = signal_conv.SignalConv2D(3, 1, use_bias=True)
     layer.build((None, None, None, 2))
-    self.assertLen(layer.weights, 2)
-    self.assertLen(layer.trainable_weights, 2)
+    self.assertLen(layer.weights, 3)
+    self.assertLen(layer.trainable_weights, 3)
     weight_names = [w.name for w in layer.weights]
-    self.assertSameElements(weight_names, ["kernel_rdft:0", "bias:0"])
+    self.assertSameElements(
+        weight_names, ["kernel_real:0", "kernel_imag:0", "bias:0"])
 
   def test_bias_variable_is_not_unnecessarily_created(self):
     layer = signal_conv.SignalConv2D(5, 3, use_bias=False)
     layer.build((None, None, None, 3))
-    self.assertLen(layer.weights, 1)
-    self.assertLen(layer.trainable_weights, 1)
+    self.assertLen(layer.weights, 2)
+    self.assertLen(layer.trainable_weights, 2)
     weight_names = [w.name for w in layer.weights]
-    self.assertSameElements(weight_names, ["kernel_rdft:0"])
+    self.assertSameElements(weight_names, ["kernel_real:0", "kernel_imag:0"])
 
   def test_variables_are_not_enumerated_when_overridden(self):
     layer = signal_conv.SignalConv2D(1, 1)
@@ -58,7 +59,7 @@ class SignalConvTest(tf.test.TestCase, parameterized.TestCase):
     layer = signal_conv.SignalConv2D(1, 1, use_bias=True)
     layer.trainable = False
     layer.build((None, None, None, 1))
-    self.assertLen(layer.weights, 2)
+    self.assertLen(layer.weights, 3)
     self.assertEmpty(layer.trainable_weights)
 
   def test_attributes_cannot_be_set_after_build(self):
@@ -107,7 +108,7 @@ class SignalConvTest(tf.test.TestCase, parameterized.TestCase):
     with tf.GradientTape() as g:
       y = layer(x)
     grads = g.gradient(y, layer.trainable_weights)
-    self.assertLen(grads, 2)
+    self.assertLen(grads, 3)
     self.assertNotIn(None, grads)
     grad_shapes = [tuple(g.shape) for g in grads]
     weight_shapes = [tuple(w.shape) for w in layer.trainable_weights]

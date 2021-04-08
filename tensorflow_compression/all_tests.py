@@ -41,7 +41,6 @@ from tensorflow_compression.python.ops.math_ops_test import *
 from tensorflow_compression.python.ops.padding_ops_test import *
 from tensorflow_compression.python.ops.range_coding_ops_test import *
 from tensorflow_compression.python.ops.soft_round_ops_test import *
-from tensorflow_compression.python.ops.spectral_ops_test import *
 
 from tensorflow_compression.python.util.packed_tensors_test import *
 # pylint: enable=wildcard-import

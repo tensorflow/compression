@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tests of parameters."""
 
+from absl.testing import parameterized
 import tensorflow as tf
 from tensorflow_compression.python.layers import parameters
 
@@ -49,24 +50,33 @@ class ParameterTest:
     self.assertEqual(value.dtype.name, converted.dtype.name)
 
 
-class RDFTParameterTest(ParameterTest, tf.test.TestCase):
+class RDFTParameterTest(ParameterTest, tf.test.TestCase,
+                        parameterized.TestCase):
 
   cls = parameters.RDFTParameter
-  kwargs = dict(name="hello_rdft", dc=True)
+  kwargs = dict(name="rdft_kernel")
   shape = (3, 3, 1, 2)
 
-  def test_initial_value_is_reproduced_without_dc(self):
-    initial_value = tf.random.uniform(self.shape, dtype=tf.float32)
-    parameter = self.cls(initial_value, dc=False)
-    expected_value = initial_value - tf.reduce_mean(
-        initial_value, axis=(0, 1), keepdims=True)
-    self.assertAllClose(expected_value, parameter(), atol=1e-6, rtol=0)
+  # TODO(jonycgn): Find out why 3D RFFT gradients are not implemented in TF.
+  @parameterized.parameters((7, 3, 2), (5, 3, 1, 2))
+  def test_gradients_propagate(self, *shape):
+    initial_value = tf.random.uniform(shape, dtype=tf.float32)
+    parameter = self.cls(initial_value, **self.kwargs)
+    rand = tf.random.uniform(shape)
+    with tf.GradientTape() as tape:
+      loss = tf.reduce_sum(rand * parameter())
+    gradients = tape.gradient(loss, parameter.variables)
+    self.assertLen(gradients, 2)
+    self.assertNotAllClose(
+        tf.zeros_like(gradients[0]), gradients[0], atol=1e-1, rtol=0)
+    self.assertNotAllClose(
+        tf.zeros_like(gradients[1]), gradients[1], atol=1e-1, rtol=0)
 
 
 class GDNParameterTest(ParameterTest, tf.test.TestCase):
 
   cls = parameters.GDNParameter
-  kwargs = dict(name="hello_gdn")
+  kwargs = dict(name="gdn_parameter")
   shape = (2, 1, 3)
 
   def test_initial_value_is_reproduced_with_minimum(self):
