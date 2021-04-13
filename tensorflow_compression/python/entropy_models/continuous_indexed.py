@@ -120,7 +120,7 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
   the ranges `[0, 10)`, `[0, 10)`, and `[0, 5)`, respectively. Each triple
   would indicate that the element in `bottleneck` corresponding to the other
   dimensions is distributed with a mixture of two logistic distributions, where
-  the components each have one of 10 location parameters between `-5` and `+5`,
+  the components each have one of 10 location parameters between `-5` and `+4`,
   inclusive, unit scale parameters, and one of five different mixture
   weightings.
   """
@@ -130,14 +130,14 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
                index_ranges,
                parameter_fns,
                coding_rank,
-               compression=False,
                channel_axis=-1,
-               dtype=tf.float32,
-               laplace_tail_mass=0.0,
+               compression=False,
+               stateless=False,
                expected_grads=False,
                tail_mass=2**-8,
                range_coder_precision=12,
-               no_variables=False):
+               dtype=tf.float32,
+               laplace_tail_mass=0):
     """Initializes the instance.
 
     Args:
@@ -161,30 +161,30 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       coding_rank: Integer. Number of innermost dimensions considered a coding
         unit. Each coding unit is compressed to its own bit string, and the
         bits in the `__call__` method are summed over each coding unit.
-      compression: Boolean. If set to `True`, the range coding tables used by
-        `compress()` and `decompress()` will be built on instantiation. This
-        assumes eager mode (throws an error if in graph mode or inside a
-        `tf.function` call). If set to `False`, these two methods will not be
-        accessible.
       channel_axis: Integer or `None`. Determines the position of the channel
         axis in `indexes`. Defaults to the last dimension. If set to `None`,
         the index tensor is expected to have the same shape as the bottleneck
         tensor (only allowed when `index_ranges` has length 1).
-      dtype: `tf.dtypes.DType`. The data type of all floating-point
-        computations carried out in this class.
-      laplace_tail_mass: Float. If positive, will augment the prior with a
-        laplace mixture for training stability. (experimental)
+      compression: Boolean. If set to `True`, the range coding tables used by
+        `compress()` and `decompress()` will be built on instantiation. If set
+        to `False`, these two methods will not be accessible.
+      stateless: Boolean. If `False`, range coding tables are created as
+        `Variable`s. This allows the entropy model to be serialized using the
+        `SavedModel` protocol, so that both the encoder and the decoder use
+        identical tables when loading the stored model. If `True`, creates range
+        coding tables as `Tensor`s. This makes the entropy model stateless and
+        allows it to be constructed within a `tf.function` body, for when the
+        range coding tables are provided manually. If `compression=False`, then
+        `stateless=True` is implied and the provided value is ignored.
       expected_grads: If True, will use analytical expected gradients during
         backpropagation w.r.t. additive uniform noise.
       tail_mass: Float. Approximate probability mass which is range encoded with
         less precision, by using a Golomb-like code.
       range_coder_precision: Integer. Precision passed to the range coding op.
-      no_variables: Boolean. If True, creates range coding tables as `Tensor`s
-        rather than `Variable`s.
-
-    Raises:
-      RuntimeError: when attempting to instantiate an entropy model with
-        `compression=True` and not in eager execution mode.
+      dtype: `tf.dtypes.DType`. The data type of all floating-point
+        computations carried out in this class.
+      laplace_tail_mass: Float. If positive, will augment the prior with a
+        laplace mixture for training stability. (experimental)
     """
     if coding_rank <= 0:
       raise ValueError("coding_rank must be larger than 0.")
@@ -207,11 +207,11 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         prior=self._make_range_coding_prior(self.index_ranges, dtype),
         coding_rank=coding_rank,
         compression=compression,
-        laplace_tail_mass=laplace_tail_mass,
+        stateless=stateless,
         expected_grads=expected_grads,
         tail_mass=tail_mass,
         range_coder_precision=range_coder_precision,
-        no_variables=no_variables
+        laplace_tail_mass=laplace_tail_mass,
     )
 
   @property
@@ -278,8 +278,7 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
 
   @tf.Module.with_name_scope
   def __call__(self, bottleneck, indexes, training=True):
-    """Perturbs a tensor with (quantization) noise and estimates bitcost.
-
+    """Perturbs a tensor with (quantization) noise and estimates rate.
 
     Args:
       bottleneck: `tf.Tensor` containing the data to be compressed.
@@ -292,10 +291,10 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         somewhat looser, but differentiable *upper* bound on this quantity.
 
     Returns:
-      A tuple (bottleneck_perturbed, bits),
-      where `bottleneck_perturbed` is `bottleneck` perturbed with (quantization)
-      noise and `bits` is the bitcost with the same shape as `bottleneck`
-      without the `self.coding_rank` innermost dimensions.
+      A tuple (bottleneck_perturbed, bits) where `bottleneck_perturbed` is
+      `bottleneck` perturbed with (quantization) noise and `bits` is the rate.
+      `bits` has the same shape as `bottleneck` without the `self.coding_rank`
+      innermost dimensions.
     """
     indexes = self._normalize_indexes(indexes)
     prior = self._make_prior(indexes)
@@ -449,13 +448,13 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
   def get_config(self):
     """Returns the configuration of the entropy model."""
     raise NotImplementedError(
-        "Serializing indexed entropy models is currently not supported.")
+        "Serializing indexed entropy models is not yet implemented.")
 
   @classmethod
   def from_config(cls, config):
     """Instantiates an entropy model from a configuration dictionary."""
     raise NotImplementedError(
-        "Serializing indexed entropy models is currently not supported.")
+        "Serializing indexed entropy models is not yet implemented.")
 
 
 class LocationScaleIndexedEntropyModel(ContinuousIndexedEntropyModel):
@@ -469,9 +468,18 @@ class LocationScaleIndexedEntropyModel(ContinuousIndexedEntropyModel):
   not for the log-normal distribution).
   """
 
-  def __init__(self, prior_fn, num_scales, scale_fn, coding_rank,
-               compression=False, dtype=tf.float32, tail_mass=2**-8,
-               range_coder_precision=12, no_variables=False):
+  def __init__(self,
+               prior_fn,
+               num_scales,
+               scale_fn,
+               coding_rank,
+               compression=False,
+               stateless=False,
+               expected_grads=False,
+               tail_mass=2**-8,
+               range_coder_precision=12,
+               dtype=tf.float32,
+               laplace_tail_mass=0):
     """Initializes the instance.
 
     Args:
@@ -492,16 +500,25 @@ class LocationScaleIndexedEntropyModel(ContinuousIndexedEntropyModel):
         unit. Each coding unit is compressed to its own bit string, and the
         bits in the `__call__` method are summed over each coding unit.
       compression: Boolean. If set to `True`, the range coding tables used by
-        `compress()` and `decompress()` will be built on instantiation.
-        Otherwise, some computation can be saved, but these two methods will not
-        be accessible.
-      dtype: `tf.dtypes.DType`. The data type of all floating-point
-        computations carried out in this class.
+        `compress()` and `decompress()` will be built on instantiation. If set
+        to `False`, these two methods will not be accessible.
+      stateless: Boolean. If `False`, range coding tables are created as
+        `Variable`s. This allows the entropy model to be serialized using the
+        `SavedModel` protocol, so that both the encoder and the decoder use
+        identical tables when loading the stored model. If `True`, creates range
+        coding tables as `Tensor`s. This makes the entropy model stateless and
+        allows it to be constructed within a `tf.function` body, for when the
+        range coding tables are provided manually. If `compression=False`, then
+        `stateless=True` is implied and the provided value is ignored.
+      expected_grads: If True, will use analytical expected gradients during
+        backpropagation w.r.t. additive uniform noise.
       tail_mass: Float. Approximate probability mass which is range encoded with
         less precision, by using a Golomb-like code.
       range_coder_precision: Integer. Precision passed to the range coding op.
-      no_variables: Boolean. If True, creates range coding tables as `Tensor`s
-        rather than `Variable`s.
+      dtype: `tf.dtypes.DType`. The data type of all floating-point
+        computations carried out in this class.
+      laplace_tail_mass: Float. If positive, will augment the prior with a
+        laplace mixture for training stability. (experimental)
     """
     num_scales = int(num_scales)
     super().__init__(
@@ -512,17 +529,19 @@ class LocationScaleIndexedEntropyModel(ContinuousIndexedEntropyModel):
             scale=scale_fn,
         ),
         coding_rank=coding_rank,
-        compression=compression,
         channel_axis=None,
-        dtype=dtype,
+        compression=compression,
+        stateless=stateless,
+        expected_grads=expected_grads,
         tail_mass=tail_mass,
         range_coder_precision=range_coder_precision,
-        no_variables=no_variables,
+        dtype=dtype,
+        laplace_tail_mass=laplace_tail_mass,
     )
 
   @tf.Module.with_name_scope
   def __call__(self, bottleneck, scale_indexes, loc=None, training=True):
-    """Perturbs a tensor with (quantization) noise and estimates bitcost.
+    """Perturbs a tensor with (quantization) noise and estimates rate.
 
     Args:
       bottleneck: `tf.Tensor` containing the data to be compressed.
@@ -540,8 +559,8 @@ class LocationScaleIndexedEntropyModel(ContinuousIndexedEntropyModel):
 
     Returns:
       A tuple (bottleneck_perturbed, bits) where `bottleneck_perturbed` is
-      `bottleneck` perturbed with (quantization) noise, and `bits` is the
-      bitcost with the same shape as `bottleneck` without the `self.coding_rank`
+      `bottleneck` perturbed with (quantization) noise and `bits` is the rate.
+      `bits` has the same shape as `bottleneck` without the `self.coding_rank`
       innermost dimensions.
     """
     if loc is None:

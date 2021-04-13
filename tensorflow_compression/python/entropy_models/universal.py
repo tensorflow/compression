@@ -54,10 +54,10 @@ def _index_ranges_without_offsets(index_ranges_with_offsets):
 def _range_coding_offsets(num_noise_levels, prior_shape, dtype=tf.float32):
   """Computes the prior offsets for building range coding tables."""
   offset_indexes = tf.range(num_noise_levels, dtype=dtype)
-  offset_indexes = tf.reshape(offset_indexes,
-                              [-1] + [1] * len(prior_shape))
-  offset = _offset_indexes_to_offset(offset_indexes, num_noise_levels,
-                                     dtype)
+  offset_indexes = tf.reshape(
+      offset_indexes, [-1] + [1] * prior_shape.rank)
+  offset = _offset_indexes_to_offset(
+      offset_indexes, num_noise_levels, dtype)
   return offset
 
 
@@ -84,7 +84,7 @@ class UniversalBatchedEntropyModel(
                tail_mass=2**-8,
                range_coder_precision=12,
                num_noise_levels=15,
-               no_variables=False):
+               stateless=False):
     """Initializes the instance.
 
     Args:
@@ -113,8 +113,11 @@ class UniversalBatchedEntropyModel(
       range_coder_precision: Integer. Precision passed to the range coding op.
       num_noise_levels: Integer. The number of levels used to quantize the
         uniform noise.
-      no_variables: Boolean. If True, creates range coding tables as `Tensor`s
-        rather than `Variable`s.
+      stateless: Boolean. If `True`, creates range coding tables as `Tensor`s
+        rather than `Variable`s. This makes the entropy model stateless and
+        allows it to be constructed within a `tf.function` body. If
+        `compression=False`, then `stateless=True` is implied and the provided
+        value is ignored.
 
     Raises:
       RuntimeError: when attempting to instantiate an entropy model with
@@ -132,12 +135,12 @@ class UniversalBatchedEntropyModel(
         expected_grads=expected_grads,
         tail_mass=tail_mass,
         range_coder_precision=range_coder_precision,
-        no_variables=no_variables)
+        stateless=stateless)
 
   @property
   def context_shape(self):
     """See base class."""
-    return [self._num_noise_levels] + [int(s) for s in self.prior.batch_shape]
+    return (self._num_noise_levels,) + self.prior_shape
 
   def _cache_quantization_offset(self):
     """See base class."""
@@ -151,8 +154,7 @@ class UniversalBatchedEntropyModel(
 
   def _compute_indexes_and_offset(self, broadcast_shape):
     """See base class."""
-    # TODO(relational): Switch to math.prod when we switch to Python 3.8
-    prior_size = functools.reduce(lambda x, y: x * y, self.prior_shape, 1)
+    prior_size = int(self.prior_shape.num_elements())
     # Create index for each dimension in prior_shape.
     indexes = tf.range(prior_size, dtype=tf.int32)
     indexes = tf.broadcast_to(
@@ -211,8 +213,7 @@ class UniversalBatchedEntropyModel(
       input_rank = tf.shape(input_shape)[0]
       _, coding_shape = tf.split(
           input_shape, [input_rank - self.coding_rank, self.coding_rank])
-      broadcast_shape = coding_shape[
-          :self.coding_rank - len(self.prior_shape)]
+      broadcast_shape = coding_shape[:self.coding_rank - self.prior_shape.rank]
       _, offset = self._compute_indexes_and_offset(broadcast_shape)
       symbols = tf.round(bottleneck - offset)
       bottleneck_perturbed = symbols + offset
@@ -254,7 +255,7 @@ class UniversalIndexedEntropyModel(
                expected_grads=False,
                tail_mass=2**-8,
                range_coder_precision=12,
-               no_variables=False,
+               stateless=False,
                num_noise_levels=15):
     """Initializes the instance.
 
@@ -292,7 +293,7 @@ class UniversalIndexedEntropyModel(
       tail_mass: Float. Approximate probability mass which is range encoded with
         less precision, by using a Golomb-like code.
       range_coder_precision: Integer. Precision passed to the range coding op.
-      no_variables: Boolean. If True, creates range coding tables as `Tensor`s
+      stateless: Boolean. If True, creates range coding tables as `Tensor`s
         rather than `Variable`s.
       num_noise_levels: Integer. The number of levels used to quantize the
         uniform noise.
@@ -323,13 +324,12 @@ class UniversalIndexedEntropyModel(
         laplace_tail_mass=laplace_tail_mass,
         expected_grads=expected_grads,
         range_coder_precision=range_coder_precision,
-        no_variables=no_variables)
+        stateless=stateless)
 
   @property
   def context_shape(self):
     """See base class."""
-    return tuple([self._num_noise_levels] +
-                 [int(s) for s in self.prior.batch_shape])
+    return (self._num_noise_levels,) + self.prior_shape
 
   @property
   def index_ranges_without_offsets(self):

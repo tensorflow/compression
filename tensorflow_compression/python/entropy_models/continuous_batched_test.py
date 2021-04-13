@@ -31,6 +31,29 @@ class ContinuousBatchedEntropyModelTest(tf.test.TestCase):
     self.assertEqual(em.range_coder_precision, 12)
     self.assertEqual(em.dtype, noisy.dtype)
 
+  def test_can_instantiate_statelessly(self):
+    noisy = uniform_noise.NoisyNormal(loc=.25, scale=1.)
+    em = ContinuousBatchedEntropyModel(
+        noisy, coding_rank=1, compression=True)
+    self.assertEqual(em.compression, True)
+    self.assertEqual(em.stateless, False)
+    self.assertAllEqual(.25, em.quantization_offset)
+    em = ContinuousBatchedEntropyModel(
+        compression=True, stateless=True, coding_rank=1,
+        prior_shape=noisy.batch_shape, dtype=noisy.dtype,
+        cdf=em.cdf, cdf_offset=em.cdf_offset, cdf_length=em.cdf_length,
+        quantization_offset=em.quantization_offset,
+    )
+    self.assertEqual(em.compression, True)
+    self.assertEqual(em.stateless, True)
+    self.assertAllEqual(.25, em.quantization_offset)
+    with self.assertRaises(RuntimeError):
+      em.prior  # pylint:disable=pointless-statement
+    self.assertEqual(em.coding_rank, 1)
+    self.assertEqual(em.tail_mass, 2**-8)
+    self.assertEqual(em.range_coder_precision, 12)
+    self.assertEqual(em.dtype, noisy.dtype)
+
   def test_requires_scalar_distributions(self):
     noisy = uniform_noise.UniformNoiseAdapter(
         tfp.distributions.MultivariateNormalDiag(
@@ -198,6 +221,7 @@ class ContinuousBatchedEntropyModelTest(tf.test.TestCase):
     self.assertAllLessEqual(bitstring_bits, 16)
     # Quantization noise should be between -.5 and .5
     self.assertAllLessEqual(tf.abs(x - x_decoded), 0.5)
+
 
 if __name__ == "__main__":
   tf.test.main()

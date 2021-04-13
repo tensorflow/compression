@@ -40,11 +40,11 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
   A typical workflow looks like this:
 
   - Train a model using an instance of this entropy model as a bottleneck,
-    passing the bottleneck tensor through it. With training=True, the model
+    passing the bottleneck tensor through it. With `training=True`, the model
     computes a differentiable upper bound on the number of bits needed to
     compress the bottleneck tensor.
   - For evaluation, get a closer estimate of the number of compressed bits
-    using training=False`.
+    using `training=False`.
   - Instantiate an entropy model with `compression=True` (and the same
     parameters as during training), and share the model between a sender and a
     receiver.
@@ -53,6 +53,20 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     the string to the receiver, and call `decompress()` there. The output is the
     quantized bottleneck tensor. Continue processing the tensor on the receiving
     side.
+
+  Entropy models which contain range coding tables (i.e. with
+  `compression=True`) can be instantiated in three ways:
+
+  - By providing a continuous "prior" distribution object. The range coding
+    tables are then derived from that continuous distribution.
+  - From a config as returned by `get_config`, followed by a call to
+    `set_weights`. This implements the Keras serialization protocol. In this
+    case, the initializer creates empty state variables for the range coding
+    tables, which are then filled by `set_weights`. As a consequence, this
+    method requires `stateless=False`.
+  - In a more low-level way, by directly providing the range coding tables to
+    `__init__`, for use cases where the Keras protocol can't be used (e.g., when
+    the entropy model must not create variables).
 
   This class assumes that all scalar elements of the encoded tensor are
   statistically independent, and that the parameters of their scalar
@@ -71,14 +85,22 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
   """
 
   def __init__(self,
-               prior,
-               coding_rank,
+               prior=None,
+               coding_rank=None,
                compression=False,
-               laplace_tail_mass=0.0,
+               stateless=False,
                expected_grads=False,
                tail_mass=2**-8,
                range_coder_precision=12,
-               no_variables=False):
+               dtype=None,
+               prior_shape=None,
+               cdf=None,
+               cdf_offset=None,
+               cdf_length=None,
+               cdf_max_length=None,
+               non_integer_offsets=True,
+               quantization_offset=None,
+               laplace_tail_mass=0):
     """Initializes the instance.
 
     Args:
@@ -96,53 +118,97 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       compression: Boolean. If set to `True`, the range coding tables used by
         `compress()` and `decompress()` will be built on instantiation. If set
         to `False`, these two methods will not be accessible.
-      laplace_tail_mass: Float. If positive, will augment the prior with a
-        Laplace mixture for training stability. (experimental)
+      stateless: Boolean. If `False`, range coding tables are created as
+        `Variable`s. This allows the entropy model to be serialized using the
+        `SavedModel` protocol, so that both the encoder and the decoder use
+        identical tables when loading the stored model. If `True`, creates range
+        coding tables as `Tensor`s. This makes the entropy model stateless and
+        allows it to be constructed within a `tf.function` body, for when the
+        range coding tables are provided manually. If `compression=False`, then
+        `stateless=True` is implied and the provided value is ignored.
       expected_grads: If True, will use analytical expected gradients during
         backpropagation w.r.t. additive uniform noise.
       tail_mass: Float. Approximate probability mass which is range encoded with
         less precision, by using a Golomb-like code.
       range_coder_precision: Integer. Precision passed to the range coding op.
-      no_variables: Boolean. If True, creates range coding tables as `Tensor`s
-        rather than `Variable`s.
+      dtype: Data type of prior. Must be provided when `prior` is omitted.
+      prior_shape: Batch shape of the prior (dimensions which are not assumed
+        i.i.d.). Must be provided when `prior` is omitted.
+      cdf: `tf.Tensor` or `None`. When provided, is used for range coding rather
+        than tables built from the prior.
+      cdf_offset: `tf.Tensor` or `None`. Must be provided along with `cdf`.
+      cdf_length: `tf.Tensor` or `None`. Must be provided along with `cdf`.
+      cdf_max_length: Maximum `cdf_length`. When provided, an empty range coding
+        table is created, which can then be restored using `set_weights`.
+        Requires `compression=True` and `stateless=False`.
+      non_integer_offsets: Boolean. Whether to quantize to non-integer offsets
+        heuristically determined from mode/median of prior. Set to `False` when
+        using soft quantization during training.
+      quantization_offset: `tf.Tensor` or `None`. If `cdf` is provided and
+        `non_integer_offsets=True`, must be provided.
+      laplace_tail_mass: Float. If positive, will augment the prior with a
+        Laplace mixture for training stability. (experimental)
 
     Raises:
       RuntimeError: when attempting to instantiate an entropy model with
         `compression=True` and not in eager execution mode.
     """
-    if coding_rank < prior.batch_shape.rank:
-      raise ValueError(
-          "`coding_rank` can't be smaller than batch rank of prior.")
     super().__init__(
         prior=prior,
         coding_rank=coding_rank,
         compression=compression,
-        laplace_tail_mass=laplace_tail_mass,
+        stateless=stateless,
         expected_grads=expected_grads,
         tail_mass=tail_mass,
         range_coder_precision=range_coder_precision,
-        no_variables=no_variables,
+        dtype=dtype,
+        prior_shape=prior_shape,
+        cdf=cdf,
+        cdf_offset=cdf_offset,
+        cdf_length=cdf_length,
+        cdf_max_length=cdf_max_length,
+        laplace_tail_mass=laplace_tail_mass,
     )
-    self._cache_quantization_offset()
+    self._non_integer_offsets = bool(non_integer_offsets)
+    if self.coding_rank < self.prior_shape.rank:
+      raise ValueError("`coding_rank` can't be smaller than `prior_shape`.")
 
-  def _cache_quantization_offset(self):
-    """Comptue quantization offset from prior and cache it."""
-    quantization_offset = helpers.quantization_offset(self.prior)
-    # Optimization: if the quantization offset is zero, we don't need to
-    # subtract/add it when quantizing, and we don't need to serialize its value.
-    # Note that this code will only work in eager mode.
-    # TODO(jonycgn): Reconsider if this optimization is worth keeping once the
-    # implementation is stable.
-    if tf.executing_eagerly() and tf.reduce_all(
-        tf.equal(quantization_offset, 0.)):
-      quantization_offset = None
-    else:
-      quantization_offset = tf.broadcast_to(
-          quantization_offset, self.prior_shape_tensor)
-      if self.compression and not self.no_variables:
-        quantization_offset = tf.Variable(
-            quantization_offset, trainable=False, name="quantization_offset")
-    self._quantization_offset = quantization_offset
+    with self.name_scope:
+      if not self.non_integer_offsets:
+        quantization_offset = None
+      elif prior is not None:
+        quantization_offset = helpers.quantization_offset(self.prior)
+        # Optimization: if the quantization offset is zero, we don't need to
+        # subtract/add it when quantizing, and we don't need to serialize its
+        # value. Note that this code will only work in eager mode.
+        if (tf.executing_eagerly() and
+            tf.reduce_all(tf.equal(quantization_offset, 0.))):
+          quantization_offset = None
+        else:
+          quantization_offset = tf.broadcast_to(
+              quantization_offset, self.prior_shape_tensor)
+      elif cdf_max_length is not None:
+        quantization_offset = tf.zeros(
+            self.prior_shape_tensor, dtype=self.dtype)
+      else:
+        assert cdf is not None
+        if quantization_offset is None:
+          raise ValueError(
+              "When providing `cdf` and `non_integer_offsets=True`, must also "
+              "provide `quantization_offset`.")
+      if quantization_offset is None:
+        self._quantization_offset = None
+      elif self.compression and not self.stateless:
+        self._quantization_offset = tf.Variable(
+            quantization_offset, dtype=self.dtype, trainable=False,
+            name="quantization_offset")
+      else:
+        self._quantization_offset = tf.convert_to_tensor(
+            quantization_offset, dtype=self.dtype, name="quantization_offset")
+
+  @property
+  def non_integer_offsets(self):
+    return self._non_integer_offsets
 
   @property
   def quantization_offset(self):
@@ -162,7 +228,7 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
 
   @tf.Module.with_name_scope
   def __call__(self, bottleneck, training=True):
-    """Perturbs a tensor with (quantization) noise and estimates bitcost.
+    """Perturbs a tensor with (quantization) noise and estimates rate.
 
     Args:
       bottleneck: `tf.Tensor` containing the data to be compressed. Must have at
@@ -176,14 +242,14 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
 
     Returns:
       A tuple (bottleneck_perturbed, bits) where `bottleneck_perturbed` is
-      `bottleneck` perturbed with (quantization) noise, and `bits` is the
-      bitcost with the same shape as `bottleneck` without the `self.coding_rank`
+      `bottleneck` perturbed with (quantization) noise, and `bits` is the rate.
+      `bits` has the same shape as `bottleneck` without the `self.coding_rank`
       innermost dimensions.
     """
     log_prob_fn = functools.partial(self._log_prob_from_prior, self.prior)
     if training:
       log_probs, bottleneck_perturbed = math_ops.perturb_and_apply(
-          log_prob_fn, bottleneck, expected_grads=self._expected_grads)
+          log_prob_fn, bottleneck, expected_grads=self.expected_grads)
     else:
       bottleneck_perturbed = self.quantize(bottleneck)
       log_probs = log_prob_fn(bottleneck_perturbed)
@@ -195,13 +261,12 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
 
   @tf.Module.with_name_scope
   def quantize(self, bottleneck):
-    """Quantizes a floating-point tensor.
+    """Quantizes a floating-point bottleneck tensor.
 
-    To use this entropy model as an information bottleneck during training, pass
-    a tensor through this function. The tensor is rounded to integer values
-    shifted by an offset, which depends on `self.prior`. For instance, for a
-    Gaussian distribution, the returned values are rounded to the location of
-    the mode of the distribution plus or minus an integer.
+    The tensor is rounded to integer values potentially shifted by offsets (if
+    `self.non_integer_offsets==True`). These offsets depend on `self.prior`. For
+    instance, for a Gaussian distribution, the returned values would be rounded
+    to the location of the mode of the distribution plus or minus an integer.
 
     The gradient of this rounding operation is overridden with the identity
     (straight-through gradient estimator).
@@ -220,9 +285,9 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     """Compresses a floating-point tensor.
 
     Compresses the tensor to bit strings. `bottleneck` is first quantized
-    as in `quantize()`, and then compressed using the probability tables derived
-    from `self.prior`. The quantized tensor can later be recovered by
-    calling `decompress()`.
+    as in `quantize()`, and then compressed using the probability tables in
+    `self.cdf` derived from `self.prior`. The quantized tensor can later be
+    recovered by calling `decompress()`.
 
     The innermost `self.coding_rank` dimensions are treated as one coding unit,
     i.e. are compressed into one string each. Any additional dimensions to the
@@ -266,8 +331,7 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       strings = tf.map_fn(
           loop_body, symbols, dtype=tf.string, name="compress")
 
-    strings = tf.reshape(strings, batch_shape)
-    return strings
+    return tf.reshape(strings, batch_shape)
 
   @tf.Module.with_name_scope
   def decompress(self, strings, broadcast_shape):
@@ -319,35 +383,9 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
 
     Returns:
       A JSON-serializable Python dict.
-
-    Raises:
-      NotImplementedError: on attempting to call this method on an entropy model
-        with `compression=False`.
     """
     config = super().get_config()
     config.update(
-        quantization_offset=self._quantization_offset is not None,
+        non_integer_offsets=self.quantization_offset is not None,
     )
     return config
-
-  @classmethod
-  def from_config(cls, config):
-    """Instantiates an entropy model from a configuration dictionary.
-
-    Args:
-      config: A `dict`, typically the output of `get_config`.
-
-    Returns:
-      An entropy model.
-    """
-    self = super().from_config(config)
-    with self.name_scope:
-      # pylint:disable=protected-access
-      if config["quantization_offset"]:
-        zeros = tf.zeros(self.prior_shape_tensor, dtype=self.dtype)
-        self._quantization_offset = tf.Variable(
-            zeros, name="quantization_offset")
-      else:
-        self._quantization_offset = None
-      # pylint:enable=protected-access
-    return self
