@@ -33,8 +33,8 @@ class PaddingOpsTest(tf.test.TestCase):
             tf.reshape(kernel, (1, -1, 1, 1)),
             padding="VALID", data_format="NHWC")
         outputs = np.squeeze(outputs.numpy())
-        pos_inp = np.squeeze(np.nonzero(inputs))
-        pos_out = np.squeeze(np.nonzero(outputs))
+        pos_inp = np.squeeze(np.nonzero(inputs > .5))
+        pos_out = np.squeeze(np.nonzero(outputs > .5))
         padding = padding_ops.same_padding_for_kernel(kshape, True)
         self.assertEqual(padding[0][0], pos_inp - pos_out)
 
@@ -52,8 +52,8 @@ class PaddingOpsTest(tf.test.TestCase):
             strides=(1, 1, 1, 1), padding="VALID", data_format="NHWC")
         outputs = outputs[:, :, (kshape[0] - 1):-(kshape[0] - 1), :]
         outputs = np.squeeze(outputs.numpy())
-        pos_inp = np.squeeze(np.nonzero(inputs))
-        pos_out = np.squeeze(np.nonzero(outputs))
+        pos_inp = np.squeeze(np.nonzero(inputs > .5))
+        pos_out = np.squeeze(np.nonzero(outputs > .5))
         padding = padding_ops.same_padding_for_kernel(kshape, False)
         self.assertEqual(padding[0][0], pos_inp - pos_out)
 
