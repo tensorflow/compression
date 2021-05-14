@@ -28,7 +28,7 @@ class Y4MDatasetTest(tf.test.TestCase):
   def setUp(self):
     super().setUp()
     self.tempfile_1 = self.create_tempfile(
-        content=b"YUV4MPEG2 W2 H2 F30:1 Ip A0:0 C420jpeg\nFRAME\nABCDEF")
+        content=b"YUV4MPEG2 W4 H2 F30:1 Ip A0:0 C420jpeg\nFRAME\nABCDEFGHIJKL")
     self.tempfile_2 = self.create_tempfile(
         content=b"YUV4MPEG2 C444 W1 H1\nFRAME\nabcFRAME\ndef")
 
@@ -40,8 +40,10 @@ class Y4MDatasetTest(tf.test.TestCase):
     y, cbcr = next(it)
     self.assertEqual(tf.uint8, y.dtype)
     self.assertEqual(tf.uint8, cbcr.dtype)
-    self.assertAllEqual(shaped_uint8(b"ABCD", (2, 2, 1)), y)
-    self.assertAllEqual(shaped_uint8(b"EF", (1, 1, 2)), cbcr)
+    cb, cr = tf.unstack(cbcr, axis=-1)
+    self.assertAllEqual(shaped_uint8(b"ABCDEFGH", (2, 4, 1)), y)
+    self.assertAllEqual(shaped_uint8(b"IJ", (1, 2)), cb)
+    self.assertAllEqual(shaped_uint8(b"KL", (1, 2)), cr)
 
     y, cbcr = next(it)
     self.assertEqual(tf.uint8, y.dtype)

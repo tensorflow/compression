@@ -132,6 +132,7 @@ class Y4MDatasetOp : public DatasetOpKernel {
               cbcr_width /= 2;
               cbcr_height /= 2;
             }
+            const size_t cbcr_size = cbcr_width * cbcr_height;
 
             // This is a no-op for the second and subsequent frames.
             buffer_.resize(frame_header.size() + frame_size);
@@ -159,8 +160,10 @@ class Y4MDatasetOp : public DatasetOpKernel {
               auto flat_cbcr = cbcr_tensor.flat<uint8>();
               std::memcpy(flat_y.data(), frame_buffer.data(), flat_y.size());
               frame_buffer.remove_prefix(flat_y.size());
-              std::memcpy(flat_cbcr.data(), frame_buffer.data(),
-                          flat_cbcr.size());
+              for (int i = 0; i < cbcr_size; i++) {
+                flat_cbcr.data()[2*i] = frame_buffer[i];
+                flat_cbcr.data()[2*i+1] = frame_buffer[cbcr_size+i];
+              }
               out_tensors->push_back(std::move(y_tensor));
               out_tensors->push_back(std::move(cbcr_tensor));
 
