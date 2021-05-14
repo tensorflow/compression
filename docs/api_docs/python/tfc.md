@@ -90,11 +90,11 @@ Data compression in TensorFlow.
 
 [`class UniversalIndexedEntropyModel`](./tfc/UniversalIndexedEntropyModel.md): Indexed entropy model model which implements Universal Quantization.
 
+[`class Y4MDataset`](./tfc/Y4MDataset.md): A `tf.Dataset` of Y'CbCr video frames from '.y4m' files.
+
 ## Functions
 
 [`estimate_tails(...)`](./tfc/estimate_tails.md): Estimates approximate tail quantiles.
-
-[`irdft_matrix(...)`](./tfc/irdft_matrix.md): Matrix for implementing kernel reparameterization with `tf.matmul`.
 
 [`lower_bound(...)`](./tfc/lower_bound.md): Same as `tf.maximum`, but with helpful gradient for `inputs < bound`.
 

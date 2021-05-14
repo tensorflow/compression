@@ -21,7 +21,7 @@ description: Indexed entropy model model which implements Universal Quantization
 
 <table class="tfo-notebook-buttons tfo-api nocontent" align="left">
 <td>
-  <a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/universal.py#L231-L441">
+  <a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/universal.py#L232-L441">
     <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
     View source on GitHub
   </a>
@@ -38,7 +38,7 @@ Inherits From: [`ContinuousIndexedEntropyModel`](../tfc/ContinuousIndexedEntropy
 <code>tfc.UniversalIndexedEntropyModel(
     prior_fn, index_ranges, parameter_fns, coding_rank, compression=False,
     dtype=tf.float32, laplace_tail_mass=0.0, expected_grads=False, tail_mass=(2 **
-    -8), range_coder_precision=12, no_variables=False, num_noise_levels=15
+    -8), range_coder_precision=12, stateless=False, num_noise_levels=15
 )
 </code></pre>
 
@@ -155,7 +155,7 @@ Integer. Precision passed to the range coding op.
 </td>
 </tr><tr>
 <td>
-`no_variables`
+`stateless`
 </td>
 <td>
 Boolean. If True, creates range coding tables as `Tensor`s
@@ -264,6 +264,13 @@ Data type of this entropy model.
 </td>
 </tr><tr>
 <td>
+`expected_grads`
+</td>
+<td>
+Whether to use analytical expected gradients during backpropagation.
+</td>
+</tr><tr>
+<td>
 `index_ranges`
 </td>
 <td>
@@ -275,6 +282,13 @@ Upper bound(s) on values allowed in `indexes` tensor.
 </td>
 <td>
 Upper bound(s) on values allowed in `indexes` , excluding offsets.
+</td>
+</tr><tr>
+<td>
+`laplace_tail_mass`
+</td>
+<td>
+Whether to augment the prior with a Laplace mixture.
 </td>
 </tr><tr>
 <td>
@@ -292,13 +306,6 @@ parent module names.
 </td>
 <td>
 Returns a `tf.name_scope` instance for this class.
-</td>
-</tr><tr>
-<td>
-`no_variables`
-</td>
-<td>
-Whether range coding tables are created as `Tensor`s or `Variable`s.
 </td>
 </tr><tr>
 <td>
@@ -323,7 +330,7 @@ Functions mapping `indexes` to each distribution parameter.
 `prior`
 </td>
 <td>
-Prior distribution, used for range coding.
+Prior distribution, used for deriving range coding tables.
 </td>
 </tr><tr>
 <td>
@@ -352,6 +359,13 @@ Batch shape of `prior` as a `Tensor`.
 </td>
 <td>
 Precision passed to range coding op.
+</td>
+</tr><tr>
+<td>
+`stateless`
+</td>
+<td>
+Whether range coding tables are created as `Tensor`s or `Variable`s.
 </td>
 </tr><tr>
 <td>
@@ -441,7 +455,7 @@ See base class.
 
 <h3 id="from_config"><code>from_config</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_indexed.py#L454-L458">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_indexed.py#L453-L457">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>@classmethod</code>
@@ -466,7 +480,7 @@ Returns the configuration of the entropy model.
 
 <h3 id="get_weights"><code>get_weights</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_base.py#L385-L386">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_base.py#L410-L411">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>get_weights()
@@ -490,7 +504,7 @@ Returns the configuration of the entropy model.
 
 <h3 id="set_weights"><code>set_weights</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_base.py#L388-L393">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_base.py#L413-L418">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>set_weights(

@@ -21,7 +21,7 @@ description: Indexed entropy model for location-scale family of random variables
 
 <table class="tfo-notebook-buttons tfo-api nocontent" align="left">
 <td>
-  <a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_indexed.py#L461-L637">
+  <a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_indexed.py#L460-L656">
     <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
     View source on GitHub
   </a>
@@ -36,9 +36,9 @@ Inherits From: [`ContinuousIndexedEntropyModel`](../tfc/ContinuousIndexedEntropy
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>tfc.LocationScaleIndexedEntropyModel(
-    prior_fn, num_scales, scale_fn, coding_rank, compression=False,
-    dtype=tf.float32, tail_mass=(2 ** -8), range_coder_precision=12,
-    no_variables=False
+    prior_fn, num_scales, scale_fn, coding_rank, compression=False, stateless=False,
+    expected_grads=False, tail_mass=(2 ** -8), range_coder_precision=12,
+    dtype=tf.float32, laplace_tail_mass=0
 )
 </code></pre>
 
@@ -104,17 +104,30 @@ bits in the `__call__` method are summed over each coding unit.
 </td>
 <td>
 Boolean. If set to `True`, the range coding tables used by
-`compress()` and `decompress()` will be built on instantiation.
-Otherwise, some computation can be saved, but these two methods will not
-be accessible.
+`compress()` and `decompress()` will be built on instantiation. If set
+to `False`, these two methods will not be accessible.
 </td>
 </tr><tr>
 <td>
-`dtype`
+`stateless`
 </td>
 <td>
-`tf.dtypes.DType`. The data type of all floating-point
-computations carried out in this class.
+Boolean. If `False`, range coding tables are created as
+`Variable`s. This allows the entropy model to be serialized using the
+`SavedModel` protocol, so that both the encoder and the decoder use
+identical tables when loading the stored model. If `True`, creates range
+coding tables as `Tensor`s. This makes the entropy model stateless and
+allows it to be constructed within a `tf.function` body, for when the
+range coding tables are provided manually. If `compression=False`, then
+`stateless=True` is implied and the provided value is ignored.
+</td>
+</tr><tr>
+<td>
+`expected_grads`
+</td>
+<td>
+If True, will use analytical expected gradients during
+backpropagation w.r.t. additive uniform noise.
 </td>
 </tr><tr>
 <td>
@@ -133,11 +146,19 @@ Integer. Precision passed to the range coding op.
 </td>
 </tr><tr>
 <td>
-`no_variables`
+`dtype`
 </td>
 <td>
-Boolean. If True, creates range coding tables as `Tensor`s
-rather than `Variable`s.
+`tf.dtypes.DType`. The data type of all floating-point
+computations carried out in this class.
+</td>
+</tr><tr>
+<td>
+`laplace_tail_mass`
+</td>
+<td>
+Float. If positive, will augment the prior with a
+laplace mixture for training stability. (experimental)
 </td>
 </tr>
 </table>
@@ -220,10 +241,24 @@ Data type of this entropy model.
 </td>
 </tr><tr>
 <td>
+`expected_grads`
+</td>
+<td>
+Whether to use analytical expected gradients during backpropagation.
+</td>
+</tr><tr>
+<td>
 `index_ranges`
 </td>
 <td>
 Upper bound(s) on values allowed in `indexes` tensor.
+</td>
+</tr><tr>
+<td>
+`laplace_tail_mass`
+</td>
+<td>
+Whether to augment the prior with a Laplace mixture.
 </td>
 </tr><tr>
 <td>
@@ -241,13 +276,6 @@ parent module names.
 </td>
 <td>
 Returns a `tf.name_scope` instance for this class.
-</td>
-</tr><tr>
-<td>
-`no_variables`
-</td>
-<td>
-Whether range coding tables are created as `Tensor`s or `Variable`s.
 </td>
 </tr><tr>
 <td>
@@ -272,7 +300,7 @@ Functions mapping `indexes` to each distribution parameter.
 `prior`
 </td>
 <td>
-Prior distribution, used for range coding.
+Prior distribution, used for deriving range coding tables.
 </td>
 </tr><tr>
 <td>
@@ -301,6 +329,13 @@ Batch shape of `prior` as a `Tensor`.
 </td>
 <td>
 Precision passed to range coding op.
+</td>
+</tr><tr>
+<td>
+`stateless`
+</td>
+<td>
+Whether range coding tables are created as `Tensor`s or `Variable`s.
 </td>
 </tr><tr>
 <td>
@@ -364,7 +399,7 @@ of calling this method if you don't expect the return value to change.
 
 <h3 id="compress"><code>compress</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_indexed.py#L585-L614">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_indexed.py#L604-L633">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>compress(
@@ -436,7 +471,7 @@ coding unit.
 
 <h3 id="decompress"><code>decompress</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_indexed.py#L616-L637">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_indexed.py#L635-L656">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>decompress(
@@ -499,7 +534,7 @@ A `tf.Tensor` of the same shape as `scale_indexes`.
 
 <h3 id="from_config"><code>from_config</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_indexed.py#L454-L458">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_indexed.py#L453-L457">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>@classmethod</code>
@@ -513,7 +548,7 @@ Instantiates an entropy model from a configuration dictionary.
 
 <h3 id="get_config"><code>get_config</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_indexed.py#L449-L452">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_indexed.py#L448-L451">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>get_config()
@@ -524,7 +559,7 @@ Returns the configuration of the entropy model.
 
 <h3 id="get_weights"><code>get_weights</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_base.py#L385-L386">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_base.py#L410-L411">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>get_weights()
@@ -535,7 +570,7 @@ Returns the configuration of the entropy model.
 
 <h3 id="quantize"><code>quantize</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_indexed.py#L555-L583">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_indexed.py#L574-L602">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>quantize(
@@ -605,7 +640,7 @@ A `tf.Tensor` containing the quantized values.
 
 <h3 id="set_weights"><code>set_weights</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_base.py#L388-L393">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_base.py#L413-L418">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>set_weights(
@@ -681,7 +716,7 @@ The original method wrapped such that it enters the module's name scope.
 
 <h3 id="__call__"><code>__call__</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_indexed.py#L523-L553">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_indexed.py#L542-L572">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>__call__(
@@ -689,7 +724,7 @@ The original method wrapped such that it enters the module's name scope.
 )
 </code></pre>
 
-Perturbs a tensor with (quantization) noise and estimates bitcost.
+Perturbs a tensor with (quantization) noise and estimates rate.
 
 
 <!-- Tabular view -->
@@ -745,8 +780,8 @@ somewhat looser, but differentiable *upper* bound on this quantity.
 <tr class="alt">
 <td colspan="2">
 A tuple (bottleneck_perturbed, bits) where `bottleneck_perturbed` is
-`bottleneck` perturbed with (quantization) noise, and `bits` is the
-bitcost with the same shape as `bottleneck` without the `self.coding_rank`
+`bottleneck` perturbed with (quantization) noise and `bits` is the rate.
+`bits` has the same shape as `bottleneck` without the `self.coding_rank`
 innermost dimensions.
 </td>
 </tr>

@@ -7,7 +7,6 @@ description: Batched entropy model for continuous random variables.
 <meta itemprop="property" content="__init__"/>
 <meta itemprop="property" content="compress"/>
 <meta itemprop="property" content="decompress"/>
-<meta itemprop="property" content="from_config"/>
 <meta itemprop="property" content="get_config"/>
 <meta itemprop="property" content="get_weights"/>
 <meta itemprop="property" content="quantize"/>
@@ -21,7 +20,7 @@ description: Batched entropy model for continuous random variables.
 
 <table class="tfo-notebook-buttons tfo-api nocontent" align="left">
 <td>
-  <a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_batched.py#L31-L353">
+  <a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_batched.py#L31-L391">
     <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
     View source on GitHub
   </a>
@@ -34,9 +33,11 @@ Batched entropy model for continuous random variables.
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>tfc.ContinuousBatchedEntropyModel(
-    prior, coding_rank, compression=False, laplace_tail_mass=0.0,
-    expected_grads=False, tail_mass=(2 ** -8), range_coder_precision=12,
-    no_variables=False
+    prior=None, coding_rank=None, compression=False, stateless=False,
+    expected_grads=False, tail_mass=(2 ** -8), range_coder_precision=12, dtype=None,
+    prior_shape=None, cdf=None, cdf_offset=None, cdf_length=None,
+    cdf_max_length=None, non_integer_offsets=True, quantization_offset=None,
+    laplace_tail_mass=0
 )
 </code></pre>
 
@@ -53,11 +54,11 @@ bottleneck tensors reliably across different platforms.
 A typical workflow looks like this:
 
 - Train a model using an instance of this entropy model as a bottleneck,
-  passing the bottleneck tensor through it. With training=True, the model
+  passing the bottleneck tensor through it. With `training=True`, the model
   computes a differentiable upper bound on the number of bits needed to
   compress the bottleneck tensor.
 - For evaluation, get a closer estimate of the number of compressed bits
-  using training=False`.
+  using `training=False`.
 - Instantiate an entropy model with `compression=True` (and the same
   parameters as during training), and share the model between a sender and a
   receiver.
@@ -66,6 +67,20 @@ A typical workflow looks like this:
   the string to the receiver, and call `decompress()` there. The output is the
   quantized bottleneck tensor. Continue processing the tensor on the receiving
   side.
+
+Entropy models which contain range coding tables (i.e. with
+`compression=True`) can be instantiated in three ways:
+
+- By providing a continuous "prior" distribution object. The range coding
+  tables are then derived from that continuous distribution.
+- From a config as returned by `get_config`, followed by a call to
+  `set_weights`. This implements the Keras serialization protocol. In this
+  case, the initializer creates empty state variables for the range coding
+  tables, which are then filled by `set_weights`. As a consequence, this
+  method requires `stateless=False`.
+- In a more low-level way, by directly providing the range coding tables to
+  `__init__`, for use cases where the Keras protocol can't be used (e.g., when
+  the entropy model must not create variables).
 
 This class assumes that all scalar elements of the encoded tensor are
 statistically independent, and that the parameters of their scalar
@@ -121,11 +136,17 @@ to `False`, these two methods will not be accessible.
 </td>
 </tr><tr>
 <td>
-`laplace_tail_mass`
+`stateless`
 </td>
 <td>
-Float. If positive, will augment the prior with a
-Laplace mixture for training stability. (experimental)
+Boolean. If `False`, range coding tables are created as
+`Variable`s. This allows the entropy model to be serialized using the
+`SavedModel` protocol, so that both the encoder and the decoder use
+identical tables when loading the stored model. If `True`, creates range
+coding tables as `Tensor`s. This makes the entropy model stateless and
+allows it to be constructed within a `tf.function` body, for when the
+range coding tables are provided manually. If `compression=False`, then
+`stateless=True` is implied and the provided value is ignored.
 </td>
 </tr><tr>
 <td>
@@ -152,11 +173,74 @@ Integer. Precision passed to the range coding op.
 </td>
 </tr><tr>
 <td>
-`no_variables`
+`dtype`
 </td>
 <td>
-Boolean. If True, creates range coding tables as `Tensor`s
-rather than `Variable`s.
+Data type of prior. Must be provided when `prior` is omitted.
+</td>
+</tr><tr>
+<td>
+`prior_shape`
+</td>
+<td>
+Batch shape of the prior (dimensions which are not assumed
+i.i.d.). Must be provided when `prior` is omitted.
+</td>
+</tr><tr>
+<td>
+`cdf`
+</td>
+<td>
+`tf.Tensor` or `None`. When provided, is used for range coding rather
+than tables built from the prior.
+</td>
+</tr><tr>
+<td>
+`cdf_offset`
+</td>
+<td>
+`tf.Tensor` or `None`. Must be provided along with `cdf`.
+</td>
+</tr><tr>
+<td>
+`cdf_length`
+</td>
+<td>
+`tf.Tensor` or `None`. Must be provided along with `cdf`.
+</td>
+</tr><tr>
+<td>
+`cdf_max_length`
+</td>
+<td>
+Maximum `cdf_length`. When provided, an empty range coding
+table is created, which can then be restored using `set_weights`.
+Requires `compression=True` and `stateless=False`.
+</td>
+</tr><tr>
+<td>
+`non_integer_offsets`
+</td>
+<td>
+Boolean. Whether to quantize to non-integer offsets
+heuristically determined from mode/median of prior. Set to `False` when
+using soft quantization during training.
+</td>
+</tr><tr>
+<td>
+`quantization_offset`
+</td>
+<td>
+`tf.Tensor` or `None`. If `cdf` is provided and
+`non_integer_offsets=True`, must be provided.
+</td>
+</tr><tr>
+<td>
+`laplace_tail_mass`
+</td>
+<td>
+Float. If positive, will augment the prior with a
+Laplace mixture for training stability. (experimental)
 </td>
 </tr>
 </table>
@@ -250,6 +334,20 @@ Data type of this entropy model.
 </td>
 </tr><tr>
 <td>
+`expected_grads`
+</td>
+<td>
+Whether to use analytical expected gradients during backpropagation.
+</td>
+</tr><tr>
+<td>
+`laplace_tail_mass`
+</td>
+<td>
+Whether to augment the prior with a Laplace mixture.
+</td>
+</tr><tr>
+<td>
 `name`
 </td>
 <td>
@@ -267,10 +365,10 @@ Returns a `tf.name_scope` instance for this class.
 </td>
 </tr><tr>
 <td>
-`no_variables`
+`non_integer_offsets`
 </td>
 <td>
-Whether range coding tables are created as `Tensor`s or `Variable`s.
+
 </td>
 </tr><tr>
 <td>
@@ -288,7 +386,7 @@ of calling this method if you don't expect the return value to change.
 `prior`
 </td>
 <td>
-Prior distribution, used for range coding.
+Prior distribution, used for deriving range coding tables.
 </td>
 </tr><tr>
 <td>
@@ -317,6 +415,13 @@ Batch shape of `prior` as a `Tensor`.
 </td>
 <td>
 Precision passed to range coding op.
+</td>
+</tr><tr>
+<td>
+`stateless`
+</td>
+<td>
+Whether range coding tables are created as `Tensor`s or `Variable`s.
 </td>
 </tr><tr>
 <td>
@@ -380,7 +485,7 @@ of calling this method if you don't expect the return value to change.
 
 <h3 id="compress"><code>compress</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_batched.py#L218-L270">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_batched.py#L283-L334">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>compress(
@@ -391,9 +496,9 @@ of calling this method if you don't expect the return value to change.
 Compresses a floating-point tensor.
 
 Compresses the tensor to bit strings. `bottleneck` is first quantized
-as in `quantize()`, and then compressed using the probability tables derived
-from `self.prior`. The quantized tensor can later be recovered by
-calling `decompress()`.
+as in `quantize()`, and then compressed using the probability tables in
+`self.cdf` derived from `self.prior`. The quantized tensor can later be
+recovered by calling `decompress()`.
 
 The innermost `self.coding_rank` dimensions are treated as one coding unit,
 i.e. are compressed into one string each. Any additional dimensions to the
@@ -436,7 +541,7 @@ coding unit.
 
 <h3 id="decompress"><code>decompress</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_batched.py#L272-L315">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_batched.py#L336-L379">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>decompress(
@@ -490,54 +595,9 @@ self.prior_shape`.
 
 
 
-<h3 id="from_config"><code>from_config</code></h3>
-
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_batched.py#L333-L353">View source</a>
-
-<pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
-<code>@classmethod</code>
-<code>from_config(
-    config
-)
-</code></pre>
-
-Instantiates an entropy model from a configuration dictionary.
-
-
-<!-- Tabular view -->
- <table class="responsive fixed orange">
-<colgroup><col width="214px"><col></colgroup>
-<tr><th colspan="2">Args</th></tr>
-
-<tr>
-<td>
-`config`
-</td>
-<td>
-A `dict`, typically the output of `get_config`.
-</td>
-</tr>
-</table>
-
-
-
-<!-- Tabular view -->
- <table class="responsive fixed orange">
-<colgroup><col width="214px"><col></colgroup>
-<tr><th colspan="2">Returns</th></tr>
-<tr class="alt">
-<td colspan="2">
-An entropy model.
-</td>
-</tr>
-
-</table>
-
-
-
 <h3 id="get_config"><code>get_config</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_batched.py#L317-L331">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_batched.py#L381-L391">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>get_config()
@@ -560,27 +620,9 @@ A JSON-serializable Python dict.
 
 
 
-<!-- Tabular view -->
- <table class="responsive fixed orange">
-<colgroup><col width="214px"><col></colgroup>
-<tr><th colspan="2">Raises</th></tr>
-
-<tr>
-<td>
-`NotImplementedError`
-</td>
-<td>
-on attempting to call this method on an entropy model
-with `compression=False`.
-</td>
-</tr>
-</table>
-
-
-
 <h3 id="get_weights"><code>get_weights</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_base.py#L385-L386">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_base.py#L410-L411">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>get_weights()
@@ -591,7 +633,7 @@ with `compression=False`.
 
 <h3 id="quantize"><code>quantize</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_batched.py#L196-L216">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_batched.py#L262-L281">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>quantize(
@@ -599,13 +641,12 @@ with `compression=False`.
 )
 </code></pre>
 
-Quantizes a floating-point tensor.
+Quantizes a floating-point bottleneck tensor.
 
-To use this entropy model as an information bottleneck during training, pass
-a tensor through this function. The tensor is rounded to integer values
-shifted by an offset, which depends on `self.prior`. For instance, for a
-Gaussian distribution, the returned values are rounded to the location of
-the mode of the distribution plus or minus an integer.
+The tensor is rounded to integer values potentially shifted by offsets (if
+`self.non_integer_offsets==True`). These offsets depend on `self.prior`. For
+instance, for a Gaussian distribution, the returned values would be rounded
+to the location of the mode of the distribution plus or minus an integer.
 
 The gradient of this rounding operation is overridden with the identity
 (straight-through gradient estimator).
@@ -644,7 +685,7 @@ A `tf.Tensor` containing the quantized values.
 
 <h3 id="set_weights"><code>set_weights</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_base.py#L388-L393">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_base.py#L413-L418">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>set_weights(
@@ -720,7 +761,7 @@ The original method wrapped such that it enters the module's name scope.
 
 <h3 id="__call__"><code>__call__</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_batched.py#L163-L194">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_batched.py#L229-L260">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>__call__(
@@ -728,7 +769,7 @@ The original method wrapped such that it enters the module's name scope.
 )
 </code></pre>
 
-Perturbs a tensor with (quantization) noise and estimates bitcost.
+Perturbs a tensor with (quantization) noise and estimates rate.
 
 
 <!-- Tabular view -->
@@ -768,8 +809,8 @@ looser, but differentiable *upper* bound on this quantity.
 <tr class="alt">
 <td colspan="2">
 A tuple (bottleneck_perturbed, bits) where `bottleneck_perturbed` is
-`bottleneck` perturbed with (quantization) noise, and `bits` is the
-bitcost with the same shape as `bottleneck` without the `self.coding_rank`
+`bottleneck` perturbed with (quantization) noise, and `bits` is the rate.
+`bits` has the same shape as `bottleneck` without the `self.coding_rank`
 innermost dimensions.
 </td>
 </tr>

@@ -17,7 +17,7 @@ description: RDFT reparameterization of a convolution kernel.
 
 <table class="tfo-notebook-buttons tfo-api nocontent" align="left">
 <td>
-  <a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/parameters.py#L71-L143">
+  <a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/parameters.py#L70-L165">
     <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
     View source on GitHub
   </a>
@@ -32,7 +32,7 @@ Inherits From: [`Parameter`](../tfc/Parameter.md)
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>tfc.RDFTParameter(
-    initial_value, name=None, dc=True, shape=None, dtype=None
+    initial_value, name=None, shape=None, dtype=None
 )
 </code></pre>
 
@@ -69,14 +69,6 @@ String. The name of the kernel.
 </td>
 </tr><tr>
 <td>
-`dc`
-</td>
-<td>
-Boolean. If `False`, the DC component of the kernel RDFTs is not
-represented, forcing the filters to be highpass. Defaults to `True`.
-</td>
-</tr><tr>
-<td>
 `shape`
 </td>
 <td>
@@ -105,13 +97,6 @@ given, inferred from `initial_value`.
 
 <tr>
 <td>
-`dc`
-</td>
-<td>
-Boolean. The `dc` parameter provided on initialization.
-</td>
-</tr><tr>
-<td>
 `shape`
 </td>
 <td>
@@ -119,10 +104,24 @@ Boolean. The `dc` parameter provided on initialization.
 </td>
 </tr><tr>
 <td>
-`rdft`
+`real`
 </td>
 <td>
-`tf.Variable`. The RDFT of the kernel.
+`tf.Variable`. The real part of the RDFT of the kernel.
+</td>
+</tr><tr>
+<td>
+`imag`
+</td>
+<td>
+`tf.Variable`. The imaginary part of the RDFT of the kernel.
+</td>
+</tr><tr>
+<td>
+`dtype`
+</td>
+<td>
+
 </td>
 </tr><tr>
 <td>
@@ -207,7 +206,7 @@ of calling this method if you don't expect the return value to change.
 
 <h3 id="get_config"><code>get_config</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/parameters.py#L135-L143">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/parameters.py#L158-L165">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>get_config() -> Dict[str, Any]
@@ -218,7 +217,7 @@ Returns the configuration of the `Parameter`.
 
 <h3 id="get_weights"><code>get_weights</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/parameters.py#L48-L49">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/parameters.py#L47-L48">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>get_weights()
@@ -229,7 +228,7 @@ Returns the configuration of the `Parameter`.
 
 <h3 id="set_weights"><code>set_weights</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/parameters.py#L51-L56">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/parameters.py#L50-L55">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>set_weights(
@@ -305,7 +304,7 @@ The original method wrapped such that it enters the module's name scope.
 
 <h3 id="__call__"><code>__call__</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/parameters.py#L130-L133">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/parameters.py#L143-L156">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>__call__() -> tf.Tensor

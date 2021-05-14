@@ -30,6 +30,7 @@ description: Soft rounded deep factorized distribution + uniform noise.
 <meta itemprop="property" content="sample"/>
 <meta itemprop="property" content="stddev"/>
 <meta itemprop="property" content="survival_function"/>
+<meta itemprop="property" content="unnormalized_log_prob"/>
 <meta itemprop="property" content="variance"/>
 <meta itemprop="property" content="with_name_scope"/>
 </div>
@@ -155,10 +156,10 @@ May be partially defined or unknown.
 </td>
 </tr><tr>
 <td>
-`experimental_is_sharded`
+`experimental_shard_axis_names`
 </td>
 <td>
-`True` for distributions which parallel-sum `log_prob` across devices.
+The list or structure of lists of active shard axis names.
 </td>
 </tr><tr>
 <td>
@@ -1211,6 +1212,24 @@ Returns a dict mapping constructor arg names to property annotations.
 This dict should include an entry for each of the distribution's
 `Tensor`-valued constructor arguments.
 
+Distribution subclasses are not required to implement
+`_parameter_properties`, so this method may raise `NotImplementedError`.
+Providing a `_parameter_properties` implementation enables several advanced
+features, including:
+  - Distribution batch slicing (`sliced_distribution = distribution[i:j]`).
+  - Automatic inference of `_batch_shape` and
+    `_batch_shape_tensor`, which must otherwise be computed explicitly.
+  - Automatic instantiation of the distribution within TFP's internal
+    property tests.
+  - Automatic construction of 'trainable' instances of the distribution
+    using appropriate bijectors to avoid violating parameter constraints.
+    This enables the distribution family to be used easily as a
+    surrogate posterior in variational inference.
+
+In the future, parameter property annotations may enable additional
+functionality; for example, returning Distribution instances from
+`tf.vectorized_map`.
+
 <!-- Tabular view -->
  <table class="responsive fixed orange">
 <colgroup><col width="214px"><col></colgroup>
@@ -1254,6 +1273,24 @@ A
 `str -> `tfp.python.internal.parameter_properties.ParameterProperties`
 dict mapping constructor argument names to `ParameterProperties`
 instances.
+</td>
+</tr>
+</table>
+
+
+
+<!-- Tabular view -->
+ <table class="responsive fixed orange">
+<colgroup><col width="214px"><col></colgroup>
+<tr><th colspan="2">Raises</th></tr>
+
+<tr>
+<td>
+`NotImplementedError`
+</td>
+<td>
+if the distribution class does not implement
+`_parameter_properties`.
 </td>
 </tr>
 </table>
@@ -1574,6 +1611,72 @@ Named arguments forwarded to subclass implementation.
 </td>
 </tr>
 
+</table>
+
+
+
+<h3 id="unnormalized_log_prob"><code>unnormalized_log_prob</code></h3>
+
+<pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
+<code>unnormalized_log_prob(
+    value, name=&#x27;unnormalized_log_prob&#x27;, **kwargs
+)
+</code></pre>
+
+Potentially unnormalized log probability density/mass function.
+
+This function is similar to `log_prob`, but does not require that the
+return value be normalized.  (Normalization here refers to the total
+integral of probability being one, as it should be by definition for any
+probability distribution.)  This is useful, for example, for distributions
+where the normalization constant is difficult or expensive to compute.  By
+default, this simply calls `log_prob`.
+
+<!-- Tabular view -->
+ <table class="responsive fixed orange">
+<colgroup><col width="214px"><col></colgroup>
+<tr><th colspan="2">Args</th></tr>
+
+<tr>
+<td>
+`value`
+</td>
+<td>
+`float` or `double` `Tensor`.
+</td>
+</tr><tr>
+<td>
+`name`
+</td>
+<td>
+Python `str` prepended to names of ops created by this function.
+</td>
+</tr><tr>
+<td>
+`**kwargs`
+</td>
+<td>
+Named arguments forwarded to subclass implementation.
+</td>
+</tr>
+</table>
+
+
+
+<!-- Tabular view -->
+ <table class="responsive fixed orange">
+<colgroup><col width="214px"><col></colgroup>
+<tr><th colspan="2">Returns</th></tr>
+
+<tr>
+<td>
+`unnormalized_log_prob`
+</td>
+<td>
+a `Tensor` of shape
+`sample_shape(x) + self.batch_shape` with values of type `self.dtype`.
+</td>
+</tr>
 </table>
 
 

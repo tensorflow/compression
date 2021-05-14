@@ -36,8 +36,8 @@
 *  <a href="../tfc/UniformNoiseAdapter.md"><code>tfc.UniformNoiseAdapter</code></a>
 *  <a href="../tfc/UniversalBatchedEntropyModel.md"><code>tfc.UniversalBatchedEntropyModel</code></a>
 *  <a href="../tfc/UniversalIndexedEntropyModel.md"><code>tfc.UniversalIndexedEntropyModel</code></a>
+*  <a href="../tfc/Y4MDataset.md"><code>tfc.Y4MDataset</code></a>
 *  <a href="../tfc/estimate_tails.md"><code>tfc.estimate_tails</code></a>
-*  <a href="../tfc/irdft_matrix.md"><code>tfc.irdft_matrix</code></a>
 *  <a href="../tfc/lower_bound.md"><code>tfc.lower_bound</code></a>
 *  <a href="../tfc/lower_tail.md"><code>tfc.lower_tail</code></a>
 *  <a href="../tfc/perturb_and_apply.md"><code>tfc.perturb_and_apply</code></a>
