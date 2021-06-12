@@ -1,4 +1,4 @@
 git+https://github.com/google/compare_gan@19922d3004b675c1a49c4d7515c06f6f75acdcc8
 tensorflow-gpu~=1.15.2
 tensorflow-compression==1.3
-Pillow~=8.1.1
+Pillow~=8.2.0
