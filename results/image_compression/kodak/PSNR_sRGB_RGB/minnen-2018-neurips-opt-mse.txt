@@ -1,0 +1,21 @@
+# Aggregate rate-distortion data for "Minnen 2018 (NeurIPS)" on kodak.
+# The first column contains bits per pixel (bpp) values.
+# The second column contains PSNR/sRGB/R'G'B' values.
+#
+# Notes:
+#  1. Aggregate values were calculated by averaging over a constant
+#     lambda value.
+#  2. This model was optimized for RGB MSE.
+#
+# If you have questions or corrections, please contact:
+#  David Minnen (dminnen@google.com) or George Toderici (gtoderici@google.com).
+
+0.071997, 26.804116
+0.153354, 28.880747
+0.264381, 30.927089
+0.428511, 33.028649
+0.635404, 34.998064
+0.904279, 37.053312
+1.258828, 39.120817
+1.982050, 42.165220
+2.992778, 45.074915

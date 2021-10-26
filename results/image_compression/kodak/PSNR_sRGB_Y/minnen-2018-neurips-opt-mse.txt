@@ -5,6 +5,7 @@
 # Notes:
 #  1. Aggregate values were calculated by averaging over a constant
 #     lambda value.
+#  2. This model was optimized for RGB MSE.
 #
 # If you have questions or corrections, please contact:
 #  David Minnen (dminnen@google.com) or George Toderici (gtoderici@google.com).
