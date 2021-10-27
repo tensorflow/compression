@@ -266,9 +266,11 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
 
   @tf.custom_gradient
   def _quantize_offset(self, inputs, offset):
+
     return tf.round(inputs - offset) + offset, lambda x: (x, None)
 
   def _quantize(self, inputs, offset=None):
+    inputs = tf.cast(inputs,dtype=tf.keras.backend.floatx())
     if offset is None:
       outputs = self._quantize_no_offset(inputs)
     else:
