@@ -178,7 +178,7 @@ class DeepFactorized(tfp.distributions.Distribution):
     shape = tf.shape(inputs)
     inputs = tf.reshape(inputs, (-1, 1, self.batch_shape.num_elements()))
     inputs = tf.transpose(inputs, (2, 1, 0))
-    logits = inputs
+    logits = tf.cast(inputs,dtype=tf.keras.backend.floatx())
     for i in range(len(self.num_filters) + 1):
       matrix = tf.nn.softplus(self._matrices[i])
       logits = tf.linalg.matmul(matrix, logits)
