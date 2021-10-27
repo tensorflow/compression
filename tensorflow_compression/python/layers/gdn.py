@@ -210,7 +210,7 @@ class GDN(tf.keras.layers.Layer):
     if isinstance(value, dict):
       value = tf.keras.utils.deserialize_keras_object(value)
     if value is not None and not callable(value):
-      value = tf.convert_to_tensor(value, dtype=self.dtype)
+      value = tf.cast(value, dtype=self.dtype)
     self._alpha_parameter = value
 
   @property
@@ -224,7 +224,7 @@ class GDN(tf.keras.layers.Layer):
     if isinstance(value, dict):
       value = tf.keras.utils.deserialize_keras_object(value)
     if value is not None and not callable(value):
-      value = tf.convert_to_tensor(value, dtype=self.dtype)
+      value = tf.cast(value, dtype=self.dtype)
     self._beta_parameter = value
 
   @property
@@ -238,7 +238,7 @@ class GDN(tf.keras.layers.Layer):
     if isinstance(value, dict):
       value = tf.keras.utils.deserialize_keras_object(value)
     if value is not None and not callable(value):
-      value = tf.convert_to_tensor(value, dtype=self.dtype)
+      value = tf.cast(value, dtype=self.dtype)
     self._gamma_parameter = value
 
   @property
@@ -252,7 +252,7 @@ class GDN(tf.keras.layers.Layer):
     if isinstance(value, dict):
       value = tf.keras.utils.deserialize_keras_object(value)
     if value is not None and not callable(value):
-      value = tf.convert_to_tensor(value, dtype=self.dtype)
+      value = tf.cast(value, dtype=self.dtype)
     self._epsilon_parameter = value
 
   @property
@@ -296,7 +296,7 @@ class GDN(tf.keras.layers.Layer):
     if self.alpha_parameter is None:
       raise RuntimeError("alpha is not initialized yet. Call build().")
     if callable(self.alpha_parameter):
-      return tf.convert_to_tensor(self.alpha_parameter(), dtype=self.dtype)
+      return tf.cast(self.alpha_parameter(), dtype=self.dtype)
     return self.alpha_parameter
 
   @property
@@ -304,7 +304,7 @@ class GDN(tf.keras.layers.Layer):
     if self.beta_parameter is None:
       raise RuntimeError("beta is not initialized yet. Call build().")
     if callable(self.beta_parameter):
-      return tf.convert_to_tensor(self.beta_parameter(), dtype=self.dtype)
+      return tf.cast(self.beta_parameter(), dtype=self.dtype)
     return self.beta_parameter
 
   @property
@@ -312,7 +312,7 @@ class GDN(tf.keras.layers.Layer):
     if self.gamma_parameter is None:
       raise RuntimeError("gamma is not initialized yet. Call build().")
     if callable(self.gamma_parameter):
-      return tf.convert_to_tensor(self.gamma_parameter(), dtype=self.dtype)
+      return tf.cast(self.gamma_parameter(), dtype=self.dtype)
     return self.gamma_parameter
 
   @property
@@ -320,7 +320,7 @@ class GDN(tf.keras.layers.Layer):
     if self.epsilon_parameter is None:
       raise RuntimeError("epsilon is not initialized yet. Call build().")
     if callable(self.epsilon_parameter):
-      return tf.convert_to_tensor(self.epsilon_parameter(), dtype=self.dtype)
+      return tf.cast(self.epsilon_parameter(), dtype=self.dtype)
     return self.epsilon_parameter
 
   @property
@@ -363,7 +363,7 @@ class GDN(tf.keras.layers.Layer):
     super().build(input_shape)
 
   def call(self, inputs) -> tf.Tensor:
-    inputs = tf.convert_to_tensor(inputs, dtype=self.dtype)
+    inputs = tf.cast(inputs, dtype=self.dtype)
     rank = inputs.shape.rank
     if rank is None or rank < 2:
       raise ValueError(f"Input tensor must have at least rank 2, received "
