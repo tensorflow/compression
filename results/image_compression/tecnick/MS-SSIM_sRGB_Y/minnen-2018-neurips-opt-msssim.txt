@@ -1,0 +1,24 @@
+# Aggregate rate-distortion data for "Minnen 2018 (NeurIPS)" on tecnick.
+# The first column contains bits per pixel (bpp) values.
+# The second column contains MS-SSIM/sRGB/Y' values.
+#
+# Notes:
+#  1. Aggregate values were calculated by averaging over a constant
+#     lambda value.
+#  2. We often graph MS-SSIM values in dB for visual clarity using:
+#     ms_ssim_db = -10 * log10(1 - ms_ssim).
+#  3. This model was optimized for RGB MS-SSIM.
+#
+# If you have questions or corrections, please contact:
+#  David Minnen (dminnen@google.com) or George Toderici (gtoderici@google.com).
+
+0.080911, 0.961266
+0.160159, 0.981464
+0.306288, 0.990734
+0.454266, 0.993507
+0.603689, 0.994009
+0.746582, 0.994754
+0.933949, 0.996996
+1.138409, 0.997298
+1.642893, 0.998564
+2.288673, 0.999301
