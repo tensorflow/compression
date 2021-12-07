@@ -11,8 +11,6 @@ cc_binary(
     ),
     copts = [
         "-pthread",
-        "-std=c++11",
-        "-D_GLIBCXX_USE_CXX11_ABI=0",
     ],
     linkshared = 1,
     linkstatic = 0,
