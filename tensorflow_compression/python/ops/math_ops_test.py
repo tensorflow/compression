@@ -18,7 +18,7 @@ from absl.testing import parameterized
 import scipy.stats
 import tensorflow as tf
 from tensorflow_compression.python.ops import math_ops
-from tensorflow_compression.python.ops import soft_round_ops
+from tensorflow_compression.python.ops import round_ops
 
 
 class MathTest(tf.test.TestCase, parameterized.TestCase):
@@ -86,7 +86,7 @@ class PerturbAndApplyTest(tf.test.TestCase):
     self.assertGreater(p, 1e-6)
 
   def test_perturb_and_apply_gradient_soft_round(self):
-    f = soft_round_ops.soft_round
+    f = round_ops.soft_round
     x = tf.linspace(-2.0, 2.0, 200)
     temperature = 7.0
     with tf.GradientTape(persistent=True) as g:

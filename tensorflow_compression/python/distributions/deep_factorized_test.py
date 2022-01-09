@@ -111,10 +111,6 @@ class NoisyDeepFactorizedTest(tf.test.TestCase):
     x = tf.linspace(-1., 1., 10)
     self.assertAllClose(df.prob(x), [0, 0, 0, 1, 1, 1, 1, 0, 0, 0])
 
-  def test_quantization_offset_is_zero(self):
-    df = deep_factorized.NoisyDeepFactorized()
-    self.assertEqual(helpers.quantization_offset(df), 0)
-
   def test_tails_are_in_order(self):
     df = deep_factorized.NoisyDeepFactorized()
     lower_tail = helpers.lower_tail(df, 2**-8)

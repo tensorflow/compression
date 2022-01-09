@@ -15,7 +15,7 @@
 """Layers for soft rounding."""
 
 import tensorflow as tf
-from tensorflow_compression.python.ops import soft_round_ops
+from tensorflow_compression.python.ops import round_ops
 
 
 __all__ = [
@@ -45,8 +45,7 @@ class SoftRound(tf.keras.layers.Layer):
     super().__init__(**kwargs)
     self._alpha = alpha
     self._transform = (
-        soft_round_ops.soft_round_inverse
-        if inverse else soft_round_ops.soft_round)
+        round_ops.soft_round_inverse if inverse else round_ops.soft_round)
 
   def call(self, inputs):
     outputs = self._transform(inputs, self._alpha)
@@ -66,8 +65,7 @@ class SoftRoundConditionalMean(tf.keras.layers.Layer):
     self._alpha = alpha
 
   def call(self, inputs):
-    return soft_round_ops.soft_round_conditional_mean(
-        inputs, alpha=self._alpha)
+    return round_ops.soft_round_conditional_mean(inputs, alpha=self._alpha)
 
   def compute_output_shape(self, input_shape):
     return input_shape

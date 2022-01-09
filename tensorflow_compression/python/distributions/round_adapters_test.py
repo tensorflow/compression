@@ -20,7 +20,6 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow_compression.python.distributions import deep_factorized
 from tensorflow_compression.python.distributions import round_adapters
-from tensorflow_compression.python.ops import soft_round_ops
 
 
 def _test_log_prob_gradient_is_bounded(self, dist_cls, values, params=()):
@@ -42,44 +41,42 @@ class AdaptersTest(tf.test.TestCase, parameterized.TestCase):
   @parameterized.named_parameters(
       ("softround_deepfactorized",
        lambda d: round_adapters.SoftRoundAdapter(d, alpha=5.0),
-       deep_factorized.DeepFactorized, 0.0),
+       deep_factorized.DeepFactorized),
       ("softround_logistic",
        lambda d: round_adapters.SoftRoundAdapter(d, alpha=5.0),
-       lambda: tfp.distributions.Logistic(loc=10.3, scale=1.5),
-       lambda: soft_round_ops.soft_round(0.3, alpha=5.0)),
+       lambda: tfp.distributions.Logistic(loc=10.3, scale=1.5)),
       ("softround_normal",
        lambda d: round_adapters.SoftRoundAdapter(d, alpha=4.0),
-       lambda: tfp.distributions.Normal(loc=10.4, scale=1.5),
-       lambda: soft_round_ops.soft_round(0.4, alpha=4.0)),
+       lambda: tfp.distributions.Normal(loc=10.4, scale=1.5)),
       ("noisysoftround_deepfactorized",
        lambda d: round_adapters.NoisySoftRoundAdapter(d, alpha=5.0),
-       deep_factorized.DeepFactorized, 0.0),
+       deep_factorized.DeepFactorized),
       ("noisysoftround_logistic",
        lambda d: round_adapters.NoisySoftRoundAdapter(d, alpha=5.0),
-       lambda: tfp.distributions.Logistic(loc=10, scale=1.5), 0.0),
+       lambda: tfp.distributions.Logistic(loc=10, scale=1.5)),
       ("noisysoftround_normal",
        lambda d: round_adapters.NoisySoftRoundAdapter(d, alpha=5.0),
-       lambda: tfp.distributions.Normal(loc=10, scale=1.5), 0.0),
+       lambda: tfp.distributions.Normal(loc=10, scale=1.5)),
       ("round_deepfactorized",
        round_adapters.RoundAdapter,
-       lambda: deep_factorized.DeepFactorized(init_scale=1.0), 0.0),
+       lambda: deep_factorized.DeepFactorized(init_scale=1.0)),
       ("round_logistic",
        round_adapters.RoundAdapter,
-       lambda: tfp.distributions.Logistic(loc=1.5, scale=1.5), 0.0),
+       lambda: tfp.distributions.Logistic(loc=1.5, scale=1.5)),
       ("round_normal",
        round_adapters.RoundAdapter,
-       lambda: tfp.distributions.Normal(loc=1.5, scale=1.5), 0.0),
+       lambda: tfp.distributions.Normal(loc=1.5, scale=1.5)),
       ("noisyround_deepfactorized",
        round_adapters.NoisyRoundAdapter,
-       lambda: deep_factorized.DeepFactorized(init_scale=1.0), 0.0),
+       lambda: deep_factorized.DeepFactorized(init_scale=1.0)),
       ("noisyround_logistic",
        round_adapters.NoisyRoundAdapter,
-       lambda: tfp.distributions.Logistic(loc=1.5, scale=1.5), 0.0),
+       lambda: tfp.distributions.Logistic(loc=1.5, scale=1.5)),
       ("noisyround_normal",
        round_adapters.NoisyRoundAdapter,
-       lambda: tfp.distributions.Normal(loc=1.5, scale=1.5), 0.0),
+       lambda: tfp.distributions.Normal(loc=1.5, scale=1.5)),
       )
-  def test_tails_and_offset(self, adapter, distribution, expected_offset):
+  def test_tails(self, adapter, distribution):
     dist = adapter(distribution())
     lower_tail = dist._lower_tail(2**-8)
     try:
@@ -98,12 +95,6 @@ class AdaptersTest(tf.test.TestCase, parameterized.TestCase):
     self.assertLessEqual(right_mass, 2**-8)
 
     self.assertGreater(upper_tail, lower_tail)
-    offset = dist._quantization_offset()
-    if not isinstance(expected_offset, float):
-      # We cannot run tf inside the parameterized test declaration, hence
-      # non-float values are wrapped in a lambda.
-      expected_offset = expected_offset()
-    self.assertAllClose(offset, expected_offset)
 
   @parameterized.named_parameters(
       ("softround_logistic",
@@ -210,16 +201,11 @@ class LocationScaleTest:
     sample = dist.sample((5, 4))
     self.assertEqual(sample.shape, (5, 4, 2))
 
-  def test_tails_and_offset_are_in_order(self):
+  def test_tails_are_in_order(self):
     dist = self.dist_cls(loc=10, scale=1.5)
-    offset = dist._quantization_offset()
     lower_tail = dist._lower_tail(2**-8)
     upper_tail = dist._upper_tail(2**-8)
     self.assertGreater(upper_tail, lower_tail)
-    if offset:
-      # If quantization offset is 0.0, it doesn't need to be between the tails.
-      self.assertGreater(upper_tail, offset)
-      self.assertGreater(offset, lower_tail)
 
   def test_stats_throw_error(self):
     dist = self.dist_cls(loc=1, scale=2)

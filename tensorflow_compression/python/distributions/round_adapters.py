@@ -19,7 +19,7 @@ import tensorflow_probability as tfp
 from tensorflow_compression.python.distributions import deep_factorized
 from tensorflow_compression.python.distributions import helpers
 from tensorflow_compression.python.distributions import uniform_noise
-from tensorflow_compression.python.ops import soft_round_ops
+from tensorflow_compression.python.ops import round_ops
 
 
 __all__ = [
@@ -239,10 +239,10 @@ class SoftRoundAdapter(MonotonicAdapter):
     self._alpha = alpha
 
   def transform(self, x):
-    return soft_round_ops.soft_round(x, self._alpha)
+    return round_ops.soft_round(x, self._alpha)
 
   def inverse_transform(self, y):
-    return soft_round_ops.soft_round_inverse(y, self._alpha)
+    return round_ops.soft_round_inverse(y, self._alpha)
 
 
 class NoisySoftRoundAdapter(uniform_noise.UniformNoiseAdapter):

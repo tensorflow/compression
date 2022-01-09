@@ -157,9 +157,10 @@ def lower_tail(distribution, tail_mass):
       tail = distribution.quantile(tail_mass / 2)
     except NotImplementedError:
       try:
+        target = tf.math.log(tf.cast(tail_mass / 2, distribution.dtype))
         tail = estimate_tails(
-            distribution.log_cdf, tf.math.log(tail_mass / 2),
-            distribution.batch_shape_tensor(), distribution.dtype)
+            distribution.log_cdf, target, distribution.batch_shape_tensor(),
+            distribution.dtype)
       except NotImplementedError:
         raise NotImplementedError(
             "`distribution` must implement `_lower_tail()`, `quantile()`, or "
@@ -193,8 +194,9 @@ def upper_tail(distribution, tail_mass):
       tail = distribution.quantile(1 - tail_mass / 2)
     except NotImplementedError:
       try:
+        target = tf.math.log(tf.cast(tail_mass / 2, distribution.dtype))
         tail = estimate_tails(
-            distribution.log_survival_function, tf.math.log(tail_mass / 2),
+            distribution.log_survival_function, target,
             distribution.batch_shape_tensor(), distribution.dtype)
       except NotImplementedError:
         raise NotImplementedError(

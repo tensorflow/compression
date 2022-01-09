@@ -65,7 +65,7 @@ py_library(
         ":deep_factorized",
         ":helpers",
         ":uniform_noise",
-        "//tensorflow_compression/python/ops:soft_round_ops",
+        "//tensorflow_compression/python/ops:round_ops",
     ],
 )
 
@@ -76,7 +76,6 @@ py_test(
     deps = [
         ":deep_factorized",
         ":round_adapters",
-        "//tensorflow_compression/python/ops:soft_round_ops",
     ],
 )
 

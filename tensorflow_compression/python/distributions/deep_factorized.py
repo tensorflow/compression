@@ -239,15 +239,18 @@ class DeepFactorized(tfp.distributions.Distribution):
     return log_s_logits + log_s_neg_logits + tf.math.log(dlogits)
 
   def _quantization_offset(self):
-    return tf.constant(0, dtype=self.dtype)
+    return helpers.estimate_tails(
+        self._logits_cumulative, 0., self.batch_shape_tensor(), self.dtype)
 
   def _lower_tail(self, tail_mass):
-    logits = tf.math.log(tail_mass / 2 / (1. - tail_mass / 2))
+    logits = tf.math.log(
+        tf.cast(tail_mass / 2 / (1. - tail_mass / 2), self.dtype))
     return helpers.estimate_tails(
         self._logits_cumulative, logits, self.batch_shape_tensor(), self.dtype)
 
   def _upper_tail(self, tail_mass):
-    logits = -tf.math.log(tail_mass / 2 / (1. - tail_mass / 2))
+    logits = -tf.math.log(
+        tf.cast(tail_mass / 2 / (1. - tail_mass / 2), self.dtype))
     return helpers.estimate_tails(
         self._logits_cumulative, logits, self.batch_shape_tensor(), self.dtype)
 

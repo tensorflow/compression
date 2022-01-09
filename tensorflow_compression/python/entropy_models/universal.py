@@ -14,8 +14,8 @@
 
 import functools
 import tensorflow as tf
-from tensorflow_compression.python.entropy_models import continuous_batched
-from tensorflow_compression.python.entropy_models import continuous_indexed
+from tensorflow_compression.python.entropy_models import continuous_base
+from tensorflow_compression.python.ops import gen_ops
 from tensorflow_compression.python.ops import math_ops
 
 
@@ -61,8 +61,7 @@ def _range_coding_offsets(num_noise_levels, prior_shape, dtype=tf.float32):
   return offset
 
 
-class UniversalBatchedEntropyModel(
-    continuous_batched.ContinuousBatchedEntropyModel):
+class UniversalBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
   """Batched entropy model model which implements Universal Quantization.
 
   In contrast to the base class, which uses rounding for quantization, here
@@ -118,49 +117,52 @@ class UniversalBatchedEntropyModel(
         allows it to be constructed within a `tf.function` body. If
         `compression=False`, then `stateless=True` is implied and the provided
         value is ignored.
-
-    Raises:
-      RuntimeError: when attempting to instantiate an entropy model with
-        `compression=True` and not in eager execution mode.
     """
-    # This attribute is used in methods we override in this class which
-    # are used during used during super().__init__(...), so we set it first.
-    self._num_noise_levels = num_noise_levels
+    if prior.event_shape.rank:
+      raise ValueError("`prior` must be a (batch of) scalar distribution(s).")
 
     super().__init__(
-        prior=prior,
         coding_rank=coding_rank,
         compression=compression,
-        laplace_tail_mass=laplace_tail_mass,
+        stateless=stateless,
         expected_grads=expected_grads,
         tail_mass=tail_mass,
         range_coder_precision=range_coder_precision,
-        stateless=stateless)
+        dtype=prior.dtype,
+        laplace_tail_mass=laplace_tail_mass,
+    )
+    self._prior = prior
+    self._num_noise_levels = num_noise_levels
+    if self.coding_rank < self.prior_shape.rank:
+      raise ValueError("`coding_rank` can't be smaller than `prior_shape`.")
+
+    with self.name_scope:
+      if self.compression:
+        offset = _range_coding_offsets(
+            self._num_noise_levels, self.prior_shape, self.dtype)
+        cdf, cdf_offset, cdf_length = self._build_tables(
+            self.prior,
+            offset=offset,
+            context_shape=(self._num_noise_levels,) + self.prior_shape)
+        self._init_compression(cdf, cdf_offset, cdf_length, None)
 
   @property
-  def context_shape(self):
-    """See base class."""
-    return (self._num_noise_levels,) + self.prior_shape
+  def prior_shape(self):
+    """Batch shape of `prior` (dimensions which are not assumed i.i.d.)."""
+    return tf.TensorShape(self.prior.batch_shape)
 
-  def _cache_quantization_offset(self):
-    """See base class."""
-    # Universal Quantization derives offsets from a pseudorandom source.
-    self._quantization_offset = None
-
-  def _offset_from_prior(self, prior):
-    """See base class."""
-    return _range_coding_offsets(self._num_noise_levels, self.prior_shape,
-                                 self.dtype)
+  @property
+  def prior_shape_tensor(self):
+    """Batch shape of `prior` as a `Tensor`."""
+    return tf.constant(self.prior_shape.as_list(), dtype=tf.int32)
 
   def _compute_indexes_and_offset(self, broadcast_shape):
-    """See base class."""
+    """Returns the indexes for range coding and the quantization offset."""
     prior_size = int(self.prior_shape.num_elements())
     # Create index for each dimension in prior_shape.
     indexes = tf.range(prior_size, dtype=tf.int32)
     indexes = tf.broadcast_to(
         indexes, tf.concat((broadcast_shape, tf.shape(indexes)), axis=0))
-    # Add channel dimension.
-    channel_axis = -1
     indexes = indexes[..., None]
 
     # Add in offset indexes.
@@ -172,16 +174,12 @@ class UniversalBatchedEntropyModel(
     # Flatten prior + offset indexes.
     index_ranges = [self._num_noise_levels, prior_size]
     strides = tf.math.cumprod(index_ranges, exclusive=True, reverse=True)
-    indexes = tf.linalg.tensordot(indexes, strides, [[channel_axis], [0]])
+    indexes = tf.linalg.tensordot(indexes, strides, [[-1], [0]])
     # Now bring to full shape.
     full_shape = tf.concat([broadcast_shape, self.prior_shape_tensor], 0)
     indexes = tf.reshape(indexes, full_shape)
     offset = tf.reshape(offset, full_shape)
     return indexes, offset
-
-  @tf.Module.with_name_scope
-  def quantize(self, bottleneck, indexes=None):
-    raise NotImplementedError()
 
   @tf.Module.with_name_scope
   def __call__(self, bottleneck, training=True):
@@ -202,8 +200,7 @@ class UniversalBatchedEntropyModel(
       and `bits` is the bitcost of transmitting such a sample having the same
       shape as `bottleneck` without the `self.coding_rank` innermost dimensions.
     """
-
-    log_prob_fn = functools.partial(self._log_prob_from_prior, self.prior)
+    log_prob_fn = functools.partial(self._log_prob, self.prior)
     if training:
       log_probs, bottleneck_perturbed = math_ops.perturb_and_apply(
           log_prob_fn, bottleneck, expected_grads=self._expected_grads)
@@ -224,13 +221,109 @@ class UniversalBatchedEntropyModel(
         -tf.math.log(tf.constant(2., dtype=log_probs.dtype)))
     return bottleneck_perturbed, bits
 
+  @tf.Module.with_name_scope
+  def compress(self, bottleneck):
+    """Compresses a floating-point tensor.
+
+    Compresses the tensor to bit strings. `bottleneck` is first quantized
+    as in `quantize()`, and then compressed using the probability tables in
+    `self.cdf` derived from `self.prior`. The quantized tensor can later be
+    recovered by calling `decompress()`.
+
+    The innermost `self.coding_rank` dimensions are treated as one coding unit,
+    i.e. are compressed into one string each. Any additional dimensions to the
+    left are treated as batch dimensions.
+
+    Args:
+      bottleneck: `tf.Tensor` containing the data to be compressed. Must have at
+        least `self.coding_rank` dimensions, and the innermost dimensions must
+        be broadcastable to `self.prior_shape`.
+
+    Returns:
+      A `tf.Tensor` having the same shape as `bottleneck` without the
+      `self.coding_rank` innermost dimensions, containing a string for each
+      coding unit.
+    """
+    input_shape = tf.shape(bottleneck)
+    input_rank = tf.shape(input_shape)[0]
+    batch_shape, coding_shape = tf.split(
+        input_shape, [input_rank - self.coding_rank, self.coding_rank])
+    broadcast_shape = coding_shape[
+        :self.coding_rank - len(self.prior_shape)]
+
+    indexes, offset = self._compute_indexes_and_offset(broadcast_shape)
+    bottleneck -= offset
+    symbols = tf.cast(tf.round(bottleneck), tf.int32)
+    symbols = tf.reshape(symbols, tf.concat([[-1], coding_shape], 0))
+
+    # Prevent tensors from bouncing back and forth between host and GPU.
+    with tf.device("/cpu:0"):
+      cdf = self.cdf
+      cdf_length = self.cdf_length
+      cdf_offset = self.cdf_offset
+      def loop_body(symbols):
+        return gen_ops.unbounded_index_range_encode(
+            symbols, indexes, cdf, cdf_length, cdf_offset,
+            precision=self.range_coder_precision,
+            overflow_width=4, debug_level=1)
+
+      # TODO(jonycgn,ssjhv): Consider switching to Python control flow.
+      strings = tf.map_fn(
+          loop_body, symbols, dtype=tf.string, name="compress")
+
+    return tf.reshape(strings, batch_shape)
+
+  @tf.Module.with_name_scope
+  def decompress(self, strings, broadcast_shape):
+    """Decompresses a tensor.
+
+    Reconstructs the quantized tensor from bit strings produced by `compress()`.
+    It is necessary to provide a part of the output shape in `broadcast_shape`.
+
+    Args:
+      strings: `tf.Tensor` containing the compressed bit strings.
+      broadcast_shape: Iterable of ints. The part of the output tensor shape
+        between the shape of `strings` on the left and `self.prior_shape` on the
+        right. This must match the shape of the input to `compress()`.
+
+    Returns:
+      A `tf.Tensor` of shape `strings.shape + broadcast_shape +
+      self.prior_shape`.
+    """
+    strings = tf.convert_to_tensor(strings, dtype=tf.string)
+    broadcast_shape = tf.convert_to_tensor(broadcast_shape, dtype=tf.int32)
+    batch_shape = tf.shape(strings)
+    symbols_shape = tf.concat(
+        [batch_shape, broadcast_shape, self.prior_shape_tensor], 0)
+
+    indexes, offset = self._compute_indexes_and_offset(broadcast_shape)
+    strings = tf.reshape(strings, [-1])
+
+    # Prevent tensors from bouncing back and forth between host and GPU.
+    with tf.device("/cpu:0"):
+      cdf = self.cdf
+      cdf_length = self.cdf_length
+      cdf_offset = self.cdf_offset
+      def loop_body(string):
+        return gen_ops.unbounded_index_range_decode(
+            string, indexes, cdf, cdf_length, cdf_offset,
+            precision=self.range_coder_precision,
+            overflow_width=4, debug_level=1)
+
+      # TODO(jonycgn,ssjhv): Consider switching to Python control flow.
+      symbols = tf.map_fn(
+          loop_body, strings, dtype=tf.int32, name="decompress")
+
+    symbols = tf.reshape(symbols, symbols_shape)
+    outputs = tf.cast(symbols, self.dtype)
+    return outputs + offset
+
   def get_config(self):
     # TODO(relational): Implement this when we need serialization.
     raise NotImplementedError()
 
 
-class UniversalIndexedEntropyModel(
-    continuous_indexed.ContinuousIndexedEntropyModel):
+class UniversalIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
   """Indexed entropy model model which implements Universal Quantization.
 
   In contrast to the base class, which uses rounding for quantization, here
@@ -241,7 +334,6 @@ class UniversalIndexedEntropyModel(
   > "Universally Quantized Neural Compression"<br />
   > Eirikur Agustsson & Lucas Theis<br />
   > https://arxiv.org/abs/2006.09952
-
   """
 
   def __init__(self,
@@ -297,34 +389,69 @@ class UniversalIndexedEntropyModel(
         rather than `Variable`s.
       num_noise_levels: Integer. The number of levels used to quantize the
         uniform noise.
-
-    Raises:
-      RuntimeError: when attempting to instantiate an entropy model with
-        `compression=True` and not in eager execution mode.
     """
-    # Add extra indexes for noise levels.
-    index_ranges_with_offsets = tuple([num_noise_levels] +
-                                      [int(r) for r in index_ranges])
+    if coding_rank <= 0:
+      raise ValueError("`coding_rank` must be larger than 0.")
+    if not callable(prior_fn):
+      raise TypeError("`prior_fn` must be a class or factory function.")
+    for name, fn in parameter_fns.items():
+      if not isinstance(name, str):
+        raise TypeError("`parameter_fns` must have string keys.")
+      if not callable(fn):
+        raise TypeError(f"`parameter_fns['{name}']` must be callable.")
 
-    # This attribute is used in methods we override in this class which
-    # are used during used during super().__init__(...), so we set it first.
-    self._num_noise_levels = num_noise_levels
-
-    # We only support channel axis at the last dimension.
-    channel_axis = -1
     super().__init__(
-        prior_fn=prior_fn,
-        index_ranges=index_ranges_with_offsets,
-        parameter_fns=parameter_fns,
         coding_rank=coding_rank,
         compression=compression,
-        channel_axis=channel_axis,
-        dtype=dtype,
-        tail_mass=tail_mass,
-        laplace_tail_mass=laplace_tail_mass,
+        stateless=stateless,
         expected_grads=expected_grads,
+        tail_mass=tail_mass,
         range_coder_precision=range_coder_precision,
-        stateless=stateless)
+        dtype=dtype,
+        laplace_tail_mass=laplace_tail_mass,
+    )
+    # Add extra indexes for noise levels.
+    self._index_ranges = tuple(
+        [num_noise_levels] + [int(r) for r in index_ranges])
+    if not self.index_ranges:
+      raise ValueError("`index_ranges` must have at least one element.")
+    self._prior_fn = prior_fn
+    self._parameter_fns = dict(parameter_fns)
+    self._num_noise_levels = num_noise_levels
+
+    with self.name_scope:
+      if self.compression:
+        index_ranges = self.index_ranges_without_offsets
+        indexes = [tf.range(r, dtype=self.dtype) for r in index_ranges]
+        indexes = tf.meshgrid(*indexes, indexing="ij")
+        indexes = tf.stack(indexes, axis=-1)
+        self._prior = self._make_prior(indexes)
+        cdf, cdf_offset, cdf_length = self._build_tables(
+            self.prior,
+            offset=_range_coding_offsets(
+                self._num_noise_levels, self.prior_shape, self.dtype),
+            context_shape=self.context_shape)
+        self._init_compression(cdf, cdf_offset, cdf_length, None)
+
+  @property
+  def index_ranges(self):
+    """Upper bound(s) on values allowed in `indexes` tensor."""
+    return self._index_ranges
+
+  @property
+  def parameter_fns(self):
+    """Functions mapping `indexes` to each distribution parameter."""
+    return self._parameter_fns
+
+  @property
+  def prior_fn(self):
+    """Class or factory function returning a `Distribution` object."""
+    return self._prior_fn
+
+  @property
+  def prior_shape(self):
+    """Batch shape of `prior` (dimensions which are not assumed i.i.d.)."""
+    return tf.TensorShape(self.prior.batch_shape)
 
   @property
   def context_shape(self):
@@ -335,6 +462,16 @@ class UniversalIndexedEntropyModel(
   def index_ranges_without_offsets(self):
     """Upper bound(s) on values allowed in `indexes` , excluding offsets."""
     return _index_ranges_without_offsets(self.index_ranges)
+
+  def _make_prior(self, indexes):
+    indexes = tf.cast(indexes, self.dtype)
+    parameters = {k: f(indexes) for k, f in self.parameter_fns.items()}
+    return self.prior_fn(**parameters)
+
+  def _flatten_indexes(self, indexes):
+    indexes = tf.cast(indexes, tf.int32)
+    strides = tf.math.cumprod(self.index_ranges, exclusive=True, reverse=True)
+    return tf.linalg.tensordot(indexes, strides, [[-1], [0]])
 
   def _normalize_indexes(self, indexes):
     """See base class."""
@@ -348,29 +485,16 @@ class UniversalIndexedEntropyModel(
       assert num_indexes == len(index_ranges)
     indexes = math_ops.lower_bound(indexes, 0)
     axes = [1] * indexes.shape.rank
-    axes[self.channel_axis] = len(index_ranges)
+    axes[-1] = len(index_ranges)
     bounds = tf.reshape([s - 1 for s in index_ranges], axes)
     return math_ops.upper_bound(indexes, tf.cast(bounds, indexes.dtype))
 
   def _offset_from_indexes(self, indexes_with_offsets):
-    """Computes the offset for universal quantization (overrides base class)."""
+    """Computes the offset for universal quantization."""
     offset_indexes = indexes_with_offsets[..., 0]
     offset = _offset_indexes_to_offset(
         offset_indexes, self._num_noise_levels, dtype=self.dtype)
     return offset
-
-  def _make_range_coding_prior(self, index_ranges, dtype):
-    """Instantiates the range coding prior."""
-    return super()._make_range_coding_prior(
-        _index_ranges_without_offsets(index_ranges), dtype)
-
-  def _offset_from_prior(self, prior):
-    return _range_coding_offsets(self._num_noise_levels, self.prior_shape,
-                                 self.dtype)
-
-  @tf.Module.with_name_scope
-  def quantize(self, bottleneck, indexes=None):
-    raise NotImplementedError()
 
   @tf.Module.with_name_scope
   def __call__(self, bottleneck, indexes, training=True):
@@ -392,7 +516,6 @@ class UniversalIndexedEntropyModel(
       and `bits` is the bitcost of transmitting such a sample having the same
       shape as `bottleneck` without the `self.coding_rank` innermost dimensions.
     """
-
     indexes = self._normalize_indexes(indexes)
     if training:
       # Here we compute `h(bottleneck + noise)`.
@@ -405,7 +528,7 @@ class UniversalIndexedEntropyModel(
         # reference here via a closure, we would get a `None` gradient for
         # `indexes`.
         prior = self._make_prior(indexes)
-        return self._log_prob_from_prior(prior, bottleneck_perturbed)
+        return self._log_prob(prior, bottleneck_perturbed)
 
       log_probs, bottleneck_perturbed = math_ops.perturb_and_apply(
           log_prob_fn, bottleneck, indexes, expected_grads=self._expected_grads)
@@ -417,7 +540,7 @@ class UniversalIndexedEntropyModel(
           self._num_noise_levels, self.dtype)
       symbols = tf.round(bottleneck - offset)
       bottleneck_perturbed = symbols + offset
-      log_probs = self._log_prob_from_prior(prior, bottleneck_perturbed)
+      log_probs = self._log_prob(prior, bottleneck_perturbed)
 
     axes = tuple(range(-self.coding_rank, 0))
     bits = tf.reduce_sum(log_probs, axis=axes) / (
@@ -426,15 +549,103 @@ class UniversalIndexedEntropyModel(
 
   @tf.Module.with_name_scope
   def compress(self, bottleneck, indexes):
-    """See base class."""
-    indexes_with_offset = _add_offset_indexes(indexes, self._num_noise_levels)
-    return super().compress(bottleneck, indexes_with_offset)
+    """Compresses a floating-point tensor.
+
+    Compresses the tensor to bit strings. `bottleneck` is first quantized
+    as in `quantize()`, and then compressed using the probability tables derived
+    from `indexes`. The quantized tensor can later be recovered by calling
+    `decompress()`.
+
+    The innermost `self.coding_rank` dimensions are treated as one coding unit,
+    i.e. are compressed into one string each. Any additional dimensions to the
+    left are treated as batch dimensions.
+
+    Args:
+      bottleneck: `tf.Tensor` containing the data to be compressed.
+      indexes: `tf.Tensor` specifying the scalar distribution for each element
+        in `bottleneck`. See class docstring for examples.
+
+    Returns:
+      A `tf.Tensor` having the same shape as `bottleneck` without the
+      `self.coding_rank` innermost dimensions, containing a string for each
+      coding unit.
+    """
+    indexes = _add_offset_indexes(indexes, self._num_noise_levels)
+    indexes = self._normalize_indexes(indexes)
+    flat_indexes = self._flatten_indexes(indexes)
+
+    symbols_shape = tf.shape(flat_indexes)
+    batch_shape = symbols_shape[:-self.coding_rank]
+    flat_shape = tf.concat([[-1], symbols_shape[-self.coding_rank:]], 0)
+
+    flat_indexes = tf.reshape(flat_indexes, flat_shape)
+
+    offset = self._offset_from_indexes(indexes)
+    symbols = tf.cast(tf.round(bottleneck - offset), tf.int32)
+    symbols = tf.reshape(symbols, flat_shape)
+
+    # Prevent tensors from bouncing back and forth between host and GPU.
+    with tf.device("/cpu:0"):
+      cdf = self.cdf
+      cdf_length = self.cdf_length
+      cdf_offset = self.cdf_offset
+      def loop_body(args):
+        return gen_ops.unbounded_index_range_encode(
+            args[0], args[1], cdf, cdf_length, cdf_offset,
+            precision=self.range_coder_precision,
+            overflow_width=4, debug_level=1)
+
+      # TODO(jonycgn,ssjhv): Consider switching to Python control flow.
+      strings = tf.map_fn(
+          loop_body, (symbols, flat_indexes), dtype=tf.string, name="compress")
+
+    strings = tf.reshape(strings, batch_shape)
+    return strings
 
   @tf.Module.with_name_scope
   def decompress(self, strings, indexes):
-    """See base class."""
-    indexes_with_offset = _add_offset_indexes(indexes, self._num_noise_levels)
-    return super().decompress(strings, indexes_with_offset)
+    """Decompresses a tensor.
+
+    Reconstructs the quantized tensor from bit strings produced by `compress()`.
+
+    Args:
+      strings: `tf.Tensor` containing the compressed bit strings.
+      indexes: `tf.Tensor` specifying the scalar distribution for each output
+        element. See class docstring for examples.
+
+    Returns:
+      A `tf.Tensor` of the same shape as `indexes` (without the optional channel
+      dimension).
+    """
+    indexes = _add_offset_indexes(indexes, self._num_noise_levels)
+    indexes = self._normalize_indexes(indexes)
+    flat_indexes = self._flatten_indexes(indexes)
+
+    symbols_shape = tf.shape(flat_indexes)
+    flat_shape = tf.concat([[-1], symbols_shape[-self.coding_rank:]], 0)
+
+    flat_indexes = tf.reshape(flat_indexes, flat_shape)
+
+    strings = tf.reshape(strings, [-1])
+
+    # Prevent tensors from bouncing back and forth between host and GPU.
+    with tf.device("/cpu:0"):
+      cdf = self.cdf
+      cdf_length = self.cdf_length
+      cdf_offset = self.cdf_offset
+      def loop_body(args):
+        return gen_ops.unbounded_index_range_decode(
+            args[0], args[1], cdf, cdf_length, cdf_offset,
+            precision=self.range_coder_precision,
+            overflow_width=4, debug_level=1)
+
+      # TODO(jonycgn,ssjhv): Consider switching to Python control flow.
+      symbols = tf.map_fn(
+          loop_body, (strings, flat_indexes), dtype=tf.int32, name="decompress")
+
+    symbols = tf.reshape(symbols, symbols_shape)
+    offset = self._offset_from_indexes(indexes)
+    return tf.cast(symbols, self.dtype) + offset
 
   def get_config(self):
     # TODO(relational): Implement this when we need serialization.

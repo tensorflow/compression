@@ -161,7 +161,6 @@ class UniversalIndexedEntropyModelTest(tf.test.TestCase,
         coding_rank=1,
     )
     self.assertEqual(em.coding_rank, 1)
-    self.assertEqual(em.channel_axis, -1)
     self.assertEqual(em._laplace_tail_mass, 0.0)
     self.assertEqual(em.tail_mass, 2**-8)
     self.assertEqual(em.range_coder_precision, 12)
@@ -235,7 +234,6 @@ class UniversalIndexedEntropyModelTest(tf.test.TestCase,
         coding_rank=1,
         compression=True)
     self.assertEqual(em.coding_rank, 1)
-    self.assertEqual(em.channel_axis, -1)
     self.assertEqual(em._laplace_tail_mass, 0.0)
     self.assertEqual(em.tail_mass, 2**-8)
     self.assertEqual(em.range_coder_precision, 12)

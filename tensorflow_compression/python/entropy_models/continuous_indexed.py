@@ -15,10 +15,10 @@
 """Indexed entropy model for continuous random variables."""
 
 import tensorflow as tf
-from tensorflow_compression.python.distributions import helpers
 from tensorflow_compression.python.entropy_models import continuous_base
 from tensorflow_compression.python.ops import gen_ops
 from tensorflow_compression.python.ops import math_ops
+from tensorflow_compression.python.ops import round_ops
 
 
 __all__ = [
@@ -181,38 +181,53 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       tail_mass: Float. Approximate probability mass which is range encoded with
         less precision, by using a Golomb-like code.
       range_coder_precision: Integer. Precision passed to the range coding op.
-      dtype: `tf.dtypes.DType`. The data type of all floating-point
-        computations carried out in this class.
+      dtype: `tf.dtypes.DType`. Data type of this entropy model (i.e. dtype of
+        prior, decompressed values).
       laplace_tail_mass: Float. If positive, will augment the prior with a
         laplace mixture for training stability. (experimental)
     """
     if coding_rank <= 0:
-      raise ValueError("coding_rank must be larger than 0.")
+      raise ValueError("`coding_rank` must be larger than 0.")
     if not callable(prior_fn):
-      raise TypeError("prior_fn must be a class or factory function.")
+      raise TypeError("`prior_fn` must be a class or factory function.")
     for name, fn in parameter_fns.items():
       if not isinstance(name, str):
-        raise TypeError("parameter_fns must have string keys.")
+        raise TypeError("`parameter_fns` must have string keys.")
       if not callable(fn):
-        raise TypeError(f"parameter_fns['{name}'] must be callable.")
-    self._index_ranges = tuple(int(r) for r in index_ranges)
-    if not self.index_ranges:
-      raise ValueError("index_ranges must have at least one element.")
-    self._channel_axis = None if channel_axis is None else int(channel_axis)
-    if self.channel_axis is None and len(self.index_ranges) > 1:
-      raise ValueError("channel_axis can't be None for len(index_ranges) > 1.")
-    self._prior_fn = prior_fn
-    self._parameter_fns = dict(parameter_fns)
+        raise TypeError(f"`parameter_fns['{name}']` must be callable.")
+
     super().__init__(
-        prior=self._make_range_coding_prior(self.index_ranges, dtype),
         coding_rank=coding_rank,
         compression=compression,
         stateless=stateless,
         expected_grads=expected_grads,
         tail_mass=tail_mass,
         range_coder_precision=range_coder_precision,
+        dtype=dtype,
         laplace_tail_mass=laplace_tail_mass,
     )
+    self._index_ranges = tuple(int(r) for r in index_ranges)
+    if not self.index_ranges:
+      raise ValueError("`index_ranges` must have at least one element.")
+    self._channel_axis = None if channel_axis is None else int(channel_axis)
+    if self.channel_axis is None and len(self.index_ranges) > 1:
+      raise ValueError(
+          "`channel_axis` can't be `None` for `len(index_ranges) > 1`.")
+    self._prior_fn = prior_fn
+    self._parameter_fns = dict(parameter_fns)
+
+    with self.name_scope:
+      if self.compression:
+        if self.channel_axis is None:
+          index_range, = index_ranges
+          indexes = tf.range(index_range, dtype=self.dtype)
+        else:
+          indexes = [tf.range(r, dtype=self.dtype) for r in index_ranges]
+          indexes = tf.meshgrid(*indexes, indexing="ij")
+          indexes = tf.stack(indexes, axis=self.channel_axis)
+        self._prior = self._make_prior(indexes)
+        cdf, cdf_offset, cdf_length = self._build_tables(self.prior)
+        self._init_compression(cdf, cdf_offset, cdf_length, None)
 
   @property
   def index_ranges(self):
@@ -234,22 +249,14 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     """Position of channel axis in `indexes` tensor."""
     return self._channel_axis
 
-  def _make_prior(self, indexes, dtype=None):
-    indexes = tf.cast(indexes, dtype or self.dtype)
+  def _make_prior(self, indexes):
+    indexes = tf.cast(indexes, self.dtype)
     parameters = {k: f(indexes) for k, f in self.parameter_fns.items()}
-    return self.prior_fn(**parameters)
-
-  def _make_range_coding_prior(self, index_ranges, dtype):
-    """Instantiates the range coding prior."""
-    dtype = tf.as_dtype(dtype)
-    if self.channel_axis is None:
-      index_range, = index_ranges
-      indexes = tf.range(index_range, dtype=dtype)
-    else:
-      indexes = [tf.range(r, dtype=dtype) for r in index_ranges]
-      indexes = tf.meshgrid(*indexes, indexing="ij")
-      indexes = tf.stack(indexes, axis=self.channel_axis)
-    return self._make_prior(indexes, dtype=dtype)
+    prior = self.prior_fn(**parameters)
+    assert prior.dtype == self.dtype
+    if prior.event_shape.rank:
+      raise ValueError("`prior` must be a (batch of) scalar distribution(s).")
+    return prior
 
   def _normalize_indexes(self, indexes):
     indexes = math_ops.lower_bound(indexes, 0)
@@ -260,8 +267,7 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       axes = [1] * indexes.shape.rank
       axes[self.channel_axis] = len(self.index_ranges)
       bounds = tf.reshape([s - 1 for s in self.index_ranges], axes)
-    indexes = math_ops.upper_bound(indexes, tf.cast(bounds, indexes.dtype))
-    return indexes
+    return math_ops.upper_bound(indexes, tf.cast(bounds, indexes.dtype))
 
   def _flatten_indexes(self, indexes):
     indexes = tf.cast(indexes, tf.int32)
@@ -270,11 +276,6 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     else:
       strides = tf.math.cumprod(self.index_ranges, exclusive=True, reverse=True)
       return tf.linalg.tensordot(indexes, strides, [[self.channel_axis], [0]])
-
-  def _offset_from_indexes(self, indexes):
-    """Compute the quantization offset from the respective prior."""
-    prior = self._make_prior(indexes)
-    return helpers.quantization_offset(prior)
 
   @tf.Module.with_name_scope
   def __call__(self, bottleneck, indexes, training=True):
@@ -297,10 +298,7 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       innermost dimensions.
     """
     indexes = self._normalize_indexes(indexes)
-    prior = self._make_prior(indexes)
     if training:
-      bottleneck_perturbed = bottleneck + tf.random.uniform(
-          tf.shape(bottleneck), minval=-.5, maxval=.5, dtype=bottleneck.dtype)
       def log_prob_fn(bottleneck_perturbed, indexes):
         # When using expected_grads=True, we will use a tf.custom_gradient on
         # this function. In this case, all non-Variable tensors that determine
@@ -310,42 +308,35 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         # reference here via a closure, we would get a `None` gradient for
         # `indexes`.
         prior = self._make_prior(indexes)
-        return self._log_prob_from_prior(prior, bottleneck_perturbed)
+        return self._log_prob(prior, bottleneck_perturbed)
       log_probs, bottleneck_perturbed = math_ops.perturb_and_apply(
-          log_prob_fn, bottleneck, indexes, expected_grads=self._expected_grads)
+          log_prob_fn, bottleneck, indexes, expected_grads=self.expected_grads)
     else:
-      offset = helpers.quantization_offset(prior)
-      bottleneck_perturbed = self._quantize(bottleneck, offset)
-      log_probs = self._log_prob_from_prior(prior, bottleneck_perturbed)
+      prior = self._make_prior(indexes)
+      bottleneck_perturbed = self.quantize(bottleneck)
+      log_probs = self._log_prob(prior, bottleneck_perturbed)
     axes = tuple(range(-self.coding_rank, 0))
     bits = tf.reduce_sum(log_probs, axis=axes) / (
         -tf.math.log(tf.constant(2, dtype=log_probs.dtype)))
     return bottleneck_perturbed, bits
 
   @tf.Module.with_name_scope
-  def quantize(self, bottleneck, indexes):
+  def quantize(self, bottleneck):
     """Quantizes a floating-point tensor.
 
     To use this entropy model as an information bottleneck during training, pass
-    a tensor through this function. The tensor is rounded to integer values
-    modulo a quantization offset, which depends on `indexes`. For instance, for
-    Gaussian distributions, the returned values are rounded to the location of
-    the mode of the distributions plus or minus an integer.
+    a tensor through this function. The tensor is rounded to integer values.
 
     The gradient of this rounding operation is overridden with the identity
     (straight-through gradient estimator).
 
     Args:
       bottleneck: `tf.Tensor` containing the data to be quantized.
-      indexes: `tf.Tensor` specifying the scalar distribution for each element
-        in `bottleneck`. See class docstring for examples.
 
     Returns:
       A `tf.Tensor` containing the quantized values.
     """
-    indexes = self._normalize_indexes(indexes)
-    offset = self._offset_from_indexes(indexes)
-    return self._quantize(bottleneck, offset)
+    return round_ops.round_st(bottleneck)
 
   @tf.Module.with_name_scope
   def compress(self, bottleneck, indexes):
@@ -379,8 +370,7 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
 
     flat_indexes = tf.reshape(flat_indexes, flat_shape)
 
-    offset = self._offset_from_indexes(indexes)
-    symbols = tf.cast(tf.round(bottleneck - offset), tf.int32)
+    symbols = tf.cast(tf.round(bottleneck), tf.int32)
     symbols = tf.reshape(symbols, flat_shape)
 
     # Prevent tensors from bouncing back and forth between host and GPU.
@@ -442,8 +432,7 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
           loop_body, (strings, flat_indexes), dtype=tf.int32, name="decompress")
 
     symbols = tf.reshape(symbols, symbols_shape)
-    offset = self._offset_from_indexes(indexes)
-    return tf.cast(symbols, self.dtype) + offset
+    return tf.cast(symbols, self.dtype)
 
   def get_config(self):
     """Returns the configuration of the entropy model."""
@@ -463,9 +452,17 @@ class LocationScaleIndexedEntropyModel(ContinuousIndexedEntropyModel):
   This class is a common special case of `ContinuousIndexedEntropyModel`. The
   specified distribution is parameterized with `num_scales` values of scale
   parameters. An element-wise location parameter is handled by shifting the
-  distributions to zero. Note: this only works for shift-invariant
-  distributions, where the `loc` parameter really denotes a translation (i.e.,
-  not for the log-normal distribution).
+  distributions to zero.
+
+  This method is illustrated in Figure 10 of:
+  > "Nonlinear Transform Coding"<br />
+  > J. Ballé, P.A. Chou, D. Minnen, S. Singh, N. Johnston, E. Agustsson,
+  > S.J. Hwang, G. Toderici<br />
+  > https://doi.org/10.1109/JSTSP.2020.3034501
+
+  Note: this only works for shift-invariant `tfpd.Distribution` objects, where
+  the `loc` parameter really denotes a translation (i.e., not for the log-normal
+  distribution).
   """
 
   def __init__(self,
@@ -564,30 +561,25 @@ class LocationScaleIndexedEntropyModel(ContinuousIndexedEntropyModel):
       innermost dimensions.
     """
     if loc is None:
-      loc = 0.0
-    bottleneck_centered = bottleneck - loc
-    bottleneck_centered_perturbed, bits = super().__call__(
-        bottleneck_centered, scale_indexes, training=training)
-    bottleneck_perturbed = bottleneck_centered_perturbed + loc
-    return bottleneck_perturbed, bits
+      return super().__call__(bottleneck, scale_indexes, training=training)
+    else:
+      bottleneck, bits = super().__call__(
+          bottleneck - loc, scale_indexes, training=training)
+      return bottleneck + loc, bits
 
   @tf.Module.with_name_scope
-  def quantize(self, bottleneck, scale_indexes, loc=None):
+  def quantize(self, bottleneck, loc=None):
     """Quantizes a floating-point tensor.
 
     To use this entropy model as an information bottleneck during training, pass
     a tensor through this function. The tensor is rounded to integer values
-    modulo a quantization offset, which depends on `indexes`. For instance, for
-    Gaussian distributions, the returned values are rounded to the location of
-    the mode of the distributions plus or minus an integer.
+    modulo the location parameters of the prior distribution given in `loc`.
 
     The gradient of this rounding operation is overridden with the identity
     (straight-through gradient estimator).
 
     Args:
       bottleneck: `tf.Tensor` containing the data to be quantized.
-      scale_indexes: `tf.Tensor` indexing the scale parameter for each element
-        in `bottleneck`. Must have the same shape as `bottleneck`.
       loc: `None` or `tf.Tensor`. If `None`, the location parameter for all
         elements is assumed to be zero. Otherwise, specifies the location
         parameter for each element in `bottleneck`. Must have the same shape as
@@ -596,10 +588,7 @@ class LocationScaleIndexedEntropyModel(ContinuousIndexedEntropyModel):
     Returns:
       A `tf.Tensor` containing the quantized values.
     """
-    if loc is None:
-      return super().quantize(bottleneck, scale_indexes)
-    else:
-      return super().quantize(bottleneck - loc, scale_indexes) + loc
+    return round_ops.round_st(bottleneck, loc)
 
   @tf.Module.with_name_scope
   def compress(self, bottleneck, scale_indexes, loc=None):

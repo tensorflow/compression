@@ -35,7 +35,7 @@ from tensorflow_compression.python.layers.soft_round import *
 from tensorflow_compression.python.ops.gen_ops import *
 from tensorflow_compression.python.ops.math_ops import *
 from tensorflow_compression.python.ops.padding_ops import *
-from tensorflow_compression.python.ops.soft_round_ops import *
+from tensorflow_compression.python.ops.round_ops import *
 
 from tensorflow_compression.python.util.packed_tensors import *
 # pylint: enable=wildcard-import

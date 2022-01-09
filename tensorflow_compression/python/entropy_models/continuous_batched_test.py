@@ -14,13 +14,15 @@
 # ==============================================================================
 """Tests of batched continuous entropy model."""
 
+from absl.testing import parameterized
 import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow_compression.python.distributions import uniform_noise
 from tensorflow_compression.python.entropy_models.continuous_batched import ContinuousBatchedEntropyModel
 
 
-class ContinuousBatchedEntropyModelTest(tf.test.TestCase):
+class ContinuousBatchedEntropyModelTest(tf.test.TestCase,
+                                        parameterized.TestCase):
 
   def test_can_instantiate(self):
     noisy = uniform_noise.NoisyNormal(loc=0., scale=1.)
@@ -107,45 +109,41 @@ class ContinuousBatchedEntropyModelTest(tf.test.TestCase):
     x_decompressed = em.decompress(em.compress(x), [100])
     self.assertAllEqual(x_decompressed, x_quantized)
 
-  def test_information_bounds(self):
-    # bits w/ `training=True` should be greater than bits w/ `training=False`
-    # because it is defined as an upper bound (albeit for infinite data). The
-    # actual length of the bit string should always be greater than
-    # bits w/ `training=False` because range coding is only asymptotically
-    # optimal, and because it operates on quantized probabilities.
-    for scale in 2 ** tf.linspace(-2., 7., 10):
-      noisy = uniform_noise.NoisyNormal(loc=0., scale=scale)
-      em = ContinuousBatchedEntropyModel(noisy, 1, compression=True)
-      x = noisy.base.sample([10000])
-      _, bits_eval = em(x, training=False)
-      _, bits_training = em(x, training=True)
-      bits_compressed = 8 * len(em.compress(x).numpy())
-      self.assertGreater(bits_training, .9975 * bits_eval)
+  @parameterized.parameters(*[2. ** i for i in range(-2, 8)])
+  def test_information_bounds(self, scale):
+    # Off-center prior to test quantization offset heuristic. Without it, it
+    # should be harder to achieve the bounds below.
+    prior = uniform_noise.NoisyNormal(loc=.5, scale=scale)
+    em = ContinuousBatchedEntropyModel(prior, coding_rank=1, compression=True)
+    x = prior.base.sample([1000000])
+    _, bits_eval = em(x, training=False)
+    _, bits_training = em(x, training=True)
+    bits_compressed = 8 * len(em.compress(x).numpy())
+    # Asymptotically, the entropy estimate with `training=True` is an upper
+    # bound on the entropy estimate with `training=False`. (With limited data,
+    # fluctuations are possible.)
+    with self.subTest("training bits > eval bits"):
+      # Sample size is too small for the bound to be asymptotic. Increasing it
+      # would make tests run too long.
+      self.assertGreater(bits_training, 0.999999 * bits_eval)
+    # Asymptotically, the length of the bit string should be greater than the
+    # entropy estimate with `training=False` because range coding is only
+    # asymptotically optimal, and because it operates on quantized
+    # probabilities.
+    with self.subTest("compressed bits > eval bits"):
       self.assertGreater(bits_compressed, bits_eval)
-
-  def test_low_entropy_bounds(self):
-    # For low entropy distributions, the training bound should be very loose,
-    # and the overhead of range coding manageable.
-    noisy = uniform_noise.NoisyNormal(loc=0., scale=.25)
-    em = ContinuousBatchedEntropyModel(noisy, 1, compression=True)
-    x = noisy.base.sample([10000])
-    _, bits_eval = em(x, training=False)
-    _, bits_training = em(x, training=True)
-    bits_compressed = 8 * len(em.compress(x).numpy())
-    self.assertAllClose(bits_training, bits_eval, atol=0, rtol=1.25)
-    self.assertAllClose(bits_compressed, bits_eval, atol=0, rtol=5e-3)
-
-  def test_high_entropy_bounds(self):
-    # For high entropy distributions, the training bound should be very tight,
-    # and the overhead of range coding manageable.
-    noisy = uniform_noise.NoisyNormal(loc=0., scale=100.)
-    em = ContinuousBatchedEntropyModel(noisy, 1, compression=True)
-    x = noisy.base.sample([10000])
-    _, bits_eval = em(x, training=False)
-    _, bits_training = em(x, training=True)
-    bits_compressed = 8 * len(em.compress(x).numpy())
-    self.assertAllClose(bits_training, bits_eval, atol=0, rtol=5e-5)
-    self.assertAllClose(bits_compressed, bits_eval, atol=0, rtol=5e-3)
+    # For low entropy distributions, the training bound can be very loose.
+    if scale <= .5:
+      with self.subTest("training bound loose"):
+        self.assertAllClose(bits_training, bits_eval, atol=0, rtol=1.25)
+        self.assertNotAllClose(bits_training, bits_eval, atol=0, rtol=1e-2)
+    # For high entropy distributions, the training bound should be tight.
+    if scale >= 64:
+      with self.subTest("training bound tight"):
+        self.assertAllClose(bits_training, bits_eval, atol=0, rtol=1e-5)
+    # The overhead of range coding should always be manageable.
+    with self.subTest("range coding overhead"):
+      self.assertAllClose(bits_compressed, bits_eval, atol=0, rtol=5e-3)
 
   def test_compression_works_after_serialization(self):
     noisy = uniform_noise.NoisyNormal(loc=.5, scale=8.)
@@ -177,7 +175,7 @@ class ContinuousBatchedEntropyModelTest(tf.test.TestCase):
 
   def test_compression_works_in_tf_function(self):
     noisy = uniform_noise.NoisyNormal(loc=0, scale=5.)
-    sample = noisy.base.sample([100])
+    samples = noisy.base.sample([100])
 
     # Since tf.function traces each function twice, and only allows variable
     # creation in the first call, we need to have a stateful object in which we
@@ -190,11 +188,11 @@ class ContinuousBatchedEntropyModelTest(tf.test.TestCase):
         if not hasattr(self, "em"):
           self.em = ContinuousBatchedEntropyModel(noisy, 1, compression=True)
         compressed = self.em.compress(values)
-        decompressed = self.em.decompress(compressed, [])
-        return decompressed
+        return self.em.decompress(compressed, [100])
 
-    values_eager = Compressor().compress(sample)
-    values_function = tf.function(Compressor().compress)(sample)
+    values_eager = Compressor().compress(samples)
+    values_function = tf.function(Compressor().compress)(samples)
+    self.assertAllClose(samples, values_eager, rtol=0., atol=.5)
     self.assertAllEqual(values_eager, values_function)
 
   def test_small_cdfs_for_dirac_prior_without_quantization_offset(self):
@@ -220,7 +218,7 @@ class ContinuousBatchedEntropyModelTest(tf.test.TestCase):
     self.assertAllLessEqual(bits_estimate, 16)
     self.assertAllLessEqual(bitstring_bits, 16)
     # Quantization noise should be between -.5 and .5
-    self.assertAllLessEqual(tf.abs(x - x_decoded), 0.5)
+    self.assertAllClose(x, x_decoded, rtol=0., atol=.5)
 
 
 if __name__ == "__main__":

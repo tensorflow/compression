@@ -18,10 +18,29 @@ import tensorflow as tf
 
 
 __all__ = [
+    "round_st",
     "soft_round",
     "soft_round_inverse",
     "soft_round_conditional_mean",
 ]
+
+
+@tf.custom_gradient
+def _round_st_no_offset(inputs):
+  return tf.round(inputs), lambda x: x
+
+
+@tf.custom_gradient
+def _round_st_offset(inputs, offset):
+  return tf.round(inputs - offset) + offset, lambda x: (x, None)
+
+
+def round_st(inputs, offset=None):
+  """Straight-through round with optional quantization offset."""
+  if offset is None:
+    return _round_st_no_offset(inputs)
+  else:
+    return _round_st_offset(inputs, offset)
 
 
 def soft_round(x, alpha, eps=1e-3):

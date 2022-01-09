@@ -75,7 +75,7 @@ py_library(
     name = "soft_round",
     srcs = ["soft_round.py"],
     srcs_version = "PY3",
-    deps = ["//tensorflow_compression/python/ops:soft_round_ops"],
+    deps = ["//tensorflow_compression/python/ops:round_ops"],
 )
 
 py_test(
@@ -84,7 +84,7 @@ py_test(
     python_version = "PY3",
     deps = [
         ":soft_round",
-        "//tensorflow_compression/python/ops:soft_round_ops",
+        "//tensorflow_compression/python/ops:round_ops",
     ],
 )
 

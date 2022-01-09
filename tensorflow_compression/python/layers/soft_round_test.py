@@ -16,7 +16,7 @@
 
 import tensorflow as tf
 from tensorflow_compression.python.layers import soft_round
-from tensorflow_compression.python.ops import soft_round_ops
+from tensorflow_compression.python.ops import round_ops
 
 
 class SoftRoundTest(tf.test.TestCase):
@@ -32,16 +32,14 @@ class SoftRoundTest(tf.test.TestCase):
     layer = soft_round.SoftRound(alpha=alpha)
     x = tf.linspace(-5.0, 5.0, num=50)
     y = layer(x)
-    self.assertAllClose(y,
-                        soft_round_ops.soft_round(x, alpha=alpha))
+    self.assertAllClose(y, round_ops.soft_round(x, alpha=alpha))
 
   def test_soft_round_layer_inverse_inverse_soft_rounds(self):
     alpha = 5.0
     layer = soft_round.SoftRound(alpha=alpha, inverse=True)
     x = tf.linspace(-5.0, 5.0, num=50)
     y = layer(x)
-    self.assertAllClose(
-        y, soft_round_ops.soft_round_inverse(x, alpha=alpha))
+    self.assertAllClose(y, round_ops.soft_round_inverse(x, alpha=alpha))
 
   def test_conditional_mean_takes_conditional_mean(self):
     alpha = 5.0
@@ -49,7 +47,7 @@ class SoftRoundTest(tf.test.TestCase):
     x = tf.linspace(-5.0, 5.0, num=50)
     y = layer(x)
     self.assertAllClose(
-        y, soft_round_ops.soft_round_conditional_mean(x, alpha=alpha))
+        y, round_ops.soft_round_conditional_mean(x, alpha=alpha))
 
 
 if __name__ == "__main__":

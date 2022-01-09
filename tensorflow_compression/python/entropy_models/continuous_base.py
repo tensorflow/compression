@@ -38,7 +38,6 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
 
   @abc.abstractmethod
   def __init__(self,
-               prior=None,
                coding_rank=None,
                compression=False,
                stateless=False,
@@ -46,21 +45,10 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
                tail_mass=2**-8,
                range_coder_precision=12,
                dtype=None,
-               prior_shape=None,
-               cdf=None,
-               cdf_offset=None,
-               cdf_length=None,
-               cdf_max_length=None,
                laplace_tail_mass=0):
     """Initializes the instance.
 
     Args:
-      prior: A `tfp.distributions.Distribution` object. A density model fitting
-        the marginal distribution of the bottleneck data with additive uniform
-        noise, which is shared a priori between the sender and the receiver. For
-        best results, the distribution should be flexible enough to have a
-        unit-width uniform distribution as a special case, since this is the
-        marginal distribution for bottleneck dimensions that are constant.
       coding_rank: Integer. Number of innermost dimensions considered a coding
         unit. Each coding unit is compressed to its own bit string, and the
         `__call__()` method sums over each coding unit.
@@ -80,83 +68,22 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
       tail_mass: Float. Approximate probability mass which is range encoded with
         less precision, by using a Golomb-like code.
       range_coder_precision: Integer. Precision passed to the range coding op.
-      dtype: Data type of prior. Must be provided when `prior` is omitted.
-      prior_shape: Batch shape of the prior (dimensions which are not assumed
-        i.i.d.). Must be provided when `prior` is omitted.
-      cdf: `tf.Tensor` or `None`. When provided, is used for range coding rather
-        than tables built from the prior.
-      cdf_offset: `tf.Tensor` or `None`. Must be provided along with `cdf`.
-      cdf_length: `tf.Tensor` or `None`. Must be provided along with `cdf`.
-      cdf_max_length: Maximum `cdf_length`. When provided, an empty range coding
-        table is created, which can then be restored using `set_weights`.
-        Requires `compression=True` and `stateless=False`.
+      dtype: `tf.dtypes.DType`. Data type of this entropy model (i.e. dtype of
+        prior, decompressed values).
       laplace_tail_mass: Float. If positive, will augment the prior with a
         Laplace mixture for training stability. (experimental)
     """
     super().__init__()
-
-    self._prior = prior
+    self._prior = None  # This will be set by subclasses, if appropriate.
     self._coding_rank = int(coding_rank)
     self._compression = bool(compression)
     self._stateless = bool(stateless)
     self._expected_grads = bool(expected_grads)
     self._tail_mass = float(tail_mass)
     self._range_coder_precision = int(range_coder_precision)
+    self._dtype = tf.as_dtype(dtype)
     self._laplace_tail_mass = float(laplace_tail_mass)
-
-    if not (prior is not None) == (dtype is None) == (prior_shape is None):
-      raise ValueError(
-          "Either `prior` or both `dtype` and `prior_shape` must be provided.")
-    if prior is None:
-      self._dtype = tf.as_dtype(dtype)
-      self._prior_shape = tf.TensorShape(prior_shape)
-    else:
-      if prior.event_shape.rank:
-        raise ValueError(
-            "`prior` must be a (batch of) scalar distribution(s).")
-      self._dtype = tf.as_dtype(prior.dtype)
-      self._prior_shape = tf.TensorShape(prior.batch_shape)
-
     with self.name_scope:
-      if self.compression:
-        if not (cdf is None) == (cdf_offset is None) == (cdf_length is None):
-          raise ValueError(
-              "Either all or none of `cdf`, `cdf_offset`, and `cdf_length` "
-              "must be provided.")
-        if (prior is None) + (cdf_max_length is None) + (cdf is None) != 2:
-          raise ValueError(
-              "With `compression=True`, must provide exactly one of `prior`, "
-              "`cdf`, or `cdf_max_length`.")
-        if prior is not None:
-          cdf, cdf_offset, cdf_length = self._build_tables(prior)
-        elif cdf_max_length is not None:
-          if self.stateless:
-            raise ValueError(
-                "With `stateless=True`, can't provide `cdf_max_length`.")
-          cdf_max_length = int(cdf_max_length)
-          context_size = int(self.context_shape.num_elements())
-          zeros = tf.zeros([context_size, cdf_max_length], dtype=tf.int32)
-          cdf = zeros
-          cdf_offset = zeros[:, 0]
-          cdf_length = zeros[:, 0]
-        if self.stateless:
-          self._cdf = tf.convert_to_tensor(cdf, dtype=tf.int32, name="cdf")
-          self._cdf_offset = tf.convert_to_tensor(
-              cdf_offset, dtype=tf.int32, name="cdf_offset")
-          self._cdf_length = tf.convert_to_tensor(
-              cdf_length, dtype=tf.int32, name="cdf_length")
-        else:
-          self._cdf = tf.Variable(
-              cdf, dtype=tf.int32, trainable=False, name="cdf")
-          self._cdf_offset = tf.Variable(
-              cdf_offset, dtype=tf.int32, trainable=False, name="cdf_offset")
-          self._cdf_length = tf.Variable(
-              cdf_length, dtype=tf.int32, trainable=False, name="cdf_length")
-      else:
-        if not (cdf is None and cdf_offset is None and cdf_length is None and
-                cdf_max_length is None):
-          raise ValueError("CDFs can't be provided with `compression=False`")
-
       self._laplace_prior = (tfp.distributions.Laplace(loc=0.0, scale=1.0)
                              if laplace_tail_mass else None)
 
@@ -211,31 +138,6 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
     return self._laplace_tail_mass
 
   @property
-  def prior_shape(self):
-    """Batch shape of `prior` (dimensions which are not assumed i.i.d.)."""
-    return self._prior_shape
-
-  @property
-  def prior_shape_tensor(self):
-    """Batch shape of `prior` as a `Tensor`."""
-    return tf.constant(self.prior_shape.as_list(), dtype=tf.int32)
-
-  @property
-  def context_shape(self):
-    """The shape of the non-flattened PDF/CDF tables for range coding.
-
-    This is typically the same as the prior shape, but can differ e.g. in
-    universal entropy models. In any case, the context_shape contains the prior
-    shape (in the trailing dimensions).
-    """
-    return self.prior_shape
-
-  @property
-  def context_shape_tensor(self):
-    """The context shape as a `Tensor`."""
-    return tf.constant(self.context_shape.as_list(), dtype=tf.int32)
-
-  @property
   def coding_rank(self):
     """Number of innermost dimensions considered a coding unit."""
     return self._coding_rank
@@ -260,26 +162,63 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
     """Precision passed to range coding op."""
     return self._range_coder_precision
 
-  @tf.custom_gradient
-  def _quantize_no_offset(self, inputs):
-    return tf.round(inputs), lambda x: x
+  def _init_compression(self, cdf, cdf_offset, cdf_length, cdf_shape):
+    """Sets up this entropy model for using the range coder.
 
-  @tf.custom_gradient
-  def _quantize_offset(self, inputs, offset):
-    return tf.round(inputs - offset) + offset, lambda x: (x, None)
+    This is done by storing `cdf`, `cdf_offset`, and `cdf_length` in
+    `tf.Variable`s (`stateless=False`) or `tf.Tensor`s (`stateless=True`) as
+    attributes of this object, or creating the variables as placeholders if
+    `cdf_shape` is provided.
 
-  def _quantize(self, inputs, offset=None):
-    if offset is None:
-      outputs = self._quantize_no_offset(inputs)
+    The reason for pre-computing the tables is that they must not be
+    re-generated independently on the sending and receiving side, since small
+    numerical discrepancies between both sides can occur in this process. If the
+    tables differ slightly, this in turn would very likely cause catastrophic
+    error propagation during range decoding. For a more in-depth discussion of
+    this, see:
+
+    > "Integer Networks for Data Compression with Latent-Variable Models"<br />
+    > J. Ballé, N. Johnston, D. Minnen<br />
+    > https://openreview.net/forum?id=S1zz2i0cY7
+
+    Args:
+      cdf: CDF table for range coder.
+      cdf_offset: CDF offset table for range coder.
+      cdf_length: CDF length table for range coder.
+      cdf_shape: Iterable of 2 integers, the shape of `cdf`. Mutually exclusive
+        with the other three arguments. If provided, creates placeholder values
+        for them.
+    """
+    if not ((cdf is None) == (cdf_offset is None) == (cdf_length is None) ==
+            (cdf_shape is not None)):
+      raise ValueError(
+          "Either all of `cdf`, `cdf_offset`, and `cdf_length`; or `cdf_shape` "
+          "must be provided.")
+    if cdf_shape is not None:
+      if self.stateless:
+        raise ValueError("With `stateless=True`, can't provide `cdf_shape`.")
+      cdf_shape = tuple(map(int, cdf_shape))
+      if len(cdf_shape) != 2:
+        raise ValueError("`cdf_shape` must consist of 2 integers.")
+      zeros = tf.zeros(cdf_shape, dtype=tf.int32)
+      cdf = zeros
+      cdf_offset = zeros[:, 0]
+      cdf_length = zeros[:, 0]
+    if self.stateless:
+      self._cdf = tf.convert_to_tensor(cdf, dtype=tf.int32, name="cdf")
+      self._cdf_offset = tf.convert_to_tensor(
+          cdf_offset, dtype=tf.int32, name="cdf_offset")
+      self._cdf_length = tf.convert_to_tensor(
+          cdf_length, dtype=tf.int32, name="cdf_length")
     else:
-      outputs = self._quantize_offset(inputs, offset)
-    return outputs
+      self._cdf = tf.Variable(
+          cdf, dtype=tf.int32, trainable=False, name="cdf")
+      self._cdf_offset = tf.Variable(
+          cdf_offset, dtype=tf.int32, trainable=False, name="cdf_offset")
+      self._cdf_length = tf.Variable(
+          cdf_length, dtype=tf.int32, trainable=False, name="cdf_length")
 
-  def _offset_from_prior(self, prior):
-    """Computes quantization offset from the prior distribution."""
-    return helpers.quantization_offset(prior)
-
-  def _build_tables(self, prior):
+  def _build_tables(self, prior, offset=None, context_shape=None):
     """Computes integer-valued probability tables used by the range coder.
 
     These tables must not be re-generated independently on the sending and
@@ -292,20 +231,23 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
     > J. Ballé, N. Johnston, D. Minnen<br />
     > https://openreview.net/forum?id=S1zz2i0cY7
 
-    The tables are stored in `tf.Variable`s (`stateless=False`) or `tf.Tensor`s
-    (`stateless=True`) as attributes of this object. The recommended way is to
-    train the model with `compression=False`, then instantiate an entropy model
-    with `compression=True`, and distribute it to a sender and a receiver.
-
     Args:
       prior: The `tfp.distributions.Distribution` object (see initializer).
+      offset: Quantization offsets to use for sampling prior probabilities.
+        Defaults to 0.
+      context_shape: Shape of innermost dimensions to evaluate the prior on.
+        Defaults to and must include `prior.batch_shape`.
 
     Returns:
       CDF table, CDF offsets, CDF lengths.
     """
-    # TODO(jonycgn, relational): Consider not using offset when soft quantization
-    # is used.
-    offset = self._offset_from_prior(prior)
+    if offset is None:
+      offset = 0.
+    if context_shape is None:
+      context_shape = tf.TensorShape(prior.batch_shape)
+    # Subclasses should have already caught this, but better be safe.
+    assert not prior.event_shape.rank
+
     lower_tail = helpers.lower_tail(prior, self.tail_mass)
     upper_tail = helpers.upper_tail(prior, self.tail_mass)
     # Integers such that:
@@ -324,10 +266,10 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
     if tf.executing_eagerly() and max_length > 2048:
       logging.warning(
           "Very wide PMF with %d elements may lead to out of memory issues. "
-          "Consider priors with smaller dispersion or increasing `tail_mass` "
+          "Consider priors with smaller variance, or increasing `tail_mass` "
           "parameter.", int(max_length))
     samples = tf.range(tf.cast(max_length, self.dtype), dtype=self.dtype)
-    samples = tf.reshape(samples, [-1] + self.context_shape.rank * [1])
+    samples = tf.reshape(samples, [-1] + context_shape.rank * [1])
     samples += pmf_start
     pmf = prior.prob(samples)
 
@@ -335,10 +277,11 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
     pmf = tf.reshape(pmf, [max_length, -1])
     pmf = tf.transpose(pmf)
 
-    pmf_length = tf.broadcast_to(pmf_length, self.context_shape_tensor)
+    context_shape = tf.constant(context_shape.as_list(), dtype=tf.int32)
+    pmf_length = tf.broadcast_to(pmf_length, context_shape)
     pmf_length = tf.reshape(pmf_length, [-1])
     cdf_length = pmf_length + 2
-    cdf_offset = tf.broadcast_to(minima, self.context_shape_tensor)
+    cdf_offset = tf.broadcast_to(minima, context_shape)
     cdf_offset = tf.reshape(cdf_offset, [-1])
 
     # Prevent tensors from bouncing back and forth between host and GPU.
@@ -349,7 +292,7 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
         overflow = tf.math.maximum(1 - tf.reduce_sum(prob, keepdims=True), 0.)
         prob = tf.concat([prob, overflow], axis=0)
         cdf = gen_ops.pmf_to_quantized_cdf(
-            prob, precision=self.range_coder_precision)
+            tf.cast(prob, tf.float32), precision=self.range_coder_precision)
         return tf.pad(
             cdf, [[0, max_length - length]], mode="CONSTANT", constant_values=0)
 
@@ -359,7 +302,7 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
 
     return cdf, cdf_offset, cdf_length
 
-  def _log_prob_from_prior(self, prior, bottleneck_perturbed):
+  def _log_prob(self, prior, bottleneck_perturbed):
     """Evaluates prior.log_prob(bottleneck + noise)."""
     if self.laplace_tail_mass:
       laplace_prior = self._laplace_prior
@@ -399,11 +342,8 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
         expected_grads=self.expected_grads,
         tail_mass=self.tail_mass,
         range_coder_precision=self.range_coder_precision,
+        cdf_shape=tuple(map(int, self.cdf.shape)),
         dtype=self.dtype.name,
-        # TODO(jonycgn): pytype thinks TensorShape is not iterable, even though
-        # it defines __iter__.
-        prior_shape=tuple(map(int, self.prior_shape)),  # pytype:disable=wrong-arg-types
-        cdf_max_length=int(self.cdf.shape[1]),
         laplace_tail_mass=self.laplace_tail_mass,
     )
 

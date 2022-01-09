@@ -23,7 +23,7 @@ py_test(
     python_version = "PY3",
     deps = [
         ":math_ops",
-        ":soft_round_ops",
+        ":round_ops",
     ],
 )
 
@@ -48,16 +48,16 @@ py_test(
 )
 
 py_library(
-    name = "soft_round_ops",
-    srcs = ["soft_round_ops.py"],
+    name = "round_ops",
+    srcs = ["round_ops.py"],
     srcs_version = "PY3",
 )
 
 py_test(
-    name = "soft_round_ops_test",
-    srcs = ["soft_round_ops_test.py"],
+    name = "round_ops_test",
+    srcs = ["round_ops_test.py"],
     python_version = "PY3",
-    deps = [":soft_round_ops"],
+    deps = [":round_ops"],
 )
 
 filegroup(
