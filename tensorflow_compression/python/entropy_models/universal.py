@@ -107,8 +107,8 @@ class UniversalBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         laplace mixture for training stability.
       expected_grads: If True, will use analytical expected gradients during
         backpropagation w.r.t. additive uniform noise.
-      tail_mass: Float. Approximate probability mass which is range encoded with
-        less precision, by using a Golomb-like code.
+      tail_mass: Float. Approximate probability mass which is encoded using an
+        Elias gamma code embedded into the range coder.
       range_coder_precision: Integer. Precision passed to the range coding op.
       num_noise_levels: Integer. The number of levels used to quantize the
         uniform noise.
@@ -127,7 +127,6 @@ class UniversalBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         stateless=stateless,
         expected_grads=expected_grads,
         tail_mass=tail_mass,
-        range_coder_precision=range_coder_precision,
         dtype=prior.dtype,
         laplace_tail_mass=laplace_tail_mass,
     )
@@ -140,11 +139,9 @@ class UniversalBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       if self.compression:
         offset = _range_coding_offsets(
             self._num_noise_levels, self.prior_shape, self.dtype)
-        cdf, cdf_offset, cdf_length = self._build_tables(
-            self.prior,
-            offset=offset,
-            context_shape=(self._num_noise_levels,) + self.prior_shape)
-        self._init_compression(cdf, cdf_offset, cdf_length, None)
+        cdf, cdf_offset = self._build_tables(
+            self.prior, range_coder_precision, offset=offset)
+        self._init_compression(cdf, cdf_offset, None)
 
   @property
   def prior_shape(self):
@@ -191,7 +188,6 @@ class UniversalBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       training: Boolean. If `False`, computes the bitcost using discretized
        uniform noise. If `True`, estimates the differential entropy with uniform
        noise.
-
 
     Returns:
       A tuple
@@ -250,28 +246,14 @@ class UniversalBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         input_shape, [input_rank - self.coding_rank, self.coding_rank])
     broadcast_shape = coding_shape[
         :self.coding_rank - len(self.prior_shape)]
-
     indexes, offset = self._compute_indexes_and_offset(broadcast_shape)
     bottleneck -= offset
     symbols = tf.cast(tf.round(bottleneck), tf.int32)
-    symbols = tf.reshape(symbols, tf.concat([[-1], coding_shape], 0))
-
-    # Prevent tensors from bouncing back and forth between host and GPU.
-    with tf.device("/cpu:0"):
-      cdf = self.cdf
-      cdf_length = self.cdf_length
-      cdf_offset = self.cdf_offset
-      def loop_body(symbols):
-        return gen_ops.unbounded_index_range_encode(
-            symbols, indexes, cdf, cdf_length, cdf_offset,
-            precision=self.range_coder_precision,
-            overflow_width=4, debug_level=1)
-
-      # TODO(jonycgn,ssjhv): Consider switching to Python control flow.
-      strings = tf.map_fn(
-          loop_body, symbols, dtype=tf.string, name="compress")
-
-    return tf.reshape(strings, batch_shape)
+    symbols -= tf.gather(self.cdf_offset, indexes)
+    handle = gen_ops.create_range_encoder(batch_shape, self.cdf)
+    encode_indexes = tf.broadcast_to(indexes, tf.shape(symbols))
+    handle = gen_ops.entropy_encode_index(handle, encode_indexes, symbols)
+    return gen_ops.entropy_encode_finalize(handle)
 
   @tf.Module.with_name_scope
   def decompress(self, strings, broadcast_shape):
@@ -292,29 +274,16 @@ class UniversalBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     """
     strings = tf.convert_to_tensor(strings, dtype=tf.string)
     broadcast_shape = tf.convert_to_tensor(broadcast_shape, dtype=tf.int32)
-    batch_shape = tf.shape(strings)
-    symbols_shape = tf.concat(
-        [batch_shape, broadcast_shape, self.prior_shape_tensor], 0)
-
+    decode_shape = tf.concat([broadcast_shape, self.prior_shape_tensor], 0)
+    output_shape = tf.concat([tf.shape(strings), decode_shape], 0)
     indexes, offset = self._compute_indexes_and_offset(broadcast_shape)
-    strings = tf.reshape(strings, [-1])
-
-    # Prevent tensors from bouncing back and forth between host and GPU.
-    with tf.device("/cpu:0"):
-      cdf = self.cdf
-      cdf_length = self.cdf_length
-      cdf_offset = self.cdf_offset
-      def loop_body(string):
-        return gen_ops.unbounded_index_range_decode(
-            string, indexes, cdf, cdf_length, cdf_offset,
-            precision=self.range_coder_precision,
-            overflow_width=4, debug_level=1)
-
-      # TODO(jonycgn,ssjhv): Consider switching to Python control flow.
-      symbols = tf.map_fn(
-          loop_body, strings, dtype=tf.int32, name="decompress")
-
-    symbols = tf.reshape(symbols, symbols_shape)
+    handle = gen_ops.create_range_decoder(strings, self.cdf)
+    decode_indexes = tf.broadcast_to(indexes, output_shape)
+    handle, symbols = gen_ops.entropy_decode_index(
+        handle, decode_indexes, decode_shape, self.cdf_offset.dtype)
+    sanity = gen_ops.entropy_decode_finalize(handle)
+    tf.debugging.assert_equal(sanity, True, message="Sanity check failed.")
+    symbols += tf.gather(self.cdf_offset, indexes)
     outputs = tf.cast(symbols, self.dtype)
     return outputs + offset
 
@@ -382,8 +351,8 @@ class UniversalIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         laplace mixture for training stability. (experimental)
       expected_grads: If True, will use analytical expected gradients during
         backpropagation w.r.t. additive uniform noise.
-      tail_mass: Float. Approximate probability mass which is range encoded with
-        less precision, by using a Golomb-like code.
+      tail_mass: Float. Approximate probability mass which is encoded using an
+        Elias gamma code embedded into the range coder.
       range_coder_precision: Integer. Precision passed to the range coding op.
       stateless: Boolean. If True, creates range coding tables as `Tensor`s
         rather than `Variable`s.
@@ -406,7 +375,6 @@ class UniversalIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         stateless=stateless,
         expected_grads=expected_grads,
         tail_mass=tail_mass,
-        range_coder_precision=range_coder_precision,
         dtype=dtype,
         laplace_tail_mass=laplace_tail_mass,
     )
@@ -426,12 +394,11 @@ class UniversalIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         indexes = tf.meshgrid(*indexes, indexing="ij")
         indexes = tf.stack(indexes, axis=-1)
         self._prior = self._make_prior(indexes)
-        cdf, cdf_offset, cdf_length = self._build_tables(
-            self.prior,
-            offset=_range_coding_offsets(
-                self._num_noise_levels, self.prior_shape, self.dtype),
-            context_shape=self.context_shape)
-        self._init_compression(cdf, cdf_offset, cdf_length, None)
+        offset = _range_coding_offsets(
+            self._num_noise_levels, self.prior.batch_shape, self.dtype)
+        cdf, cdf_offset = self._build_tables(
+            self.prior, range_coder_precision, offset=offset)
+        self._init_compression(cdf, cdf_offset, None)
 
   @property
   def index_ranges(self):
@@ -447,16 +414,6 @@ class UniversalIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
   def prior_fn(self):
     """Class or factory function returning a `Distribution` object."""
     return self._prior_fn
-
-  @property
-  def prior_shape(self):
-    """Batch shape of `prior` (dimensions which are not assumed i.i.d.)."""
-    return tf.TensorShape(self.prior.batch_shape)
-
-  @property
-  def context_shape(self):
-    """See base class."""
-    return (self._num_noise_levels,) + self.prior_shape
 
   @property
   def index_ranges_without_offsets(self):
@@ -573,34 +530,14 @@ class UniversalIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     indexes = _add_offset_indexes(indexes, self._num_noise_levels)
     indexes = self._normalize_indexes(indexes)
     flat_indexes = self._flatten_indexes(indexes)
-
     symbols_shape = tf.shape(flat_indexes)
     batch_shape = symbols_shape[:-self.coding_rank]
-    flat_shape = tf.concat([[-1], symbols_shape[-self.coding_rank:]], 0)
-
-    flat_indexes = tf.reshape(flat_indexes, flat_shape)
-
     offset = self._offset_from_indexes(indexes)
     symbols = tf.cast(tf.round(bottleneck - offset), tf.int32)
-    symbols = tf.reshape(symbols, flat_shape)
-
-    # Prevent tensors from bouncing back and forth between host and GPU.
-    with tf.device("/cpu:0"):
-      cdf = self.cdf
-      cdf_length = self.cdf_length
-      cdf_offset = self.cdf_offset
-      def loop_body(args):
-        return gen_ops.unbounded_index_range_encode(
-            args[0], args[1], cdf, cdf_length, cdf_offset,
-            precision=self.range_coder_precision,
-            overflow_width=4, debug_level=1)
-
-      # TODO(jonycgn,ssjhv): Consider switching to Python control flow.
-      strings = tf.map_fn(
-          loop_body, (symbols, flat_indexes), dtype=tf.string, name="compress")
-
-    strings = tf.reshape(strings, batch_shape)
-    return strings
+    symbols -= tf.gather(self.cdf_offset, flat_indexes)
+    handle = gen_ops.create_range_encoder(batch_shape, self.cdf)
+    handle = gen_ops.entropy_encode_index(handle, flat_indexes, symbols)
+    return gen_ops.entropy_encode_finalize(handle)
 
   @tf.Module.with_name_scope
   def decompress(self, strings, indexes):
@@ -620,30 +557,14 @@ class UniversalIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     indexes = _add_offset_indexes(indexes, self._num_noise_levels)
     indexes = self._normalize_indexes(indexes)
     flat_indexes = self._flatten_indexes(indexes)
-
     symbols_shape = tf.shape(flat_indexes)
-    flat_shape = tf.concat([[-1], symbols_shape[-self.coding_rank:]], 0)
-
-    flat_indexes = tf.reshape(flat_indexes, flat_shape)
-
-    strings = tf.reshape(strings, [-1])
-
-    # Prevent tensors from bouncing back and forth between host and GPU.
-    with tf.device("/cpu:0"):
-      cdf = self.cdf
-      cdf_length = self.cdf_length
-      cdf_offset = self.cdf_offset
-      def loop_body(args):
-        return gen_ops.unbounded_index_range_decode(
-            args[0], args[1], cdf, cdf_length, cdf_offset,
-            precision=self.range_coder_precision,
-            overflow_width=4, debug_level=1)
-
-      # TODO(jonycgn,ssjhv): Consider switching to Python control flow.
-      symbols = tf.map_fn(
-          loop_body, (strings, flat_indexes), dtype=tf.int32, name="decompress")
-
-    symbols = tf.reshape(symbols, symbols_shape)
+    decode_shape = symbols_shape[-self.coding_rank:]
+    handle = gen_ops.create_range_decoder(strings, self.cdf)
+    handle, symbols = gen_ops.entropy_decode_index(
+        handle, flat_indexes, decode_shape, self.cdf_offset.dtype)
+    sanity = gen_ops.entropy_decode_finalize(handle)
+    tf.debugging.assert_equal(sanity, True, message="Sanity check failed.")
+    symbols += tf.gather(self.cdf_offset, flat_indexes)
     offset = self._offset_from_indexes(indexes)
     return tf.cast(symbols, self.dtype) + offset
 

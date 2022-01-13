@@ -30,7 +30,6 @@ class ContinuousBatchedEntropyModelTest(tf.test.TestCase,
     self.assertIs(em.prior, noisy)
     self.assertEqual(em.coding_rank, 1)
     self.assertEqual(em.tail_mass, 2**-8)
-    self.assertEqual(em.range_coder_precision, 12)
     self.assertEqual(em.dtype, noisy.dtype)
 
   def test_can_instantiate_statelessly(self):
@@ -43,7 +42,7 @@ class ContinuousBatchedEntropyModelTest(tf.test.TestCase,
     em = ContinuousBatchedEntropyModel(
         compression=True, stateless=True, coding_rank=1,
         prior_shape=noisy.batch_shape, dtype=noisy.dtype,
-        cdf=em.cdf, cdf_offset=em.cdf_offset, cdf_length=em.cdf_length,
+        cdf=em.cdf, cdf_offset=em.cdf_offset,
         quantization_offset=em.quantization_offset,
     )
     self.assertEqual(em.compression, True)
@@ -196,16 +195,15 @@ class ContinuousBatchedEntropyModelTest(tf.test.TestCase,
     self.assertAllEqual(values_eager, values_function)
 
   def test_small_cdfs_for_dirac_prior_without_quantization_offset(self):
-    prior = uniform_noise.NoisyNormal(loc=100 * tf.range(16.0), scale=1e-10)
-    prior._quantization_offset = lambda: 0.0
+    prior = uniform_noise.NoisyNormal(loc=100. * tf.range(16.), scale=1e-10)
     em = ContinuousBatchedEntropyModel(
-        prior, coding_rank=2, compression=True)
-    self.assertAllLessEqual(em._cdf_length, 10)
+        prior, coding_rank=2, non_integer_offset=False, compression=True)
+    self.assertEqual(em.cdf_offset.shape[0], 16)
+    self.assertLessEqual(em.cdf.shape[0], 16 * 6)
 
   def test_small_bitcost_for_dirac_prior(self):
-    prior = uniform_noise.NoisyNormal(loc=100 * tf.range(16.0), scale=1e-10)
-    em = ContinuousBatchedEntropyModel(
-        prior, coding_rank=2, compression=True)
+    prior = uniform_noise.NoisyNormal(loc=100. * tf.range(16.), scale=1e-10)
+    em = ContinuousBatchedEntropyModel(prior, coding_rank=2, compression=True)
     num_symbols = 1000
     source = prior.base
     x = source.sample((3, num_symbols))

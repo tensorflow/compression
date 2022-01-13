@@ -139,8 +139,7 @@ def lower_tail(distribution, tail_mass):
   number of symbols. This method returns a cut-off location for the lower
   tail, such that approximately `tail_mass` probability mass is contained in
   the tails (together). The tails are then handled by using the 'overflow'
-  functionality of the range coder implementation (using a Golomb-like
-  universal code).
+  functionality of the range coder implementation (using an Elias gamma code).
 
   Args:
     distribution: A `tfp.distributions.Distribution` object.
@@ -176,8 +175,7 @@ def upper_tail(distribution, tail_mass):
   number of symbols. This method returns a cut-off location for the upper
   tail, such that approximately `tail_mass` probability mass is contained in
   the tails (together). The tails are then handled by using the 'overflow'
-  functionality of the range coder implementation (using a Golomb-like
-  universal code).
+  functionality of the range coder implementation (using an Elias gamma code).
 
   Args:
     distribution: A `tfp.distributions.Distribution` object.

@@ -178,16 +178,14 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         `stateless=True` is implied and the provided value is ignored.
       expected_grads: If True, will use analytical expected gradients during
         backpropagation w.r.t. additive uniform noise.
-      tail_mass: Float. Approximate probability mass which is range encoded with
-        less precision, by using a Golomb-like code.
+      tail_mass: Float. Approximate probability mass which is encoded using an
+        Elias gamma code embedded into the range coder.
       range_coder_precision: Integer. Precision passed to the range coding op.
       dtype: `tf.dtypes.DType`. Data type of this entropy model (i.e. dtype of
         prior, decompressed values).
       laplace_tail_mass: Float. If positive, will augment the prior with a
         laplace mixture for training stability. (experimental)
     """
-    if coding_rank <= 0:
-      raise ValueError("`coding_rank` must be larger than 0.")
     if not callable(prior_fn):
       raise TypeError("`prior_fn` must be a class or factory function.")
     for name, fn in parameter_fns.items():
@@ -202,7 +200,6 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         stateless=stateless,
         expected_grads=expected_grads,
         tail_mass=tail_mass,
-        range_coder_precision=range_coder_precision,
         dtype=dtype,
         laplace_tail_mass=laplace_tail_mass,
     )
@@ -226,8 +223,8 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
           indexes = tf.meshgrid(*indexes, indexing="ij")
           indexes = tf.stack(indexes, axis=self.channel_axis)
         self._prior = self._make_prior(indexes)
-        cdf, cdf_offset, cdf_length = self._build_tables(self.prior)
-        self._init_compression(cdf, cdf_offset, cdf_length, None)
+        cdf, cdf_offset = self._build_tables(self.prior, range_coder_precision)
+        self._init_compression(cdf, cdf_offset, None)
 
   @property
   def index_ranges(self):
@@ -363,33 +360,13 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     """
     indexes = self._normalize_indexes(indexes)
     flat_indexes = self._flatten_indexes(indexes)
-
-    symbols_shape = tf.shape(flat_indexes)
-    batch_shape = symbols_shape[:-self.coding_rank]
-    flat_shape = tf.concat([[-1], symbols_shape[-self.coding_rank:]], 0)
-
-    flat_indexes = tf.reshape(flat_indexes, flat_shape)
-
+    all_but_last_n_elems = lambda t, n: t[:-n] if n else t
+    batch_shape = all_but_last_n_elems(tf.shape(flat_indexes), self.coding_rank)
     symbols = tf.cast(tf.round(bottleneck), tf.int32)
-    symbols = tf.reshape(symbols, flat_shape)
-
-    # Prevent tensors from bouncing back and forth between host and GPU.
-    with tf.device("/cpu:0"):
-      cdf = self.cdf
-      cdf_length = self.cdf_length
-      cdf_offset = self.cdf_offset
-      def loop_body(args):
-        return gen_ops.unbounded_index_range_encode(
-            args[0], args[1], cdf, cdf_length, cdf_offset,
-            precision=self.range_coder_precision,
-            overflow_width=4, debug_level=1)
-
-      # TODO(jonycgn,ssjhv): Consider switching to Python control flow.
-      strings = tf.map_fn(
-          loop_body, (symbols, flat_indexes), dtype=tf.string, name="compress")
-
-    strings = tf.reshape(strings, batch_shape)
-    return strings
+    symbols -= tf.gather(self.cdf_offset, flat_indexes)
+    handle = gen_ops.create_range_encoder(batch_shape, self.cdf)
+    handle = gen_ops.entropy_encode_index(handle, flat_indexes, symbols)
+    return gen_ops.entropy_encode_finalize(handle)
 
   @tf.Module.with_name_scope
   def decompress(self, strings, indexes):
@@ -406,32 +383,17 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       A `tf.Tensor` of the same shape as `indexes` (without the optional channel
       dimension).
     """
+    strings = tf.convert_to_tensor(strings, dtype=tf.string)
     indexes = self._normalize_indexes(indexes)
     flat_indexes = self._flatten_indexes(indexes)
-
-    symbols_shape = tf.shape(flat_indexes)
-    flat_shape = tf.concat([[-1], symbols_shape[-self.coding_rank:]], 0)
-
-    flat_indexes = tf.reshape(flat_indexes, flat_shape)
-
-    strings = tf.reshape(strings, [-1])
-
-    # Prevent tensors from bouncing back and forth between host and GPU.
-    with tf.device("/cpu:0"):
-      cdf = self.cdf
-      cdf_length = self.cdf_length
-      cdf_offset = self.cdf_offset
-      def loop_body(args):
-        return gen_ops.unbounded_index_range_decode(
-            args[0], args[1], cdf, cdf_length, cdf_offset,
-            precision=self.range_coder_precision,
-            overflow_width=4, debug_level=1)
-
-      # TODO(jonycgn,ssjhv): Consider switching to Python control flow.
-      symbols = tf.map_fn(
-          loop_body, (strings, flat_indexes), dtype=tf.int32, name="decompress")
-
-    symbols = tf.reshape(symbols, symbols_shape)
+    last_n_elems = lambda t, n: t[-n:] if n else t[:0]
+    decode_shape = last_n_elems(tf.shape(flat_indexes), self.coding_rank)
+    handle = gen_ops.create_range_decoder(strings, self.cdf)
+    handle, symbols = gen_ops.entropy_decode_index(
+        handle, flat_indexes, decode_shape, self.cdf_offset.dtype)
+    sanity = gen_ops.entropy_decode_finalize(handle)
+    tf.debugging.assert_equal(sanity, True, message="Sanity check failed.")
+    symbols += tf.gather(self.cdf_offset, flat_indexes)
     return tf.cast(symbols, self.dtype)
 
   def get_config(self):
@@ -509,8 +471,8 @@ class LocationScaleIndexedEntropyModel(ContinuousIndexedEntropyModel):
         `stateless=True` is implied and the provided value is ignored.
       expected_grads: If True, will use analytical expected gradients during
         backpropagation w.r.t. additive uniform noise.
-      tail_mass: Float. Approximate probability mass which is range encoded with
-        less precision, by using a Golomb-like code.
+      tail_mass: Float. Approximate probability mass which is encoded using an
+        Elias gamma code embedded into the range coder.
       range_coder_precision: Integer. Precision passed to the range coding op.
       dtype: `tf.dtypes.DType`. The data type of all floating-point
         computations carried out in this class.

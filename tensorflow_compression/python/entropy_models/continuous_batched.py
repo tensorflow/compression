@@ -97,8 +97,7 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
                prior_shape=None,
                cdf=None,
                cdf_offset=None,
-               cdf_length=None,
-               cdf_shape=None,
+               cdf_shapes=None,
                non_integer_offset=True,
                quantization_offset=None,
                laplace_tail_mass=0):
@@ -129,23 +128,22 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         `stateless=True` is implied and the provided value is ignored.
       expected_grads: If True, will use analytical expected gradients during
         backpropagation w.r.t. additive uniform noise.
-      tail_mass: Float. Approximate probability mass which is range encoded with
-        less precision, by using a Golomb-like code.
+      tail_mass: Float. Approximate probability mass which is encoded using an
+        Elias gamma code embedded into the range coder.
       range_coder_precision: Integer. Precision passed to the range coding op.
       dtype: `tf.dtypes.DType`. Data type of this entropy model (i.e. dtype of
         prior, decompressed values). Must be provided if `prior` is omitted.
       prior_shape: Batch shape of the prior (dimensions which are not assumed
-        i.i.d.). Must be provided when `prior` is omitted.
-      cdf: `tf.Tensor` or `None`. When provided, is used for range coding rather
+        i.i.d.). Must be provided if `prior` is omitted.
+      cdf: `tf.Tensor` or `None`. If provided, is used for range coding rather
         than tables built from the prior.
       cdf_offset: `tf.Tensor` or `None`. Must be provided along with `cdf`.
-      cdf_length: `tf.Tensor` or `None`. Must be provided along with `cdf`.
-      cdf_shape: Shape of `cdf`. When provided, an empty range coding table is
-        created, which can then be restored using `set_weights`. Requires
-        `compression=True` and `stateless=False`.
+      cdf_shapes: Shapes of `cdf` and `cdf_offset`. If provided, empty range
+        coding tables are created, which can then be restored using
+        `set_weights`. Requires `compression=True` and `stateless=False`.
       non_integer_offset: Boolean. Whether to quantize to non-integer offsets
-        heuristically determined from mode/median of prior. Set to `False` when
-        using soft quantization during training.
+        heuristically determined from mode/median of prior. Set this to `False`
+        if you are using soft quantization during training.
       quantization_offset: `tf.Tensor` or `None`. If `cdf` is provided and
         `non_integer_offset=True`, must be provided as well.
       laplace_tail_mass: Float. If positive, will augment the prior with a
@@ -154,12 +152,11 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     if not (prior is not None) == (dtype is None) == (prior_shape is None):
       raise ValueError(
           "Either `prior` or both `dtype` and `prior_shape` must be provided.")
-    if (prior is None) + (cdf_shape is None) + (cdf is None) != 2:
+    if (prior is None) + (cdf_shapes is None) + (cdf is None) != 2:
       raise ValueError(
-          "Must provide exactly one of `prior`, `cdf`, or `cdf_shape`.")
+          "Must provide exactly one of `prior`, `cdf`, or `cdf_shapes`.")
     if not compression and not (
-        cdf is None and cdf_offset is None and cdf_length is None and
-        cdf_shape is None):
+        cdf is None and cdf_offset is None and cdf_shapes is None):
       raise ValueError("CDFs can't be provided with `compression=False`")
     if prior is not None and prior.event_shape.rank:
       raise ValueError("`prior` must be a (batch of) scalar distribution(s).")
@@ -170,7 +167,6 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         stateless=stateless,
         expected_grads=expected_grads,
         tail_mass=tail_mass,
-        range_coder_precision=range_coder_precision,
         dtype=dtype if dtype is not None else prior.dtype,
         laplace_tail_mass=laplace_tail_mass,
     )
@@ -188,8 +184,8 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       elif not self.non_integer_offset:
         # If not using the offset heuristic, always quantize to integers.
         quantization_offset = None
-      elif cdf_shape is not None:
-        # `cdf_shape` being set indicates that we are using the `SavedModel`
+      elif cdf_shapes is not None:
+        # `cdf_shapes` being set indicates that we are using the `SavedModel`
         # protocol. So create a placeholder value.
         quantization_offset = tf.zeros(
             self.prior_shape_tensor, dtype=self.dtype)
@@ -222,10 +218,10 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         self._quantization_offset = tf.convert_to_tensor(
             quantization_offset, dtype=self.dtype, name="quantization_offset")
       if self.compression:
-        if cdf is None and cdf_shape is None:
-          cdf, cdf_offset, cdf_length = self._build_tables(
-              self.prior, offset=quantization_offset)
-        self._init_compression(cdf, cdf_offset, cdf_length, cdf_shape)
+        if cdf is None and cdf_shapes is None:
+          cdf, cdf_offset = self._build_tables(
+              self.prior, range_coder_precision, offset=quantization_offset)
+        self._init_compression(cdf, cdf_offset, cdf_shapes)
 
   @property
   def prior_shape(self):
@@ -246,15 +242,6 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     if self._quantization_offset is None:
       return None
     return tf.convert_to_tensor(self._quantization_offset)
-
-  def _compute_indexes(self, broadcast_shape):
-    """Returns the indexes for range coding and the quantization offset."""
-    # TODO(jonycgn, ssjhv): Investigate broadcasting in range coding op.
-    prior_size = functools.reduce(lambda x, y: x * y, self.prior_shape, 1)
-    indexes = tf.range(prior_size, dtype=tf.int32)
-    indexes = tf.reshape(indexes, self.prior_shape_tensor)
-    return tf.broadcast_to(
-        indexes, tf.concat([broadcast_shape, self.prior_shape_tensor], 0))
 
   @tf.Module.with_name_scope
   def __call__(self, bottleneck, training=True):
@@ -283,7 +270,6 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     else:
       bottleneck_perturbed = self.quantize(bottleneck)
       log_probs = log_prob_fn(bottleneck_perturbed)
-
     axes = tuple(range(-self.coding_rank, 0))
     bits = tf.reduce_sum(log_probs, axis=axes) / (
         -tf.math.log(tf.constant(2, dtype=log_probs.dtype)))
@@ -335,35 +321,18 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       coding unit.
     """
     input_shape = tf.shape(bottleneck)
-    input_rank = tf.shape(input_shape)[0]
-    batch_shape, coding_shape = tf.split(
-        input_shape, [input_rank - self.coding_rank, self.coding_rank])
-    broadcast_shape = coding_shape[
-        :self.coding_rank - len(self.prior_shape)]
-
-    indexes = self._compute_indexes(broadcast_shape)
+    all_but_last_n_elems = lambda t, n: t[:-n] if n else t
+    batch_shape = all_but_last_n_elems(input_shape, self.coding_rank)
+    iid_shape = all_but_last_n_elems(input_shape, self.prior_shape.rank)
     offset = self.quantization_offset
     if offset is not None:
       bottleneck -= offset
     symbols = tf.cast(tf.round(bottleneck), tf.int32)
-    symbols = tf.reshape(symbols, tf.concat([[-1], coding_shape], 0))
-
-    # Prevent tensors from bouncing back and forth between host and GPU.
-    with tf.device("/cpu:0"):
-      cdf = self.cdf
-      cdf_length = self.cdf_length
-      cdf_offset = self.cdf_offset
-      def loop_body(symbols):
-        return gen_ops.unbounded_index_range_encode(
-            symbols, indexes, cdf, cdf_length, cdf_offset,
-            precision=self.range_coder_precision,
-            overflow_width=4, debug_level=1)
-
-      # TODO(jonycgn,ssjhv): Consider switching to Python control flow.
-      strings = tf.map_fn(
-          loop_body, symbols, dtype=tf.string, name="compress")
-
-    return tf.reshape(strings, batch_shape)
+    symbols = tf.reshape(symbols, tf.concat([iid_shape, [-1]], 0))
+    symbols -= self.cdf_offset
+    handle = gen_ops.create_range_encoder(batch_shape, self.cdf)
+    handle = gen_ops.entropy_encode_channel(handle, symbols)
+    return gen_ops.entropy_encode_finalize(handle)
 
   @tf.Module.with_name_scope
   def decompress(self, strings, broadcast_shape):
@@ -384,32 +353,22 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     """
     strings = tf.convert_to_tensor(strings, dtype=tf.string)
     broadcast_shape = tf.convert_to_tensor(broadcast_shape, dtype=tf.int32)
-    batch_shape = tf.shape(strings)
-    symbols_shape = tf.concat(
-        [batch_shape, broadcast_shape, self.prior_shape_tensor], 0)
-
-    indexes = self._compute_indexes(broadcast_shape)
-    strings = tf.reshape(strings, [-1])
-
-    # Prevent tensors from bouncing back and forth between host and GPU.
-    with tf.device("/cpu:0"):
-      cdf = self.cdf
-      cdf_length = self.cdf_length
-      cdf_offset = self.cdf_offset
-      def loop_body(string):
-        return gen_ops.unbounded_index_range_decode(
-            string, indexes, cdf, cdf_length, cdf_offset,
-            precision=self.range_coder_precision,
-            overflow_width=4, debug_level=1)
-
-      # TODO(jonycgn,ssjhv): Consider switching to Python control flow.
-      symbols = tf.map_fn(
-          loop_body, strings, dtype=tf.int32, name="decompress")
-
-    symbols = tf.reshape(symbols, symbols_shape)
+    decode_shape = tf.concat(
+        [broadcast_shape, [tf.reduce_prod(self.prior_shape_tensor)]], 0)
+    output_shape = tf.concat(
+        [tf.shape(strings), broadcast_shape, self.prior_shape_tensor], 0)
+    handle = gen_ops.create_range_decoder(strings, self.cdf)
+    handle, symbols = gen_ops.entropy_decode_channel(
+        handle, decode_shape, self.cdf_offset.dtype)
+    sanity = gen_ops.entropy_decode_finalize(handle)
+    tf.debugging.assert_equal(sanity, True, message="Sanity check failed.")
+    symbols += self.cdf_offset
+    symbols = tf.reshape(symbols, output_shape)
     outputs = tf.cast(symbols, self.dtype)
     offset = self.quantization_offset
-    return outputs + offset if offset is not None else outputs
+    if offset is not None:
+      outputs += offset
+    return outputs
 
   def get_config(self):
     """Returns the configuration of the entropy model.
