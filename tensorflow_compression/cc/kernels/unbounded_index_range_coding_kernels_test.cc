@@ -40,7 +40,6 @@ limitations under the License.
 #include "tensorflow/core/platform/test.h"
 #include "tensorflow/core/public/session.h"
 #include "tensorflow/core/public/session_options.h"
-#include "tensorflow_compression/cc/kernels/range_coder.h"
 
 namespace tensorflow_compression {
 namespace {
@@ -52,7 +51,6 @@ using tensorflow::Graph;
 using tensorflow::int16;
 using tensorflow::int32;
 using tensorflow::int64;
-using tensorflow::Log2Ceiling;
 using tensorflow::Node;
 using tensorflow::NodeBuilder;
 using tensorflow::NodeDefBuilder;

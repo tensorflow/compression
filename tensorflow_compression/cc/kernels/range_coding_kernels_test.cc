@@ -37,7 +37,7 @@ limitations under the License.
 #include "tensorflow/core/platform/test.h"
 #include "tensorflow/core/public/session.h"
 #include "tensorflow/core/public/session_options.h"
-#include "tensorflow_compression/cc/kernels/range_coder.h"
+#include "tensorflow_compression/cc/lib/range_coder.h"
 
 namespace tensorflow_compression {
 namespace {
@@ -473,12 +473,12 @@ TEST_F(RangeCoderOpsTest, EncoderDebug) {
 TEST_F(RangeCoderOpsTest, DecoderDebug) {
   RangeEncoder encoder;
 
-  tstring encoded_string;
+  std::string encoded_string;
   encoder.Encode(16, 18, 5, &encoded_string);
   encoder.Finalize(&encoded_string);
 
   Tensor encoded(DT_STRING, {});
-  encoded.scalar<tstring>()() = std::move(encoded_string);
+  encoded.scalar<tstring>()() = encoded_string;
 
   Tensor shape(DT_INT32, {0});
 

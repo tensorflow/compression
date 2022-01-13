@@ -18,6 +18,7 @@ limitations under the License.
 #include "tensorflow/core/framework/partial_tensor_shape.h"
 #include "tensorflow/core/framework/tensor.h"
 #include "tensorflow/core/platform/errors.h"
+#include "tensorflow/core/platform/logging.h"
 
 namespace tensorflow_compression {
 namespace {

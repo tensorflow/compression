@@ -13,6 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
+// DEPRECATED. Use new implementation of range coders in range_coder_kernels.cc.
+
 #define EIGEN_USE_THREADS
 
 #include <algorithm>
@@ -31,7 +33,7 @@ limitations under the License.
 #include "tensorflow/core/platform/logging.h"
 #include "tensorflow/core/platform/macros.h"
 #include "tensorflow/core/platform/types.h"
-#include "tensorflow_compression/cc/kernels/range_coder.h"
+#include "tensorflow_compression/cc/lib/range_coder.h"
 #include "tensorflow_compression/cc/kernels/range_coding_kernels_util.h"
 
 namespace tensorflow_compression {
@@ -205,7 +207,7 @@ class RangeEncodeOp : public OpKernel {
     Tensor* output_tensor;
     OP_REQUIRES_OK(context,
                    context->allocate_output(0, TensorShape{}, &output_tensor));
-    tstring* output = &output_tensor->scalar<tstring>()();
+    std::string output;
 
     switch (data_shape.size()) {
 #define RANGE_ENCODE_CASE(dims)                                           \
@@ -213,7 +215,7 @@ class RangeEncodeOp : public OpKernel {
     OP_REQUIRES_OK(context,                                               \
                    RangeEncodeImpl<dims>(data.flat<int16>(), data_shape,  \
                                          cdf.flat_inner_dims<int32, 2>(), \
-                                         cdf_shape, output));             \
+                                         cdf_shape, &output));            \
   } break
       RANGE_ENCODE_CASE(1);
       RANGE_ENCODE_CASE(2);
@@ -228,6 +230,7 @@ class RangeEncodeOp : public OpKernel {
             cdf.shape().DebugString()));
         return;
     }
+    output_tensor->scalar<tstring>()() = output;
   }
 
  private:
@@ -236,7 +239,7 @@ class RangeEncodeOp : public OpKernel {
                                      absl::Span<const int64> data_shape,
                                      TTypes<int32>::ConstMatrix cdf,
                                      absl::Span<const int64> cdf_shape,
-                                     tstring* output) const {
+                                     std::string* output) const {
     const int64 data_size = data.size();
     const int64 cdf_size = cdf.size();
     const int64 chip_size = cdf.dimension(1);

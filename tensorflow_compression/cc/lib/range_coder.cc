@@ -1,4 +1,4 @@
-/* Copyright 2018 Google LLC. All Rights Reserved.
+/* Copyright 2021 Google LLC. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,30 +19,28 @@ limitations under the License.
 // a digitised message", presented to the Video & Data Recording Conference,
 // held in Southampton, July 24-27, 1979.
 //
-#include "tensorflow_compression/cc/kernels/range_coder.h"
+#include "tensorflow_compression/cc/lib/range_coder.h"
+
+#include <cstdint>
 #include <limits>
 #include <string>
+
+#include "absl/base/integral_types.h"
+#include "absl/status/status.h"
+#include "absl/strings/string_view.h"
 #include "absl/types/span.h"
 #include "tensorflow/core/platform/logging.h"
-#include "tensorflow/core/platform/types.h"
 
 namespace tensorflow_compression {
-using tensorflow::int32;
-using tensorflow::tstring;
-using tensorflow::uint32;
-using tensorflow::uint64;
-using tensorflow::uint8;
-
-void RangeEncoder::Encode(int32 lower, int32 upper, int precision,
-                          tstring* sink) {
-  // Input requirement: 0 < precision < 16.
-  DCHECK_GT(precision, 0);
-  DCHECK_LE(precision, 16);
-
+void RangeEncoder::Encode(int32_t lower, int32_t upper, int precision,
+                          std::string* sink) {
   // Input requirement: 0 <= lower < upper <= 2^precision.
   DCHECK_LE(0, lower);
   DCHECK_LT(lower, upper);
   DCHECK_LE(upper, 1 << precision);
+
+  DCHECK_GT(precision, 0);
+  DCHECK_LE(precision, 16);
 
   // `base` and `size` represent a half-open interval [base, base + size).
   // Loop invariant: 2^16 <= size <= 2^32.
@@ -51,7 +49,7 @@ void RangeEncoder::Encode(int32 lower, int32 upper, int precision,
   // are quantized to up to 16 bits, the smallest interval size the encode may
   // handle is 2^-16. If size is smaller than 2^16, a small interval input may
   // collapse the encoder range into an empty interval.
-  const uint64 size = static_cast<uint64>(size_minus1_) + 1;
+  const uint64_t size = static_cast<uint64_t>(size_minus1_) + 1;
   DCHECK_NE(size >> 16, 0);
 
   // For short notation, let u := lower and v := upper.
@@ -66,8 +64,8 @@ void RangeEncoder::Encode(int32 lower, int32 upper, int precision,
   // NOTE: The max value of `size` is 2^32 and size > 0. Therefore `size * u`
   // can be rewritten as `(size - 1) * u + u` and all the computation can be
   // done in 32-bit mode. If 32-bit multiply is faster, then rewrite.
-  const uint32 a = (size * static_cast<uint64>(lower)) >> precision;
-  const uint32 b = ((size * static_cast<uint64>(upper)) >> precision) - 1;
+  const uint32_t a = (size * static_cast<uint64_t>(lower)) >> precision;
+  const uint32_t b = ((size * static_cast<uint64_t>(upper)) >> precision) - 1;
   DCHECK_LE(a, b);
 
   // Let's confirm the RHS of a, b fit in uint32 type.
@@ -202,7 +200,7 @@ void RangeEncoder::Encode(int32 lower, int32 upper, int precision,
       // base can be raised to 2^32 (force case #2), or (base + size) can be
       // lowered to 2^32 (force case #3), depending on which transition
       // keeps size larger.
-      CHECK_LT(delay_, static_cast<uint64>(1) << 62);
+      CHECK_LT(delay_, static_cast<uint64_t>(1) << 62);
       delay_ += 0x20000;  // Two more bytes of zeros. Check overflow?
     }
     return;
@@ -228,13 +226,13 @@ void RangeEncoder::Encode(int32 lower, int32 upper, int precision,
     // (8 * delay[MAX:16]) bytes of 0x00.
     if (base_overflow) {
       // Case #2.
-      DCHECK_NE((static_cast<uint64>(base_ - a) + a) >> 32, 0);
+      DCHECK_NE((static_cast<uint64_t>(base_ - a) + a) >> 32, 0);
       sink->push_back(static_cast<char>(delay_ >> 8));
       sink->push_back(static_cast<char>(delay_ >> 0));
       sink->append(delay_ >> 16, static_cast<char>(0));
     } else {
       // Case #3.
-      DCHECK_EQ(static_cast<uint64>(base_ + size_minus1_) >> 32, 0);
+      DCHECK_EQ(static_cast<uint64_t>(base_ + size_minus1_) >> 32, 0);
       --delay_;
       sink->push_back(static_cast<char>(delay_ >> 8));
       sink->push_back(static_cast<char>(delay_ >> 0));
@@ -245,7 +243,7 @@ void RangeEncoder::Encode(int32 lower, int32 upper, int precision,
   }
 
   if (size_minus1_ >> 16 == 0) {
-    const uint32 top = base_ >> 16;
+    const uint32_t top = base_ >> 16;
 
     base_ <<= 16;
     size_minus1_ <<= 16;
@@ -263,7 +261,7 @@ void RangeEncoder::Encode(int32 lower, int32 upper, int precision,
   }
 }
 
-void RangeEncoder::Finalize(tstring* sink) {
+void RangeEncoder::Finalize(std::string* sink) const {
   // Finalize the encode by writing out any number in the interval
   // [base, base + size).
   //
@@ -272,8 +270,6 @@ void RangeEncoder::Finalize(tstring* sink) {
   if (delay_ != 0) {
     // The last state was state 1. Since base < 2^32 < base + size, pick 2^32
     // (state 1, case #3).
-    // NOTE: It is a bit difficult to trigger this code path on purpose.
-    // TODO(ssjhv): Find a way to trigger this code path for test coverage.
     sink->push_back(static_cast<char>(delay_ >> 8));
     if ((delay_ & 0xFF) != 0) {
       sink->push_back(static_cast<char>(delay_));
@@ -281,96 +277,94 @@ void RangeEncoder::Finalize(tstring* sink) {
   } else if (base_ != 0) {
     // If base == 0, then pick 0 from [base, base + size) and no zeros are
     // explicitly written.
-    //
-    // Otherwise, pick (base + (2^16 - base[16:0])), i.e., round up base to the
-    // next multiple of 2^16. As 2^16 < size, this value should be in the
-    // interval [base, base + size).
-    const uint32 mid = ((base_ - 1) >> 16) + 1;
-    DCHECK_EQ(mid & 0xFFFF, mid);
-    sink->push_back(static_cast<char>(mid >> 8));
-    if ((mid & 0xFF) != 0) {
-      sink->push_back(static_cast<char>(mid >> 0));
-    }
-  }
 
-  base_ = 0;
-  size_minus1_ = std::numeric_limits<uint32>::max();
-  delay_ = 0;
-}
-
-RangeDecoder::RangeDecoder(const tstring& source)
-    : current_(source.begin()), end_(source.end()) {
-  Read16BitValue();
-  Read16BitValue();
-}
-
-int32 RangeDecoder::Decode(absl::Span<const int32> cdf, int precision) {
-  // Input requirement: 0 < precision < 16.
-  DCHECK_GT(precision, 0);
-  DCHECK_LE(precision, 16);
-
-  const uint64 size = static_cast<uint64>(size_minus1_) + 1;
-  const uint64 offset =
-      ((static_cast<uint64>(value_ - base_) + 1) << precision) - 1;
-
-  // After the binary search, `pv` points to the smallest number v that
-  // satisfies offset < (size * v) / 2^precision.
-
-  // Assumes that cdf[0] == 0. Therefore (size * cdf[0]) / 2^precision is always
-  // less than or equal to offset.
-  const int32* pv = cdf.data() + 1;
-  // `len` can be cdf.size() - 2 if there is guarantee that the last element of
-  // cdf is 2^precision.
-  auto len = cdf.size() - 1;
-  DCHECK_GT(len, 0);
-
-  do {
-    const auto half = len / 2;
-    const int32* mid = pv + half;
-    DCHECK_GE(*mid, 0);
-    DCHECK_LE(*mid, 1 << precision);
-    if (size * static_cast<uint64>(*mid) <= offset) {
-      pv = mid + 1;
-      len -= half + 1;
+    // Otherwise, first check whether (base + (2^24 - base[24:0])) is inside the
+    // interval, ie., rounding up base to the next multiple of 2^24 is within
+    // [base, base + size). If true, then write the uppermost byte of the
+    // round-up value.
+    const uint32_t upper = base_ + size_minus1_;
+    DCHECK_LE(base_, base_ + size_minus1_);  // Check state 0 consistency.
+    // Rounding up to next multiple of 2^24 is (((base - 1) >> 24) + 1) << 24,
+    // provided that base != 0.
+    const uint32_t mid = ((base_ - 1) >> 24) + 1;
+    if (mid <= (upper >> 24)) {
+      sink->push_back(static_cast<char>(mid));
     } else {
-      len = half;
+      // Else, pick (base + (2^16 - base[16:0])), i.e., round up base to the
+      // next multiple of 2^16. As 2^16 <= size, this value should be in the
+      // interval [base, base + size).
+      const uint32_t mid = ((base_ - 1) >> 16) + 1;
+      DCHECK_EQ(mid & 0xFFFF, mid);
+      sink->push_back(static_cast<char>(mid >> 8));
+      // TODO(ssjhv): Is this ever false?
+      if ((mid & 0xFF) != 0) {
+        sink->push_back(static_cast<char>(mid >> 0));
+      }
     }
-  } while (len > 0);
-
-  // If (size * v) / 2^precision <= offset for all v in cdf, then pv points to
-  // one after the last element of cdf. That is a decoding error.
-  //
-  // TODO(ssjhv): Consider returning -1 to indicate error. Or start len =
-  // cdf.size() - 2 instead and give up detecting this error.
-  CHECK_LT(pv, cdf.data() + cdf.size());
-
-  const uint32 a = (size * static_cast<uint64>(*(pv - 1))) >> precision;
-  const uint32 b = ((size * static_cast<uint64>(*pv)) >> precision) - 1;
-  DCHECK_LE(a, offset >> precision);
-  DCHECK_LE(offset >> precision, b);
-
-  base_ += a;
-  size_minus1_ = b - a;
-
-  if (size_minus1_ >> 16 == 0) {
-    base_ <<= 16;
-    size_minus1_ <<= 16;
-    size_minus1_ |= 0xFFFF;
-
-    Read16BitValue();
-  }
-
-  return pv - cdf.data() - 1;
-}
-
-void RangeDecoder::Read16BitValue() {
-  value_ <<= 8;
-  if (current_ != end_) {
-    value_ |= static_cast<uint8>(*current_++);
-  }
-  value_ <<= 8;
-  if (current_ != end_) {
-    value_ |= static_cast<uint8>(*current_++);
   }
 }
+
+absl::Status RangeEncoder::CheckForError(int32_t lower, int32_t upper,
+                                         int precision) const {
+  if (ABSL_PREDICT_FALSE(!(0 < precision && precision <= 16))) {
+    return absl::InvalidArgumentError(absl::StrCat(
+        "precision not in (0, 16]: ", precision));
+  }
+  if (ABSL_PREDICT_FALSE(
+          !(0 <= lower && lower < upper && upper <= (1 << precision)))) {
+    return absl::InvalidArgumentError(absl::StrCat(
+        "Must satisfy 0 <= lower < upper <= ", 1 << precision,
+        ": lower=", lower, ", upper=", upper
+    ));
+  }
+  return absl::OkStatus();
+}
+
+template <typename T>
+absl::Status RangeDecoder::CheckForErrorInternal(absl::Span<const T> cdf,
+                                                 int precision,
+                                                 bool allow_zero) const {
+  if (ABSL_PREDICT_FALSE(!(0 < precision && precision <= 16))) {
+    return absl::InvalidArgumentError(absl::StrCat(
+        "precision not in (0, 16]: ", precision));
+  }
+  if (ABSL_PREDICT_FALSE(cdf.size() <= 1)) {
+    return absl::InvalidArgumentError(absl::StrCat(
+        "cdf.size() = ", cdf.size(), " <= 1"));
+  }
+
+  for (typename absl::Span<const T>::size_type i = 0; i + 1 < cdf.size(); ++i) {
+    bool monotonic = cdf[i] < cdf[i + 1];
+    monotonic |= (allow_zero && cdf[i] == cdf[i + 1]);
+    if (ABSL_PREDICT_FALSE(!monotonic)) {
+      return absl::InvalidArgumentError("cdf is not monotonic");
+    }
+  }
+
+  const T first = cdf[0];
+  const T last = cdf[cdf.size() - 1];
+  if (ABSL_PREDICT_FALSE(!(0 <= first && last <= (1 << precision)))) {
+    return absl::InvalidArgumentError(absl::StrCat(
+        "cdf values must be between 0 and ", 1 << precision));
+  }
+
+  const uint64_t size = static_cast<uint64_t>(size_minus1_) + 1;
+  const uint64_t smallest = (static_cast<uint64_t>(value_ - base_) + 1)
+                            << precision;
+  if (ABSL_PREDICT_FALSE(!(size * static_cast<uint64_t>(first) < smallest))) {
+    return absl::InvalidArgumentError(absl::StrCat(
+        "cdf[0]=", first, " is too large and there was a decode error"));
+  }
+  if (ABSL_PREDICT_FALSE(!(smallest <= size * static_cast<uint64_t>(last)))) {
+    return absl::InvalidArgumentError(absl::StrCat(
+        "cdf[^1]=", last, " is too small and there was a decode error"));
+  }
+
+  return absl::OkStatus();
+}
+
+template absl::Status RangeDecoder::CheckForErrorInternal(
+    absl::Span<const int16>, int, bool) const;
+template absl::Status RangeDecoder::CheckForErrorInternal(
+    absl::Span<const int32>, int, bool) const;
 }  // namespace tensorflow_compression

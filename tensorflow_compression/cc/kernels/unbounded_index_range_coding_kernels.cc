@@ -13,6 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
+// DEPRECATED. Use new implementation of range coders in range_coder_kernels.cc.
+
 #include <algorithm>
 #include <array>
 #include <limits>
@@ -32,7 +34,7 @@ limitations under the License.
 #include "tensorflow/core/platform/logging.h"
 #include "tensorflow/core/platform/macros.h"
 #include "tensorflow/core/platform/types.h"
-#include "tensorflow_compression/cc/kernels/range_coder.h"
+#include "tensorflow_compression/cc/lib/range_coder.h"
 
 namespace tensorflow_compression {
 namespace {
@@ -176,13 +178,15 @@ class UnboundedIndexRangeEncodeOp : public OpKernel {
                                                   cdf_size, offset));
     }
 
-    Tensor* output;
+    Tensor* output_tensor;
     OP_REQUIRES_OK(context,
-                   context->allocate_output(0, TensorShape{}, &output));
+                   context->allocate_output(0, TensorShape{}, &output_tensor));
+    std::string output;
 
     RangeEncodeImpl(data.flat<int32>(), index.flat<int32>(),
                     cdf.matrix<int32>(), cdf_size.vec<int32>(),
-                    offset.vec<int32>(), &output->flat<tstring>()(0));
+                    offset.vec<int32>(), &output);
+    output_tensor->flat<tstring>()(0) = output;
   }
 
  private:
@@ -190,7 +194,8 @@ class UnboundedIndexRangeEncodeOp : public OpKernel {
                        TTypes<int32>::ConstFlat index,
                        TTypes<int32>::ConstMatrix cdf,
                        TTypes<int32>::ConstVec cdf_size,
-                       TTypes<int32>::ConstVec offset, tstring* output) const {
+                       TTypes<int32>::ConstVec offset,
+                       std::string* output) const {
     RangeEncoder encoder;
 
     DCHECK_GE(cdf.dimension(1), 2);

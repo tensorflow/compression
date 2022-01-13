@@ -13,6 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
+// DEPRECATED. Use new implementation of range coders in range_coder_kernels.cc.
+
 #ifndef TENSORFLOW_COMPRESSION_CC_KERNELS_RANGE_CODING_KERNELS_UTIL_H_
 #define TENSORFLOW_COMPRESSION_CC_KERNELS_RANGE_CODING_KERNELS_UTIL_H_
 

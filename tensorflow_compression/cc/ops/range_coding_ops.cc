@@ -13,6 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
+// DEPRECATED. Use new ops in range_coder_ops.cc.
+
 #include "tensorflow/core/framework/common_shape_fns.h"
 #include "tensorflow/core/framework/op.h"
 #include "tensorflow/core/framework/shape_inference.h"
@@ -243,37 +245,6 @@ precision: The number of bits for probability quantization. Must be <= 16, and
 overflow_width: The bit width of the variable-length overflow code. Must be <=
   precision, and must match the width used by `UnboundedIndexRangeEncode` that
   produced `encoded`.
-)doc");
-
-REGISTER_OP("PmfToQuantizedCdf")
-    .Input("pmf: float")
-    .Output("cdf: int32")
-    .Attr("precision: int >= 1")
-    .SetShapeFn([](InferenceContext* c) {
-      ShapeHandle in;
-      TF_RETURN_IF_ERROR(c->WithRankAtLeast(c->input(0), 1, &in));
-      DimensionHandle last;
-      TF_RETURN_IF_ERROR(c->Add(c->Dim(in, -1), 1, &last));
-      ShapeHandle out;
-      TF_RETURN_IF_ERROR(c->ReplaceDim(in, -1, last, &out));
-      c->set_output(0, out);
-      return Status::OK();
-    })
-    .Doc(R"doc(
-Converts a PMF into a quantized CDF for range coding.
-
-This op uses floating-point operations internally. Therefore the quantized
-output may not be consistent across multiple platforms. For entropy encoders and
-decoders to have the same quantized CDF on different platforms, the quantized
-CDF should be produced once and saved, then the saved quantized CDF should be
-used everywhere.
-
-After quantization, if PMF does not sum to 2^precision, then some values of PMF
-are increased or decreased to adjust the sum to equal to 2^precision.
-
-Note that the input PMF is pre-quantization. The input PMF is not normalized
-by this op prior to quantization. Therefore the user is responsible for
-normalizing PMF if necessary.
 )doc");
 
 }  // namespace

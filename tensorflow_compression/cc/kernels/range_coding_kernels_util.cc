@@ -13,6 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
+// DEPRECATED. Use new implementation of range coders in range_coder_kernels.cc.
+
 #include "tensorflow_compression/cc/kernels/range_coding_kernels_util.h"
 #include <vector>
 #include "tensorflow/core/framework/tensor_shape.h"

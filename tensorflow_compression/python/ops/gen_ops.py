@@ -23,10 +23,14 @@ globals().update({n: getattr(ops, n) for n in dir(ops)})
 
 # pylint:disable=undefined-all-variable
 __all__ = [
+    "create_range_encoder",
+    "create_range_decoder",
+    "entropy_decode_channel",
+    "entropy_decode_finalize",
+    "entropy_decode_index",
+    "entropy_encode_channel",
+    "entropy_encode_finalize",
+    "entropy_encode_index",
     "pmf_to_quantized_cdf",
-    "range_decode",
-    "range_encode",
-    "unbounded_index_range_decode",
-    "unbounded_index_range_encode",
 ]
 # pylint:enable=undefined-all-variable
