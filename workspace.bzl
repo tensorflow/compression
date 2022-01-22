@@ -42,12 +42,12 @@ cc_library(
 tensorflow_pip = repository_rule(
     implementation = _tensorflow_pip_impl,
     attrs = {
-        "python_program": attr.string(default = "python"),
+        "python_program": attr.string(default = "python3"),
     },
 )
 
 def tensorflow_compression_workspace():
   tensorflow_pip(
       name = "tensorflow_pip",
-      python_program = "python",
+      python_program = "python3",
   )
