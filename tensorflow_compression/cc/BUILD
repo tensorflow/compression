@@ -7,11 +7,13 @@ cc_binary(
             "**/*.h",
             "**/*.cc",
         ],
-        exclude = ["**/*_test.cc"],
+        exclude = [
+            "**/*_test.cc",
+        ],
     ),
     copts = [
         "-pthread",
-        "-std=c++11",
+        "-std=c++14",
         "-D_GLIBCXX_USE_CXX11_ABI=0",
     ],
     linkshared = 1,

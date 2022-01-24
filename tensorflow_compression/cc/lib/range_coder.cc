@@ -19,19 +19,20 @@ limitations under the License.
 // a digitised message", presented to the Video & Data Recording Conference,
 // held in Southampton, July 24-27, 1979.
 //
+
 #include "tensorflow_compression/cc/lib/range_coder.h"
 
 #include <cstdint>
 #include <limits>
 #include <string>
 
-#include "absl/base/integral_types.h"
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
 #include "tensorflow/core/platform/logging.h"
 
 namespace tensorflow_compression {
+
 void RangeEncoder::Encode(int32_t lower, int32_t upper, int precision,
                           std::string* sink) {
   // Input requirement: 0 <= lower < upper <= 2^precision.
@@ -364,7 +365,7 @@ absl::Status RangeDecoder::CheckForErrorInternal(absl::Span<const T> cdf,
 }
 
 template absl::Status RangeDecoder::CheckForErrorInternal(
-    absl::Span<const int16>, int, bool) const;
+    absl::Span<const int16_t>, int, bool) const;
 template absl::Status RangeDecoder::CheckForErrorInternal(
-    absl::Span<const int32>, int, bool) const;
+    absl::Span<const int32_t>, int, bool) const;
 }  // namespace tensorflow_compression

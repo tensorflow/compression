@@ -21,13 +21,13 @@ limitations under the License.
 #include <string>
 #include <type_traits>
 
-#include "absl/base/integral_types.h"
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
 #include "tensorflow/core/platform/logging.h"
 
 namespace tensorflow_compression {
+
 class RangeEncoder {
  public:
   RangeEncoder() = default;
@@ -196,7 +196,7 @@ class RangeDecoder {
     static const T* Search(uint64_t lower_bound, uint64_t size, const T* pv,
                            int64_t len) {
       return std::find_if(pv, pv + len, [lower_bound, size](T value) {
-        return lower_bound <= size * static_cast<uint64>(value);
+        return lower_bound <= size * static_cast<uint64_t>(value);
       });
     }
   };

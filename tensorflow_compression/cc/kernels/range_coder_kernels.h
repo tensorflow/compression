@@ -19,7 +19,6 @@ limitations under the License.
 #include <cstdint>
 #include <string>
 
-#include "absl/base/integral_types.h"
 #include "absl/types/span.h"
 #include "tensorflow/core/framework/tensor.h"
 #include "tensorflow/core/framework/tensor_types.h"

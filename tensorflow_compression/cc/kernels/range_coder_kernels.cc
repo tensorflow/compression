@@ -19,8 +19,6 @@ limitations under the License.
 #include <string>
 #include <utility>
 
-#include "absl/base/integral_types.h"
-#include "tensorflow_compression/cc/lib/range_coder.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
 #include "absl/types/span.h"
@@ -36,6 +34,7 @@ limitations under the License.
 #include "tensorflow/core/framework/variant_tensor_data.h"
 #include "tensorflow/core/lib/core/errors.h"
 #include "tensorflow/core/lib/core/threadpool.h"
+#include "tensorflow_compression/cc/lib/range_coder.h"
 
 namespace tensorflow_compression {
 namespace {
@@ -367,11 +366,12 @@ class EntropyEncodeChannelOp : public tensorflow::OpKernel {
     tensorflow::thread::ThreadPool* workers =
         context->device()->tensorflow_cpu_worker_threads()->workers;
     tensorflow::mutex mu;
-    workers->ParallelFor(
-        handle.size(), cost_per_unit,
-        [&handle, &mu, context, value, index_stride](int64 start, int64 limit) {
-          PerShard(handle, value, index_stride, context, &mu, start, limit);
-        });
+    workers->ParallelFor(handle.size(), cost_per_unit,
+                         [&handle, &mu, context, value, index_stride](
+                             int64_t start, int64_t limit) {
+                           PerShard(handle, value, index_stride, context, &mu,
+                                    start, limit);
+                         });
 
     context->set_output(0, handle_tensor);
   }
@@ -382,18 +382,16 @@ class EntropyEncodeChannelOp : public tensorflow::OpKernel {
                        const int64_t index_stride,
                        tensorflow::OpKernelContext* context,
                        tensorflow::mutex* mu, int64_t start, int64_t limit) {
-#define REQUIRES_OK(status)                             \
-  if (auto s = (status); ABSL_PREDICT_FALSE(!s.ok())) { \
-    tensorflow::mutex_lock lock(*mu);                   \
-    context->SetStatus(s);                              \
-    return;                                             \
-  }
-
 #define REQUIRES(cond, status)        \
   if (!ABSL_PREDICT_TRUE(cond)) {     \
     tensorflow::mutex_lock lock(*mu); \
     context->SetStatus(status);       \
     return;                           \
+  }
+#define REQUIRES_OK(status)           \
+  {                                   \
+    auto s = (status);                \
+    REQUIRES(s.ok(), s);              \
   }
 
     const int64_t num_elements = value.dimension(1);
@@ -467,7 +465,7 @@ class EntropyEncodeIndexOp : public tensorflow::OpKernel {
     tensorflow::mutex mu;
     workers->ParallelFor(
         handle.size(), cost_per_unit,
-        [&handle, &mu, context, value, index](int64 start, int64 limit) {
+        [&handle, &mu, context, value, index](int64_t start, int64_t limit) {
           PerShard(handle, index, value, context, &mu, start, limit);
         });
 
@@ -480,18 +478,16 @@ class EntropyEncodeIndexOp : public tensorflow::OpKernel {
                        TTypes<int32_t>::ConstMatrix value,
                        tensorflow::OpKernelContext* context,
                        tensorflow::mutex* mu, int64_t start, int64_t limit) {
-#define REQUIRES_OK(status)                             \
-  if (auto s = (status); ABSL_PREDICT_FALSE(!s.ok())) { \
-    tensorflow::mutex_lock lock(*mu);                   \
-    context->SetStatus(s);                              \
-    return;                                             \
-  }
-
 #define REQUIRES(cond, status)        \
   if (!ABSL_PREDICT_TRUE(cond)) {     \
     tensorflow::mutex_lock lock(*mu); \
     context->SetStatus(status);       \
     return;                           \
+  }
+#define REQUIRES_OK(status)           \
+  {                                   \
+    auto s = (status);                \
+    REQUIRES(s.ok(), s);              \
   }
 
     const int64_t num_elements = value.dimension(1);
@@ -621,7 +617,7 @@ class EntropyDecodeChannelOp : public tensorflow::OpKernel {
     tensorflow::mutex mu;
     workers->ParallelFor(handle.size(), cost_per_unit,
                          [&handle, &mu, context, index_stride, &output](
-                             int64 start, int64 limit) {
+                             int64_t start, int64_t limit) {
                            PerShard(handle, index_stride, output, context, &mu,
                                     start, limit);
                          });
@@ -634,18 +630,16 @@ class EntropyDecodeChannelOp : public tensorflow::OpKernel {
                        TTypes<int32_t>::Matrix output,
                        tensorflow::OpKernelContext* context,
                        tensorflow::mutex* mu, int64_t start, int64_t limit) {
-#define REQUIRES_OK(status)                             \
-  if (auto s = (status); ABSL_PREDICT_FALSE(!s.ok())) { \
-    tensorflow::mutex_lock lock(*mu);                   \
-    context->SetStatus(s);                              \
-    return;                                             \
-  }
-
 #define REQUIRES(cond, status)        \
   if (!ABSL_PREDICT_TRUE(cond)) {     \
     tensorflow::mutex_lock lock(*mu); \
     context->SetStatus(status);       \
     return;                           \
+  }
+#define REQUIRES_OK(status)           \
+  {                                   \
+    auto s = (status);                \
+    REQUIRES(s.ok(), s);              \
   }
 
     const int64_t num_elements = output.dimension(1);
@@ -723,7 +717,7 @@ class EntropyDecodeIndexOp : public tensorflow::OpKernel {
     tensorflow::mutex mu;
     workers->ParallelFor(
         handle.size(), cost_per_unit,
-        [&handle, &mu, context, index, &output](int64 start, int64 limit) {
+        [&handle, &mu, context, index, &output](int64_t start, int64_t limit) {
           PerShard(handle, index, output, context, &mu, start, limit);
         });
 
@@ -736,18 +730,16 @@ class EntropyDecodeIndexOp : public tensorflow::OpKernel {
                        TTypes<int32_t>::Matrix output,
                        tensorflow::OpKernelContext* context,
                        tensorflow::mutex* mu, int64_t start, int64_t limit) {
-#define REQUIRES_OK(status)                             \
-  if (auto s = (status); ABSL_PREDICT_FALSE(!s.ok())) { \
-    tensorflow::mutex_lock lock(*mu);                   \
-    context->SetStatus(s);                              \
-    return;                                             \
-  }
-
 #define REQUIRES(cond, status)        \
   if (!ABSL_PREDICT_TRUE(cond)) {     \
     tensorflow::mutex_lock lock(*mu); \
     context->SetStatus(status);       \
     return;                           \
+  }
+#define REQUIRES_OK(status)           \
+  {                                   \
+    auto s = (status);                \
+    REQUIRES(s.ok(), s);              \
   }
 
     const int64_t num_elements = output.dimension(1);
