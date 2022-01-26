@@ -19,20 +19,9 @@ from tensorflow_compression.python.ops import round_ops
 
 
 __all__ = [
-    "Round",
     "SoftRound",
     "SoftRoundConditionalMean",
 ]
-
-
-class Round(tf.keras.layers.Layer):
-  """Applies rounding."""
-
-  def call(self, inputs):
-    return tf.round(inputs)
-
-  def compute_output_shape(self, input_shape):
-    return input_shape
 
 
 class SoftRound(tf.keras.layers.Layer):

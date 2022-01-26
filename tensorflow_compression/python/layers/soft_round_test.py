@@ -21,12 +21,6 @@ from tensorflow_compression.python.ops import round_ops
 
 class SoftRoundTest(tf.test.TestCase):
 
-  def test_round_layer_rounds(self):
-    layer = soft_round.Round()
-    x = tf.linspace(-5.0, 5.0, num=50)
-    y = layer(x)
-    self.assertAllClose(y, tf.math.round(x))
-
   def test_soft_round_layer_soft_rounds(self):
     alpha = 5.0
     layer = soft_round.SoftRound(alpha=alpha)
