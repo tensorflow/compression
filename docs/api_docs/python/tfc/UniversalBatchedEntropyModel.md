@@ -9,7 +9,6 @@ description: Batched entropy model model which implements Universal Quantization
 <meta itemprop="property" content="decompress"/>
 <meta itemprop="property" content="get_config"/>
 <meta itemprop="property" content="get_weights"/>
-<meta itemprop="property" content="quantize"/>
 <meta itemprop="property" content="set_weights"/>
 <meta itemprop="property" content="with_name_scope"/>
 </div>
@@ -20,7 +19,7 @@ description: Batched entropy model model which implements Universal Quantization
 
 <table class="tfo-notebook-buttons tfo-api nocontent" align="left">
 <td>
-  <a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/universal.py#L64-L229">
+  <a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/universal.py#L64-L292">
     <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
     View source on GitHub
   </a>
@@ -30,8 +29,6 @@ description: Batched entropy model model which implements Universal Quantization
 
 
 Batched entropy model model which implements Universal Quantization.
-
-Inherits From: [`ContinuousBatchedEntropyModel`](../tfc/ContinuousBatchedEntropyModel.md)
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>tfc.UniversalBatchedEntropyModel(
@@ -114,8 +111,8 @@ backpropagation w.r.t. additive uniform noise.
 `tail_mass`
 </td>
 <td>
-Float. Approximate probability mass which is range encoded with
-less precision, by using a Golomb-like code.
+Float. Approximate probability mass which is encoded using an
+Elias gamma code embedded into the range coder.
 </td>
 </tr><tr>
 <td>
@@ -148,24 +145,6 @@ value is ignored.
 
 
 
-<!-- Tabular view -->
- <table class="responsive fixed orange">
-<colgroup><col width="214px"><col></colgroup>
-<tr><th colspan="2"><h2 class="add-link">Raises</h2></th></tr>
-
-<tr>
-<td>
-`RuntimeError`
-</td>
-<td>
-when attempting to instantiate an entropy model with
-`compression=True` and not in eager execution mode.
-</td>
-</tr>
-</table>
-
-
-
 
 
 <!-- Tabular view -->
@@ -176,13 +155,6 @@ when attempting to instantiate an entropy model with
 <tr>
 <td>
 `cdf`
-</td>
-<td>
-
-</td>
-</tr><tr>
-<td>
-`cdf_length`
 </td>
 <td>
 
@@ -207,20 +179,6 @@ Number of innermost dimensions considered a coding unit.
 </td>
 <td>
 Whether this entropy model is prepared for compression.
-</td>
-</tr><tr>
-<td>
-`context_shape`
-</td>
-<td>
-See base class.
-</td>
-</tr><tr>
-<td>
-`context_shape_tensor`
-</td>
-<td>
-The context shape as a `Tensor`.
 </td>
 </tr><tr>
 <td>
@@ -262,13 +220,6 @@ Returns a `tf.name_scope` instance for this class.
 </td>
 </tr><tr>
 <td>
-`non_integer_offsets`
-</td>
-<td>
-
-</td>
-</tr><tr>
-<td>
 `non_trainable_variables`
 </td>
 <td>
@@ -301,17 +252,10 @@ Batch shape of `prior` as a `Tensor`.
 </td>
 </tr><tr>
 <td>
-`quantization_offset`
-</td>
-<td>
-
-</td>
-</tr><tr>
-<td>
 `range_coder_precision`
 </td>
 <td>
-Precision passed to range coding op.
+Precision used in range coding op.
 </td>
 </tr><tr>
 <td>
@@ -382,7 +326,7 @@ of calling this method if you don't expect the return value to change.
 
 <h3 id="compress"><code>compress</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_batched.py#L283-L334">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/universal.py#L220-L256">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>compress(
@@ -438,7 +382,7 @@ coding unit.
 
 <h3 id="decompress"><code>decompress</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_batched.py#L336-L379">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/universal.py#L258-L288">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>decompress(
@@ -494,7 +438,7 @@ self.prior_shape`.
 
 <h3 id="get_config"><code>get_config</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/universal.py#L227-L229">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/universal.py#L290-L292">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>get_config()
@@ -517,9 +461,27 @@ A JSON-serializable Python dict.
 
 
 
+<!-- Tabular view -->
+ <table class="responsive fixed orange">
+<colgroup><col width="214px"><col></colgroup>
+<tr><th colspan="2">Raises</th></tr>
+
+<tr>
+<td>
+`RuntimeError`
+</td>
+<td>
+on attempting to call this method on an entropy model
+with `compression=False` or with `stateless=True`.
+</td>
+</tr>
+</table>
+
+
+
 <h3 id="get_weights"><code>get_weights</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_base.py#L410-L411">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_base.py#L339-L340">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>get_weights()
@@ -528,22 +490,9 @@ A JSON-serializable Python dict.
 
 
 
-<h3 id="quantize"><code>quantize</code></h3>
-
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/universal.py#L182-L184">View source</a>
-
-<pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
-<code>quantize(
-    bottleneck, indexes=None
-)
-</code></pre>
-
-
-
-
 <h3 id="set_weights"><code>set_weights</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_base.py#L413-L418">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_base.py#L342-L347">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>set_weights(
@@ -619,7 +568,7 @@ The original method wrapped such that it enters the module's name scope.
 
 <h3 id="__call__"><code>__call__</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/universal.py#L186-L225">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/universal.py#L181-L218">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>__call__(

@@ -14,6 +14,7 @@ description: A tf.Dataset of Y'CbCr video frames from '.y4m' files.
 <meta itemprop="property" content="bucket_by_sequence_length"/>
 <meta itemprop="property" content="cache"/>
 <meta itemprop="property" content="cardinality"/>
+<meta itemprop="property" content="choose_from_datasets"/>
 <meta itemprop="property" content="concatenate"/>
 <meta itemprop="property" content="enumerate"/>
 <meta itemprop="property" content="filter"/>
@@ -32,12 +33,18 @@ description: A tf.Dataset of Y'CbCr video frames from '.y4m' files.
 <meta itemprop="property" content="random"/>
 <meta itemprop="property" content="range"/>
 <meta itemprop="property" content="reduce"/>
+<meta itemprop="property" content="rejection_resample"/>
 <meta itemprop="property" content="repeat"/>
+<meta itemprop="property" content="sample_from_datasets"/>
+<meta itemprop="property" content="scan"/>
 <meta itemprop="property" content="shard"/>
 <meta itemprop="property" content="shuffle"/>
 <meta itemprop="property" content="skip"/>
+<meta itemprop="property" content="snapshot"/>
 <meta itemprop="property" content="take"/>
+<meta itemprop="property" content="take_while"/>
 <meta itemprop="property" content="unbatch"/>
+<meta itemprop="property" content="unique"/>
 <meta itemprop="property" content="window"/>
 <meta itemprop="property" content="with_options"/>
 <meta itemprop="property" content="zip"/>
@@ -288,7 +295,8 @@ if eager execution is not enabled.
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>batch(
-    batch_size, drop_remainder=False, num_parallel_calls=None, deterministic=None
+    batch_size, drop_remainder=False, num_parallel_calls=None, deterministic=None,
+    name=None
 )
 </code></pre>
 
@@ -365,8 +373,15 @@ boolean is specified (`True` or `False`), it controls the order in which
 the transformation produces elements. If set to `False`, the
 transformation is allowed to yield elements out of order to trade
 determinism for performance. If not specified, the
-`tf.data.Options.experimental_deterministic` option
-(`True` by default) controls the behavior.
+`tf.data.Options.deterministic` option (`True` by default) controls the
+behavior.
+</td>
+</tr><tr>
+<td>
+`name`
+</td>
+<td>
+(Optional.) A name for the tf.data operation.
 </td>
 </tr>
 </table>
@@ -396,7 +411,7 @@ A `Dataset`.
 <code>bucket_by_sequence_length(
     element_length_func, bucket_boundaries, bucket_batch_sizes, padded_shapes=None,
     padding_values=None, pad_to_bucket_boundary=False, no_padding=False,
-    drop_remainder=False
+    drop_remainder=False, name=None
 )
 </code></pre>
 
@@ -509,6 +524,13 @@ whether the last batch should be dropped in the case it has fewer than
 `batch_size` elements; the default behavior is not to drop the smaller
 batch.
 </td>
+</tr><tr>
+<td>
+`name`
+</td>
+<td>
+(Optional.) A name for the tf.data operation.
+</td>
 </tr>
 </table>
 
@@ -520,8 +542,7 @@ batch.
 <tr><th colspan="2">Returns</th></tr>
 <tr class="alt">
 <td colspan="2">
-A `Dataset` transformation function, which can be passed to
-`tf.data.Dataset.apply`.
+A `Dataset`.
 </td>
 </tr>
 
@@ -550,7 +571,7 @@ if `len(bucket_batch_sizes) != len(bucket_boundaries) + 1`.
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>cache(
-    filename=&#x27;&#x27;
+    filename=&#x27;&#x27;, name=None
 )
 </code></pre>
 
@@ -610,6 +631,13 @@ to call `shuffle` *after* calling `cache`.
 A `tf.string` scalar `tf.Tensor`, representing the name of a
 directory on the filesystem to use for caching elements in this Dataset.
 If a filename is not provided, the dataset will be cached in memory.
+</td>
+</tr><tr>
+<td>
+`name`
+</td>
+<td>
+(Optional.) A name for the tf.data operation.
 </td>
 </tr>
 </table>
@@ -677,11 +705,118 @@ named constants `tf.data.INFINITE_CARDINALITY` and
 
 
 
+<h3 id="choose_from_datasets"><code>choose_from_datasets</code></h3>
+
+<pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
+<code>@staticmethod</code>
+<code>choose_from_datasets(
+    datasets, choice_dataset, stop_on_empty_dataset=True
+)
+</code></pre>
+
+Creates a dataset that deterministically chooses elements from `datasets`.
+
+For example, given the following datasets:
+
+```python
+datasets = [tf.data.Dataset.from_tensors("foo").repeat(),
+            tf.data.Dataset.from_tensors("bar").repeat(),
+            tf.data.Dataset.from_tensors("baz").repeat()]
+
+# Define a dataset containing `[0, 1, 2, 0, 1, 2, 0, 1, 2]`.
+choice_dataset = tf.data.Dataset.range(3).repeat(3)
+
+result = tf.data.Dataset.choose_from_datasets(datasets, choice_dataset)
+```
+
+The elements of `result` will be:
+
+```
+"foo", "bar", "baz", "foo", "bar", "baz", "foo", "bar", "baz"
+```
+
+<!-- Tabular view -->
+ <table class="responsive fixed orange">
+<colgroup><col width="214px"><col></colgroup>
+<tr><th colspan="2">Args</th></tr>
+
+<tr>
+<td>
+`datasets`
+</td>
+<td>
+A non-empty list of `tf.data.Dataset` objects with compatible
+structure.
+</td>
+</tr><tr>
+<td>
+`choice_dataset`
+</td>
+<td>
+A `tf.data.Dataset` of scalar `tf.int64` tensors between
+`0` and `len(datasets) - 1`.
+</td>
+</tr><tr>
+<td>
+`stop_on_empty_dataset`
+</td>
+<td>
+If `True`, selection stops if it encounters an
+empty dataset. If `False`, it skips empty datasets. It is recommended to
+set it to `True`. Otherwise, the selected elements start off as the user
+intends, but may change as input datasets become empty. This can be
+difficult to detect since the dataset starts off looking correct.
+Defaults to `True`.
+</td>
+</tr>
+</table>
+
+
+
+<!-- Tabular view -->
+ <table class="responsive fixed orange">
+<colgroup><col width="214px"><col></colgroup>
+<tr><th colspan="2">Returns</th></tr>
+<tr class="alt">
+<td colspan="2">
+A dataset that interleaves elements from `datasets` according to the
+values of `choice_dataset`.
+</td>
+</tr>
+
+</table>
+
+
+
+<!-- Tabular view -->
+ <table class="responsive fixed orange">
+<colgroup><col width="214px"><col></colgroup>
+<tr><th colspan="2">Raises</th></tr>
+
+<tr>
+<td>
+`TypeError`
+</td>
+<td>
+If `datasets` or `choice_dataset` has the wrong type.
+</td>
+</tr><tr>
+<td>
+`ValueError`
+</td>
+<td>
+If `datasets` is empty.
+</td>
+</tr>
+</table>
+
+
+
 <h3 id="concatenate"><code>concatenate</code></h3>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>concatenate(
-    dataset
+    dataset, name=None
 )
 </code></pre>
 
@@ -719,6 +854,13 @@ TypeError: Two datasets to concatenate have different types
 <td>
 `Dataset` to be concatenated.
 </td>
+</tr><tr>
+<td>
+`name`
+</td>
+<td>
+(Optional.) A name for the tf.data operation.
+</td>
 </tr>
 </table>
 
@@ -745,7 +887,7 @@ A `Dataset`.
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>enumerate(
-    start=0
+    start=0, name=None
 )
 </code></pre>
 
@@ -787,6 +929,13 @@ It is similar to python's `enumerate`.
 A `tf.int64` scalar `tf.Tensor`, representing the start value for
 enumeration.
 </td>
+</tr><tr>
+<td>
+`name`
+</td>
+<td>
+Optional. A name for the tf.data operations used by `enumerate`.
+</td>
 </tr>
 </table>
 
@@ -813,7 +962,7 @@ A `Dataset`.
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>filter(
-    predicate
+    predicate, name=None
 )
 </code></pre>
 
@@ -844,6 +993,13 @@ Filters this dataset according to `predicate`.
 <td>
 A function mapping a dataset element to a boolean.
 </td>
+</tr><tr>
+<td>
+`name`
+</td>
+<td>
+(Optional.) A name for the tf.data operation.
+</td>
 </tr>
 </table>
 
@@ -871,11 +1027,23 @@ The `Dataset` containing the elements of this dataset for which
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>flat_map(
-    map_func
+    map_func, name=None
 )
 </code></pre>
 
 Maps `map_func` across this dataset and flattens the result.
+
+
+#### The type signature is:
+
+
+
+```
+def flat_map(
+  self: Dataset[T],
+  map_func: Callable[[T], Dataset[S]]
+) -> Dataset[S]
+```
 
 Use `flat_map` if you want to make sure that the order of your dataset
 stays the same. For example, to flatten a dataset of batches into a
@@ -883,8 +1051,9 @@ dataset of their elements:
 
 ```
 >>> dataset = tf.data.Dataset.from_tensor_slices(
-...                [[1, 2, 3], [4, 5, 6], [7, 8, 9]])
->>> dataset = dataset.flat_map(lambda x: Dataset.from_tensor_slices(x))
+...     [[1, 2, 3], [4, 5, 6], [7, 8, 9]])
+>>> dataset = dataset.flat_map(
+...     lambda x: tf.data.Dataset.from_tensor_slices(x))
 >>> list(dataset.as_numpy_iterator())
 [1, 2, 3, 4, 5, 6, 7, 8, 9]
 ```
@@ -904,6 +1073,13 @@ dataset of their elements:
 </td>
 <td>
 A function mapping a dataset element to a dataset.
+</td>
+</tr><tr>
+<td>
+`name`
+</td>
+<td>
+(Optional.) A name for the tf.data operation.
 </td>
 </tr>
 </table>
@@ -933,7 +1109,7 @@ A `Dataset`.
 <code>@staticmethod</code>
 <code>from_generator(
     generator, output_types=None, output_shapes=None, args=None,
-    output_signature=None
+    output_signature=None, name=None
 )
 </code></pre>
 
@@ -942,6 +1118,16 @@ Creates a `Dataset` whose elements are generated by `generator`. (deprecated arg
 Warning: SOME ARGUMENTS ARE DEPRECATED: `(output_shapes, output_types)`. They will be removed in a future version.
 Instructions for updating:
 Use output_signature instead
+
+Note: The current implementation of `Dataset.from_generator()` uses
+`tf.numpy_function` and inherits the same constraints. In particular, it
+requires the dataset and iterator related operations to be placed
+on a device in the same process as the Python program that called
+`Dataset.from_generator()`. In particular, using `from_generator` will
+preclude the use of tf.data service for scaling out dataset processing.
+The body of `generator` will not be serialized in a `GraphDef`, and you
+should not use this method if you need to serialize your model and restore
+it in a different environment.
 
 The `generator` argument must be a callable object that returns
 an object that supports the `iter()` protocol (e.g. a generator function).
@@ -976,14 +1162,6 @@ There is also a deprecated way to call `from_generator` by either with
 In this case the output of the function will be assumed to consist of
 `tf.Tensor` objects with the types defined by `output_types` and with the
 shapes which are either unknown or defined by `output_shapes`.
-
-Note: The current implementation of `Dataset.from_generator()` uses
-`tf.numpy_function` and inherits the same constraints. In particular, it
-requires the dataset and iterator related operations to be placed
-on a device in the same process as the Python program that called
-`Dataset.from_generator()`. The body of `generator` will not be
-serialized in a `GraphDef`, and you should not use this method if you
-need to serialize your model and restore it in a different environment.
 
 Note: If `generator` depends on mutable global variables or other external
 state, be aware that the runtime may invoke `generator` multiple times
@@ -1049,6 +1227,14 @@ and passed to `generator` as NumPy-array arguments.
 objects corresponding to each component of an element yielded by
 `generator`.
 </td>
+</tr><tr>
+<td>
+`name`
+</td>
+<td>
+(Optional.) A name for the tf.data operations used by
+`from_generator`.
+</td>
 </tr>
 </table>
 
@@ -1076,7 +1262,7 @@ A `Dataset`.
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>@staticmethod</code>
 <code>from_tensor_slices(
-    tensors
+    tensors, name=None
 )
 </code></pre>
 
@@ -1171,6 +1357,13 @@ A dataset element, whose components have the same first
 dimension. Supported values are documented
 [here](https://www.tensorflow.org/guide/data#dataset_structure).
 </td>
+</tr><tr>
+<td>
+`name`
+</td>
+<td>
+(Optional.) A name for the tf.data operation.
+</td>
 </tr>
 </table>
 
@@ -1198,7 +1391,7 @@ A `Dataset`.
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>@staticmethod</code>
 <code>from_tensors(
-    tensors
+    tensors, name=None
 )
 </code></pre>
 
@@ -1246,6 +1439,13 @@ guide](https://tensorflow.org/guide/data#consuming_numpy_arrays).
 A dataset "element". Supported values are documented
 [here](https://www.tensorflow.org/guide/data#dataset_structure).
 </td>
+</tr><tr>
+<td>
+`name`
+</td>
+<td>
+(Optional.) A name for the tf.data operation.
+</td>
 </tr>
 </table>
 
@@ -1271,10 +1471,12 @@ A `Dataset`.
 <h3 id="get_single_element"><code>get_single_element</code></h3>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
-<code>get_single_element()
+<code>get_single_element(
+    name=None
+)
 </code></pre>
 
-Returns the single element of the `dataset` as a nested structure of tensors.
+Returns the single element of the `dataset`.
 
 The function enables you to use a `tf.data.Dataset` in a stateless
 "tensor-in tensor-out" expression, without creating an iterator.
@@ -1315,7 +1517,7 @@ This can be particularly useful when your tensor transformations are
 expressed as `tf.data.Dataset` operations, and you want to use those
 transformations while serving your model.
 
-# Keras
+#### Keras
 
 ```python
 
@@ -1340,7 +1542,7 @@ tf.saved_model.save(preprocessing_model, your_exported_model_dir,
               )
 ```
 
-# Estimator
+#### Estimator
 
 In the case of estimators, you need to generally define a `serving_input_fn`
 which would require the features to be processed by the model while
@@ -1381,6 +1583,23 @@ estimator.export_saved_model(your_exported_model_dir, serving_input_fn)
 <!-- Tabular view -->
  <table class="responsive fixed orange">
 <colgroup><col width="214px"><col></colgroup>
+<tr><th colspan="2">Args</th></tr>
+
+<tr>
+<td>
+`name`
+</td>
+<td>
+(Optional.) A name for the tf.data operation.
+</td>
+</tr>
+</table>
+
+
+
+<!-- Tabular view -->
+ <table class="responsive fixed orange">
+<colgroup><col width="214px"><col></colgroup>
 <tr><th colspan="2">Returns</th></tr>
 <tr class="alt">
 <td colspan="2">
@@ -1415,7 +1634,7 @@ one element.
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>group_by_window(
-    key_func, reduce_func, window_size=None, window_size_func=None
+    key_func, reduce_func, window_size=None, window_size_func=None, name=None
 )
 </code></pre>
 
@@ -1487,6 +1706,13 @@ A function mapping a key to a `tf.int64` scalar
 the same key to combine in a single batch, which will be passed to
 `reduce_func`. Mutually exclusive with `window_size`.
 </td>
+</tr><tr>
+<td>
+`name`
+</td>
+<td>
+(Optional.) A name for the tf.data operation.
+</td>
 </tr>
 </table>
 
@@ -1498,7 +1724,7 @@ the same key to combine in a single batch, which will be passed to
 <tr><th colspan="2">Returns</th></tr>
 <tr class="alt">
 <td colspan="2">
-A `tf.data.Dataset`
+A `Dataset`.
 </td>
 </tr>
 
@@ -1529,11 +1755,23 @@ passed.
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>interleave(
     map_func, cycle_length=None, block_length=None, num_parallel_calls=None,
-    deterministic=None
+    deterministic=None, name=None
 )
 </code></pre>
 
 Maps `map_func` across this dataset, and interleaves the results.
+
+
+#### The type signature is:
+
+
+
+```
+def interleave(
+  self: Dataset[T],
+  map_func: Callable[[T], Dataset[S]]
+) -> Dataset[S]
+```
 
 For example, you can use `Dataset.interleave()` to process many input files
 concurrently:
@@ -1614,7 +1852,8 @@ isn't required, it can also improve performance to set
 `map_func`
 </td>
 <td>
-A function mapping a dataset element to a dataset.
+A function that takes a dataset element and returns a
+`tf.data.Dataset`.
 </td>
 </tr><tr>
 <td>
@@ -1658,8 +1897,15 @@ boolean is specified (`True` or `False`), it controls the order in which
 the transformation produces elements. If set to `False`, the
 transformation is allowed to yield elements out of order to trade
 determinism for performance. If not specified, the
-`tf.data.Options.experimental_deterministic` option
-(`True` by default) controls the behavior.
+`tf.data.Options.deterministic` option (`True` by default) controls the
+behavior.
+</td>
+</tr><tr>
+<td>
+`name`
+</td>
+<td>
+(Optional.) A name for the tf.data operation.
 </td>
 </tr>
 </table>
@@ -1688,7 +1934,7 @@ A `Dataset`.
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>@staticmethod</code>
 <code>list_files(
-    file_pattern, shuffle=None, seed=None
+    file_pattern, shuffle=None, seed=None, name=None
 )
 </code></pre>
 
@@ -1751,6 +1997,13 @@ Defaults to `True`.
 seed that will be used to create the distribution. See
 `tf.random.set_seed` for behavior.
 </td>
+</tr><tr>
+<td>
+`name`
+</td>
+<td>
+Optional. A name for the tf.data operations used by `list_files`.
+</td>
 </tr>
 </table>
 
@@ -1777,7 +2030,7 @@ A `Dataset` of strings corresponding to file names.
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>map(
-    map_func, num_parallel_calls=None, deterministic=None
+    map_func, num_parallel_calls=None, deterministic=None, name=None
 )
 </code></pre>
 
@@ -1956,8 +2209,15 @@ boolean is specified (`True` or `False`), it controls the order in which
 the transformation produces elements. If set to `False`, the
 transformation is allowed to yield elements out of order to trade
 determinism for performance. If not specified, the
-`tf.data.Options.experimental_deterministic` option
-(`True` by default) controls the behavior.
+`tf.data.Options.deterministic` option (`True` by default) controls the
+behavior.
+</td>
+</tr><tr>
+<td>
+`name`
+</td>
+<td>
+(Optional.) A name for the tf.data operation.
 </td>
 </tr>
 </table>
@@ -2008,7 +2268,8 @@ A `tf.data.Options` object representing the dataset options.
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>padded_batch(
-    batch_size, padded_shapes=None, padding_values=None, drop_remainder=False
+    batch_size, padded_shapes=None, padding_values=None, drop_remainder=False,
+    name=None
 )
 </code></pre>
 
@@ -2144,6 +2405,13 @@ whether the last batch should be dropped in the case it has fewer than
 `batch_size` elements; the default behavior is not to drop the smaller
 batch.
 </td>
+</tr><tr>
+<td>
+`name`
+</td>
+<td>
+(Optional.) A name for the tf.data operation.
+</td>
 </tr>
 </table>
 
@@ -2176,8 +2444,17 @@ A `Dataset`.
 `ValueError`
 </td>
 <td>
-If a component has an unknown rank, and  the `padded_shapes`
+If a component has an unknown rank, and the `padded_shapes`
 argument is not set.
+</td>
+</tr><tr>
+<td>
+`TypeError`
+</td>
+<td>
+If a component is of an unsupported type. The list of supported
+types is documented in
+https://www.tensorflow.org/guide/data#dataset_structure.
 </td>
 </tr>
 </table>
@@ -2188,7 +2465,7 @@ argument is not set.
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>prefetch(
-    buffer_size
+    buffer_size, name=None
 )
 </code></pre>
 
@@ -2226,6 +2503,13 @@ A `tf.int64` scalar `tf.Tensor`, representing the maximum
 number of elements that will be buffered when prefetching. If the value
 `tf.data.AUTOTUNE` is used, then the buffer size is dynamically tuned.
 </td>
+</tr><tr>
+<td>
+`name`
+</td>
+<td>
+Optional. A name for the tf.data transformation.
+</td>
 </tr>
 </table>
 
@@ -2253,7 +2537,7 @@ A `Dataset`.
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>@staticmethod</code>
 <code>random(
-    seed=None
+    seed=None, name=None
 )
 </code></pre>
 
@@ -2280,6 +2564,13 @@ True
 <td>
 (Optional) If specified, the dataset produces a deterministic
 sequence of values.
+</td>
+</tr><tr>
+<td>
+`name`
+</td>
+<td>
+(Optional.) A name for the tf.data operation.
 </td>
 </tr>
 </table>
@@ -2343,7 +2634,7 @@ Creates a `Dataset` of a step-separated range of values.
 `*args`
 </td>
 <td>
-follows the same semantics as python's xrange.
+follows the same semantics as python's range.
 len(args) == 1 -> start = 0, stop = args[0], step = 1.
 len(args) == 2 -> start = args[0], stop = args[1], step = 1.
 len(args) == 3 -> start = args[0], stop = args[1], step = args[2].
@@ -2353,7 +2644,8 @@ len(args) == 3 -> start = args[0], stop = args[1], step = args[2].
 `**kwargs`
 </td>
 <td>
-- output_type: Its expected dtype. (Optional, default: `tf.int64`).
+  - output_type: Its expected dtype. (Optional, default: `tf.int64`).
+- name: (Optional.) A name for the tf.data operation.
 </td>
 </tr>
 </table>
@@ -2398,7 +2690,7 @@ if len(args) == 0.
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>reduce(
-    initial_state, reduce_func
+    initial_state, reduce_func, name=None
 )
 </code></pre>
 
@@ -2439,6 +2731,13 @@ A function that maps `(old_state, input_element)` to
 The structure of `new_state` must match the structure of
 `initial_state`.
 </td>
+</tr><tr>
+<td>
+`name`
+</td>
+<td>
+(Optional.) A name for the tf.data operation.
+</td>
 </tr>
 </table>
 
@@ -2458,11 +2757,120 @@ A dataset element corresponding to the final state of the transformation.
 
 
 
+<h3 id="rejection_resample"><code>rejection_resample</code></h3>
+
+<pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
+<code>rejection_resample(
+    class_func, target_dist, initial_dist=None, seed=None, name=None
+)
+</code></pre>
+
+A transformation that resamples a dataset to a target distribution.
+
+Lets consider the following example where a dataset with an initial data
+distribution of `init_dist` needs to be resampled into a dataset with
+`target_dist` distribution.
+
+```
+>>> import collections
+>>> initial_dist = [0.5, 0.5]
+>>> target_dist = [0.6, 0.4]
+>>> num_classes = len(initial_dist)
+>>> num_samples = 100000
+>>> data_np = np.random.choice(num_classes, num_samples, p=initial_dist)
+>>> dataset = tf.data.Dataset.from_tensor_slices(data_np)
+>>> x = collections.defaultdict(int)
+>>> for i in dataset:
+...   x[i.numpy()] += 1
+```
+
+The value of `x` will be close to `{0: 50000, 1: 50000}` as per the
+`initial_dist` distribution.
+
+```
+>>> dataset = dataset.rejection_resample(
+...    class_func=lambda x: x % 2,
+...    target_dist=target_dist,
+...    initial_dist=initial_dist)
+```
+
+```
+>>> y = collections.defaultdict(int)
+>>> for i in dataset:
+...   cls, _ = i
+...   y[cls.numpy()] += 1
+```
+
+The value of `y` will be now be close to `{0: 75000, 1: 50000}` thus
+satisfying the `target_dist` distribution.
+
+<!-- Tabular view -->
+ <table class="responsive fixed orange">
+<colgroup><col width="214px"><col></colgroup>
+<tr><th colspan="2">Args</th></tr>
+
+<tr>
+<td>
+`class_func`
+</td>
+<td>
+A function mapping an element of the input dataset to a scalar
+`tf.int32` tensor. Values should be in `[0, num_classes)`.
+</td>
+</tr><tr>
+<td>
+`target_dist`
+</td>
+<td>
+A floating point type tensor, shaped `[num_classes]`.
+</td>
+</tr><tr>
+<td>
+`initial_dist`
+</td>
+<td>
+(Optional.)  A floating point type tensor, shaped
+`[num_classes]`.  If not provided, the true class distribution is
+estimated live in a streaming fashion.
+</td>
+</tr><tr>
+<td>
+`seed`
+</td>
+<td>
+(Optional.) Python integer seed for the resampler.
+</td>
+</tr><tr>
+<td>
+`name`
+</td>
+<td>
+(Optional.) A name for the tf.data operation.
+</td>
+</tr>
+</table>
+
+
+
+<!-- Tabular view -->
+ <table class="responsive fixed orange">
+<colgroup><col width="214px"><col></colgroup>
+<tr><th colspan="2">Returns</th></tr>
+<tr class="alt">
+<td colspan="2">
+A `Dataset`
+</td>
+</tr>
+
+</table>
+
+
+
 <h3 id="repeat"><code>repeat</code></h3>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>repeat(
-    count=None
+    count=None, name=None
 )
 </code></pre>
 
@@ -2475,8 +2883,9 @@ Repeats this dataset so each original value is seen `count` times.
 [1, 2, 3, 1, 2, 3, 1, 2, 3]
 ```
 
-Note: If this dataset is a function of global state (e.g. a random number
-generator), then different repetitions may produce different elements.
+Note: If the input dataset depends on global state (e.g. a random number
+generator) or its output is non-deterministic (e.g. because of upstream
+`shuffle`), then different repetitions may produce different elements.
 
 <!-- Tabular view -->
  <table class="responsive fixed orange">
@@ -2491,6 +2900,13 @@ generator), then different repetitions may produce different elements.
 (Optional.) A `tf.int64` scalar `tf.Tensor`, representing the
 number of times the dataset should be repeated. The default behavior (if
 `count` is `None` or `-1`) is for the dataset be repeated indefinitely.
+</td>
+</tr><tr>
+<td>
+`name`
+</td>
+<td>
+(Optional.) A name for the tf.data operation.
 </td>
 </tr>
 </table>
@@ -2514,11 +2930,207 @@ A `Dataset`.
 
 
 
+<h3 id="sample_from_datasets"><code>sample_from_datasets</code></h3>
+
+<pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
+<code>@staticmethod</code>
+<code>sample_from_datasets(
+    datasets, weights=None, seed=None, stop_on_empty_dataset=False
+)
+</code></pre>
+
+Samples elements at random from the datasets in `datasets`.
+
+Creates a dataset by interleaving elements of `datasets` with `weight[i]`
+probability of picking an element from dataset `i`. Sampling is done without
+replacement. For example, suppose we have 2 datasets:
+
+```python
+dataset1 = tf.data.Dataset.range(0, 3)
+dataset2 = tf.data.Dataset.range(100, 103)
+```
+
+Suppose that we sample from these 2 datasets with the following weights:
+
+```python
+sample_dataset = tf.data.Dataset.sample_from_datasets(
+    [dataset1, dataset2], weights=[0.5, 0.5])
+```
+
+One possible outcome of elements in sample_dataset is:
+
+```
+print(list(sample_dataset.as_numpy_iterator()))
+# [100, 0, 1, 101, 2, 102]
+```
+
+<!-- Tabular view -->
+ <table class="responsive fixed orange">
+<colgroup><col width="214px"><col></colgroup>
+<tr><th colspan="2">Args</th></tr>
+
+<tr>
+<td>
+`datasets`
+</td>
+<td>
+A non-empty list of `tf.data.Dataset` objects with compatible
+structure.
+</td>
+</tr><tr>
+<td>
+`weights`
+</td>
+<td>
+(Optional.) A list or Tensor of `len(datasets)` floating-point
+values where `weights[i]` represents the probability to sample from
+`datasets[i]`, or a `tf.data.Dataset` object where each element is such
+a list. Defaults to a uniform distribution across `datasets`.
+</td>
+</tr><tr>
+<td>
+`seed`
+</td>
+<td>
+(Optional.) A `tf.int64` scalar `tf.Tensor`, representing the random
+seed that will be used to create the distribution. See
+`tf.random.set_seed` for behavior.
+</td>
+</tr><tr>
+<td>
+`stop_on_empty_dataset`
+</td>
+<td>
+If `True`, sampling stops if it encounters an empty
+dataset. If `False`, it skips empty datasets. It is recommended to set
+it to `True`. Otherwise, the distribution of samples starts off as the
+user intends, but may change as input datasets become empty. This can be
+difficult to detect since the dataset starts off looking correct.
+Default to `False` for backward compatibility.
+</td>
+</tr>
+</table>
+
+
+
+<!-- Tabular view -->
+ <table class="responsive fixed orange">
+<colgroup><col width="214px"><col></colgroup>
+<tr><th colspan="2">Returns</th></tr>
+<tr class="alt">
+<td colspan="2">
+A dataset that interleaves elements from `datasets` at random, according
+to `weights` if provided, otherwise with uniform probability.
+</td>
+</tr>
+
+</table>
+
+
+
+<!-- Tabular view -->
+ <table class="responsive fixed orange">
+<colgroup><col width="214px"><col></colgroup>
+<tr><th colspan="2">Raises</th></tr>
+
+<tr>
+<td>
+`TypeError`
+</td>
+<td>
+If the `datasets` or `weights` arguments have the wrong type.
+</td>
+</tr><tr>
+<td>
+`ValueError`
+</td>
+<td>
+  - If `datasets` is empty, or
+- If `weights` is specified and does not match the length of `datasets`.
+</td>
+</tr>
+</table>
+
+
+
+<h3 id="scan"><code>scan</code></h3>
+
+<pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
+<code>scan(
+    initial_state, scan_func, name=None
+)
+</code></pre>
+
+A transformation that scans a function across an input dataset.
+
+This transformation is a stateful relative of `tf.data.Dataset.map`.
+In addition to mapping `scan_func` across the elements of the input dataset,
+`scan()` accumulates one or more state tensors, whose initial values are
+`initial_state`.
+
+```
+>>> dataset = tf.data.Dataset.range(10)
+>>> initial_state = tf.constant(0, dtype=tf.int64)
+>>> scan_func = lambda state, i: (state + i, state + i)
+>>> dataset = dataset.scan(initial_state=initial_state, scan_func=scan_func)
+>>> list(dataset.as_numpy_iterator())
+[0, 1, 3, 6, 10, 15, 21, 28, 36, 45]
+```
+
+<!-- Tabular view -->
+ <table class="responsive fixed orange">
+<colgroup><col width="214px"><col></colgroup>
+<tr><th colspan="2">Args</th></tr>
+
+<tr>
+<td>
+`initial_state`
+</td>
+<td>
+A nested structure of tensors, representing the initial
+state of the accumulator.
+</td>
+</tr><tr>
+<td>
+`scan_func`
+</td>
+<td>
+A function that maps `(old_state, input_element)` to
+`(new_state, output_element)`. It must take two arguments and return a
+pair of nested structures of tensors. The `new_state` must match the
+structure of `initial_state`.
+</td>
+</tr><tr>
+<td>
+`name`
+</td>
+<td>
+(Optional.) A name for the tf.data operation.
+</td>
+</tr>
+</table>
+
+
+
+<!-- Tabular view -->
+ <table class="responsive fixed orange">
+<colgroup><col width="214px"><col></colgroup>
+<tr><th colspan="2">Returns</th></tr>
+<tr class="alt">
+<td colspan="2">
+A `Dataset`.
+</td>
+</tr>
+
+</table>
+
+
+
 <h3 id="shard"><code>shard</code></h3>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>shard(
-    num_shards, index
+    num_shards, index, name=None
 )
 </code></pre>
 
@@ -2595,6 +3207,13 @@ shards operating in parallel.
 <td>
 A `tf.int64` scalar `tf.Tensor`, representing the worker index.
 </td>
+</tr><tr>
+<td>
+`name`
+</td>
+<td>
+(Optional.) A name for the tf.data operation.
+</td>
 </tr>
 </table>
 
@@ -2643,7 +3262,7 @@ in an error during a session.run call.)
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>shuffle(
-    buffer_size, seed=None, reshuffle_each_iteration=None
+    buffer_size, seed=None, reshuffle_each_iteration=None, name=None
 )
 </code></pre>
 
@@ -2728,6 +3347,13 @@ seed that will be used to create the distribution. See
 that the dataset should be pseudorandomly reshuffled each time it is
 iterated over. (Defaults to `True`.)
 </td>
+</tr><tr>
+<td>
+`name`
+</td>
+<td>
+(Optional.) A name for the tf.data operation.
+</td>
 </tr>
 </table>
 
@@ -2754,7 +3380,7 @@ A `Dataset`.
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>skip(
-    count
+    count, name=None
 )
 </code></pre>
 
@@ -2782,6 +3408,13 @@ elements of this dataset that should be skipped to form the new dataset.
 If `count` is greater than the size of this dataset, the new dataset
 will contain no elements.  If `count` is -1, skips the entire dataset.
 </td>
+</tr><tr>
+<td>
+`name`
+</td>
+<td>
+(Optional.) A name for the tf.data operation.
+</td>
 </tr>
 </table>
 
@@ -2804,11 +3437,143 @@ A `Dataset`.
 
 
 
+<h3 id="snapshot"><code>snapshot</code></h3>
+
+<pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
+<code>snapshot(
+    path, compression=&#x27;AUTO&#x27;, reader_func=None, shard_func=None, name=None
+)
+</code></pre>
+
+API to persist the output of the input dataset.
+
+The snapshot API allows users to transparently persist the output of their
+preprocessing pipeline to disk, and materialize the pre-processed data on a
+different training run.
+
+This API enables repeated preprocessing steps to be consolidated, and allows
+re-use of already processed data, trading off disk storage and network
+bandwidth for freeing up more valuable CPU resources and accelerator compute
+time.
+
+https://github.com/tensorflow/community/blob/master/rfcs/20200107-tf-data-snapshot.md
+has detailed design documentation of this feature.
+
+Users can specify various options to control the behavior of snapshot,
+including how snapshots are read from and written to by passing in
+user-defined functions to the `reader_func` and `shard_func` parameters.
+
+`shard_func` is a user specified function that maps input elements to
+snapshot shards.
+
+Users may want to specify this function to control how snapshot files should
+be written to disk. Below is an example of how a potential `shard_func`
+could be written.
+
+```python
+dataset = ...
+dataset = dataset.enumerate()
+dataset = dataset.snapshot("/path/to/snapshot/dir",
+    shard_func=lambda x, y: x % NUM_SHARDS, ...)
+dataset = dataset.map(lambda x, y: y)
+```
+
+`reader_func` is a user specified function that accepts a single argument:
+(1) a Dataset of Datasets, each representing a "split" of elements of the
+original dataset. The cardinality of the input dataset matches the
+number of the shards specified in the `shard_func` (see above). The function
+should return a Dataset of elements of the original dataset.
+
+Users may want specify this function to control how snapshot files should be
+read from disk, including the amount of shuffling and parallelism.
+
+Here is an example of a standard reader function a user can define. This
+function enables both dataset shuffling and parallel reading of datasets:
+
+```python
+def user_reader_func(datasets):
+  # shuffle the datasets splits
+  datasets = datasets.shuffle(NUM_CORES)
+  # read datasets in parallel and interleave their elements
+  return datasets.interleave(lambda x: x, num_parallel_calls=AUTOTUNE)
+
+dataset = dataset.snapshot("/path/to/snapshot/dir",
+    reader_func=user_reader_func)
+```
+
+By default, snapshot parallelizes reads by the number of cores available on
+the system, but will not attempt to shuffle the data.
+
+<!-- Tabular view -->
+ <table class="responsive fixed orange">
+<colgroup><col width="214px"><col></colgroup>
+<tr><th colspan="2">Args</th></tr>
+
+<tr>
+<td>
+`path`
+</td>
+<td>
+Required. A directory to use for storing / loading the snapshot to /
+from.
+</td>
+</tr><tr>
+<td>
+`compression`
+</td>
+<td>
+Optional. The type of compression to apply to the snapshot
+written to disk. Supported options are `GZIP`, `SNAPPY`, `AUTO` or None.
+Defaults to `AUTO`, which attempts to pick an appropriate compression
+algorithm for the dataset.
+</td>
+</tr><tr>
+<td>
+`reader_func`
+</td>
+<td>
+Optional. A function to control how to read data from
+snapshot shards.
+</td>
+</tr><tr>
+<td>
+`shard_func`
+</td>
+<td>
+Optional. A function to control how to shard data when writing
+a snapshot.
+</td>
+</tr><tr>
+<td>
+`name`
+</td>
+<td>
+(Optional.) A name for the tf.data operation.
+</td>
+</tr>
+</table>
+
+
+
+<!-- Tabular view -->
+ <table class="responsive fixed orange">
+<colgroup><col width="214px"><col></colgroup>
+<tr><th colspan="2">Returns</th></tr>
+<tr class="alt">
+<td colspan="2">
+A `Dataset`.
+</td>
+</tr>
+
+</table>
+
+
+
 <h3 id="take"><code>take</code></h3>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>take(
-    count
+    count, name=None
 )
 </code></pre>
 
@@ -2836,6 +3601,13 @@ elements of this dataset that should be taken to form the new dataset.
 If `count` is -1, or if `count` is greater than the size of this
 dataset, the new dataset will contain all elements of this dataset.
 </td>
+</tr><tr>
+<td>
+`name`
+</td>
+<td>
+(Optional.) A name for the tf.data operation.
+</td>
 </tr>
 </table>
 
@@ -2858,10 +3630,69 @@ A `Dataset`.
 
 
 
+<h3 id="take_while"><code>take_while</code></h3>
+
+<pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
+<code>take_while(
+    predicate, name=None
+)
+</code></pre>
+
+A transformation that stops dataset iteration based on a `predicate`.
+
+```
+>>> dataset = tf.data.Dataset.range(10)
+>>> dataset = dataset.take_while(lambda x: x < 5)
+>>> list(dataset.as_numpy_iterator())
+[0, 1, 2, 3, 4]
+```
+
+<!-- Tabular view -->
+ <table class="responsive fixed orange">
+<colgroup><col width="214px"><col></colgroup>
+<tr><th colspan="2">Args</th></tr>
+
+<tr>
+<td>
+`predicate`
+</td>
+<td>
+A function that maps a nested structure of tensors (having
+shapes and types defined by `self.output_shapes` and
+`self.output_types`) to a scalar `tf.bool` tensor.
+</td>
+</tr><tr>
+<td>
+`name`
+</td>
+<td>
+(Optional.) A name for the tf.data operation.
+</td>
+</tr>
+</table>
+
+
+
+<!-- Tabular view -->
+ <table class="responsive fixed orange">
+<colgroup><col width="214px"><col></colgroup>
+<tr><th colspan="2">Returns</th></tr>
+<tr class="alt">
+<td colspan="2">
+A `Dataset`.
+</td>
+</tr>
+
+</table>
+
+
+
 <h3 id="unbatch"><code>unbatch</code></h3>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
-<code>unbatch()
+<code>unbatch(
+    name=None
+)
 </code></pre>
 
 Splits elements of a dataset into multiple elements.
@@ -2886,6 +3717,77 @@ unnecessary usage of `unbatch`.
 <!-- Tabular view -->
  <table class="responsive fixed orange">
 <colgroup><col width="214px"><col></colgroup>
+<tr><th colspan="2">Args</th></tr>
+
+<tr>
+<td>
+`name`
+</td>
+<td>
+(Optional.) A name for the tf.data operation.
+</td>
+</tr>
+</table>
+
+
+
+<!-- Tabular view -->
+ <table class="responsive fixed orange">
+<colgroup><col width="214px"><col></colgroup>
+<tr><th colspan="2">Returns</th></tr>
+<tr class="alt">
+<td colspan="2">
+A `Dataset`.
+</td>
+</tr>
+
+</table>
+
+
+
+<h3 id="unique"><code>unique</code></h3>
+
+<pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
+<code>unique(
+    name=None
+)
+</code></pre>
+
+A transformation that discards duplicate elements of a `Dataset`.
+
+Use this transformation to produce a dataset that contains one instance of
+each unique element in the input. For example:
+
+```
+>>> dataset = tf.data.Dataset.from_tensor_slices([1, 37, 2, 37, 2, 1])
+>>> dataset = dataset.unique()
+>>> sorted(list(dataset.as_numpy_iterator()))
+[1, 2, 37]
+```
+
+Note: This transformation only supports datasets which fit into memory
+and have elements of either `tf.int32`, `tf.int64` or `tf.string` type.
+
+<!-- Tabular view -->
+ <table class="responsive fixed orange">
+<colgroup><col width="214px"><col></colgroup>
+<tr><th colspan="2">Args</th></tr>
+
+<tr>
+<td>
+`name`
+</td>
+<td>
+(Optional.) A name for the tf.data operation.
+</td>
+</tr>
+</table>
+
+
+
+<!-- Tabular view -->
+ <table class="responsive fixed orange">
+<colgroup><col width="214px"><col></colgroup>
 <tr><th colspan="2">Returns</th></tr>
 <tr class="alt">
 <td colspan="2">
@@ -2901,44 +3803,68 @@ A `Dataset`.
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>window(
-    size, shift=None, stride=1, drop_remainder=False
+    size, shift=None, stride=1, drop_remainder=False, name=None
 )
 </code></pre>
 
-Combines (nests of) input elements into a dataset of (nests of) windows.
+Returns a dataset of "windows".
 
-A "window" is a finite dataset of flat elements of size `size` (or possibly
-fewer if there are not enough input elements to fill the window and
+Each "window" is a dataset that contains a subset of elements of the
+input dataset. These are finite datasets of size `size` (or possibly fewer
+if there are not enough input elements to fill the window and
 `drop_remainder` evaluates to `False`).
-
-The `shift` argument determines the number of input elements by which the
-window moves on each iteration.  If windows and elements are both numbered
-starting at 0, the first element in window `k` will be element `k * shift`
-of the input dataset. In particular, the first element of the first window
-will always be the first element of the input dataset.
-
-The `stride` argument determines the stride of the input elements, and the
-`shift` argument determines the shift of the window.
 
 #### For example:
 
 
 
 ```
->>> dataset = tf.data.Dataset.range(7).window(2)
+>>> dataset = tf.data.Dataset.range(7).window(3)
 >>> for window in dataset:
-...   print(list(window.as_numpy_iterator()))
-[0, 1]
-[2, 3]
-[4, 5]
+...   print(window)
+<...Dataset element_spec=TensorSpec(shape=(), dtype=tf.int64, name=None)>
+<...Dataset element_spec=TensorSpec(shape=(), dtype=tf.int64, name=None)>
+<...Dataset element_spec=TensorSpec(shape=(), dtype=tf.int64, name=None)>
+```
+
+Since windows are datasets, they can be iterated over:
+
+```
+>>> for window in dataset:
+...   print([item.numpy() for item in window])
+[0, 1, 2]
+[3, 4, 5]
 [6]
->>> dataset = tf.data.Dataset.range(7).window(3, 2, 1, True)
+```
+
+#### Shift
+
+The `shift` argument determines the number of input elements to shift
+between the start of each window. If windows and elements are both numbered
+starting at 0, the first element in window `k` will be element `k * shift`
+of the input dataset. In particular, the first element of the first window
+will always be the first element of the input dataset.
+
+```
+>>> dataset = tf.data.Dataset.range(7).window(3, shift=1,
+...                                           drop_remainder=True)
 >>> for window in dataset:
 ...   print(list(window.as_numpy_iterator()))
 [0, 1, 2]
+[1, 2, 3]
 [2, 3, 4]
+[3, 4, 5]
 [4, 5, 6]
->>> dataset = tf.data.Dataset.range(7).window(3, 1, 2, True)
+```
+
+#### Stride
+
+The `stride` argument determines the stride between input elements within a
+window.
+
+```
+>>> dataset = tf.data.Dataset.range(7).window(3, shift=1, stride=2,
+...                                           drop_remainder=True)
 >>> for window in dataset:
 ...   print(list(window.as_numpy_iterator()))
 [0, 2, 4]
@@ -2946,29 +3872,86 @@ The `stride` argument determines the stride of the input elements, and the
 [2, 4, 6]
 ```
 
-Note that when the `window` transformation is applied to a dataset of
-nested elements, it produces a dataset of nested windows.
+#### Nested elements
+
+When the `window` transformation is applied to a dataset whos elements are
+nested structures, it produces a dataset where the elements have the same
+nested structure but each leaf is replaced by a window. In other words,
+the nesting is applied outside of the windows as opposed inside of them.
+
+#### The type signature is:
+
+
 
 ```
->>> nested = ([1, 2, 3, 4], [5, 6, 7, 8])
->>> dataset = tf.data.Dataset.from_tensor_slices(nested).window(2)
->>> for window in dataset:
-...   def to_numpy(ds):
-...     return list(ds.as_numpy_iterator())
-...   print(tuple(to_numpy(component) for component in window))
-([1, 2], [5, 6])
-([3, 4], [7, 8])
+def window(
+    self: Dataset[Nest[T]], ...
+) -> Dataset[Nest[Dataset[T]]]
 ```
 
+Applying `window` to a `Dataset` of tuples gives a tuple of windows:
+
 ```
->>> dataset = tf.data.Dataset.from_tensor_slices({'a': [1, 2, 3, 4]})
+>>> dataset = tf.data.Dataset.from_tensor_slices(([1, 2, 3, 4, 5],
+...                                               [6, 7, 8, 9, 10]))
 >>> dataset = dataset.window(2)
->>> for window in dataset:
-...   def to_numpy(ds):
-...     return list(ds.as_numpy_iterator())
-...   print({'a': to_numpy(window['a'])})
-{'a': [1, 2]}
-{'a': [3, 4]}
+>>> windows = next(iter(dataset))
+>>> windows
+(<...Dataset element_spec=TensorSpec(shape=(), dtype=tf.int32, name=None)>,
+ <...Dataset element_spec=TensorSpec(shape=(), dtype=tf.int32, name=None)>)
+```
+
+```
+>>> def to_numpy(ds):
+...   return list(ds.as_numpy_iterator())
+>>>
+>>> for windows in dataset:
+...   print(to_numpy(windows[0]), to_numpy(windows[1]))
+[1, 2] [6, 7]
+[3, 4] [8, 9]
+[5] [10]
+```
+
+Applying `window` to a `Dataset` of dictionaries gives a dictionary of
+`Datasets`:
+
+```
+>>> dataset = tf.data.Dataset.from_tensor_slices({'a': [1, 2, 3],
+...                                               'b': [4, 5, 6],
+...                                               'c': [7, 8, 9]})
+>>> dataset = dataset.window(2)
+>>> def to_numpy(ds):
+...   return list(ds.as_numpy_iterator())
+>>>
+>>> for windows in dataset:
+...   print(tf.nest.map_structure(to_numpy, windows))
+{'a': [1, 2], 'b': [4, 5], 'c': [7, 8]}
+{'a': [3], 'b': [6], 'c': [9]}
+```
+
+#### Flatten a dataset of windows
+
+The `Dataset.flat_map` and `Dataset.interleave` methods can be used to
+flatten a dataset of windows into a single dataset.
+
+The argument to `flat_map` is a function that takes an element from the
+dataset and returns a `Dataset`. `flat_map` chains together the resulting
+datasets sequentially.
+
+For example, to turn each window into a dense tensor:
+
+```
+>>> size = 3
+>>> dataset = tf.data.Dataset.range(7).window(size, shift=1,
+...                                           drop_remainder=True)
+>>> batched = dataset.flat_map(lambda x:x.batch(3))
+>>> for batch in batched:
+...   print(batch.numpy())
+[0 1 2]
+[1 2 3]
+[2 3 4]
+[3 4 5]
+[4 5 6]
 ```
 
 <!-- Tabular view -->
@@ -3011,6 +3994,13 @@ The default value of 1 means "retain every input element".
 whether the last windows should be dropped if their size is smaller than
 `size`.
 </td>
+</tr><tr>
+<td>
+`name`
+</td>
+<td>
+(Optional.) A name for the tf.data operation.
+</td>
 </tr>
 </table>
 
@@ -3026,8 +4016,8 @@ whether the last windows should be dropped if their size is smaller than
 `Dataset`
 </td>
 <td>
-A `Dataset` of (nests of) windows -- a finite datasets of flat
-elements created from the (nests of) input elements.
+A `Dataset` of (nests of) windows. Each window is a finite
+datasets of flat elements.
 </td>
 </tr>
 </table>
@@ -3038,7 +4028,7 @@ elements created from the (nests of) input elements.
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>with_options(
-    options
+    options, name=None
 )
 </code></pre>
 
@@ -3055,7 +4045,7 @@ options do not use different non-default values.
 ...                    num_parallel_calls=3)
 >>> options = tf.data.Options()
 >>> # This will make the interleave order non-deterministic.
->>> options.experimental_deterministic = False
+>>> options.deterministic = False
 >>> ds = ds.with_options(options)
 ```
 
@@ -3070,6 +4060,13 @@ options do not use different non-default values.
 </td>
 <td>
 A `tf.data.Options` that identifies the options the use.
+</td>
+</tr><tr>
+<td>
+`name`
+</td>
+<td>
+(Optional.) A name for the tf.data operation.
 </td>
 </tr>
 </table>
@@ -3115,7 +4112,7 @@ when an option is set more than once to a non-default value
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>@staticmethod</code>
 <code>zip(
-    datasets
+    datasets, name=None
 )
 </code></pre>
 
@@ -3169,6 +4166,13 @@ nesting mechanisms are documented
 </td>
 <td>
 A (nested) structure of datasets.
+</td>
+</tr><tr>
+<td>
+`name`
+</td>
+<td>
+(Optional.) A name for the tf.data operation.
 </td>
 </tr>
 </table>

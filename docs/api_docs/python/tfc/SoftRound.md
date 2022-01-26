@@ -25,7 +25,7 @@ description: Applies a differentiable approximation of rounding.
 
 <table class="tfo-notebook-buttons tfo-api nocontent" align="left">
 <td>
-  <a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/soft_round.py#L38-L56">
+  <a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/soft_round.py#L27-L44">
     <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
     View source on GitHub
   </a>
@@ -405,7 +405,7 @@ may also be zero-argument callables which create a loss tensor.
 <td>
 Additional keyword arguments for backward compatibility.
 Accepted values:
-inputs - Deprecated, will be automatically inferred.
+  inputs - Deprecated, will be automatically inferred.
 </td>
 </tr>
 </table>
@@ -510,9 +510,11 @@ Creates the variables of the layer (optional, for subclass implementers).
 
 This is a method that implementers of subclasses of `Layer` or `Model`
 can override if they need a state-creation step in-between
-layer instantiation and layer call.
+layer instantiation and layer call. It is invoked automatically before
+the first execution of `call()`.
 
-This is typically used to create the weights of `Layer` subclasses.
+This is typically used to create the weights of `Layer` subclasses
+(at the discretion of the subclass implementer).
 
 <!-- Tabular view -->
  <table class="responsive fixed orange">
@@ -585,7 +587,7 @@ one per output tensor of the layer).
 
 <h3 id="compute_output_shape"><code>compute_output_shape</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/soft_round.py#L55-L56">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/soft_round.py#L43-L44">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>compute_output_shape(
@@ -595,9 +597,9 @@ one per output tensor of the layer).
 
 Computes the output shape of the layer.
 
-If the layer has not been built, this method will call `build` on the
-layer. This assumes that the layer will later be used with inputs that
-match the input shape provided here.
+This method will cause the layer's state to be built, if that has not
+happened before. This requires that the layer will later be used with
+inputs that match the input shape provided here.
 
 <!-- Tabular view -->
  <table class="responsive fixed orange">

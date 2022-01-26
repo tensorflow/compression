@@ -21,7 +21,7 @@ description: Indexed entropy model for location-scale family of random variables
 
 <table class="tfo-notebook-buttons tfo-api nocontent" align="left">
 <td>
-  <a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_indexed.py#L460-L656">
+  <a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_indexed.py#L411-L607">
     <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
     View source on GitHub
   </a>
@@ -49,9 +49,17 @@ Inherits From: [`ContinuousIndexedEntropyModel`](../tfc/ContinuousIndexedEntropy
 This class is a common special case of `ContinuousIndexedEntropyModel`. The
 specified distribution is parameterized with `num_scales` values of scale
 parameters. An element-wise location parameter is handled by shifting the
-distributions to zero. Note: this only works for shift-invariant
-distributions, where the `loc` parameter really denotes a translation (i.e.,
-not for the log-normal distribution).
+distributions to zero.
+
+This method is illustrated in Figure 10 of:
+> "Nonlinear Transform Coding"<br />
+> J. Ballé, P.A. Chou, D. Minnen, S. Singh, N. Johnston, E. Agustsson,
+> S.J. Hwang, G. Toderici<br />
+> https://doi.org/10.1109/JSTSP.2020.3034501
+
+Note: this only works for shift-invariant `tfpd.Distribution` objects, where
+the `loc` parameter really denotes a translation (i.e., not for the log-normal
+distribution).
 
 <!-- Tabular view -->
  <table class="responsive fixed orange">
@@ -134,8 +142,8 @@ backpropagation w.r.t. additive uniform noise.
 `tail_mass`
 </td>
 <td>
-Float. Approximate probability mass which is range encoded with
-less precision, by using a Golomb-like code.
+Float. Approximate probability mass which is encoded using an
+Elias gamma code embedded into the range coder.
 </td>
 </tr><tr>
 <td>
@@ -181,13 +189,6 @@ laplace mixture for training stability. (experimental)
 </td>
 </tr><tr>
 <td>
-`cdf_length`
-</td>
-<td>
-
-</td>
-</tr><tr>
-<td>
 `cdf_offset`
 </td>
 <td>
@@ -213,24 +214,6 @@ Number of innermost dimensions considered a coding unit.
 </td>
 <td>
 Whether this entropy model is prepared for compression.
-</td>
-</tr><tr>
-<td>
-`context_shape`
-</td>
-<td>
-The shape of the non-flattened PDF/CDF tables for range coding.
-
-This is typically the same as the prior shape, but can differ e.g. in
-universal entropy models. In any case, the context_shape contains the prior
-shape (in the trailing dimensions).
-</td>
-</tr><tr>
-<td>
-`context_shape_tensor`
-</td>
-<td>
-The context shape as a `Tensor`.
 </td>
 </tr><tr>
 <td>
@@ -311,24 +294,10 @@ Class or factory function returning a `Distribution` object.
 </td>
 </tr><tr>
 <td>
-`prior_shape`
-</td>
-<td>
-Batch shape of `prior` (dimensions which are not assumed i.i.d.).
-</td>
-</tr><tr>
-<td>
-`prior_shape_tensor`
-</td>
-<td>
-Batch shape of `prior` as a `Tensor`.
-</td>
-</tr><tr>
-<td>
 `range_coder_precision`
 </td>
 <td>
-Precision passed to range coding op.
+Precision used in range coding op.
 </td>
 </tr><tr>
 <td>
@@ -399,7 +368,7 @@ of calling this method if you don't expect the return value to change.
 
 <h3 id="compress"><code>compress</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_indexed.py#L604-L633">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_indexed.py#L555-L584">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>compress(
@@ -471,7 +440,7 @@ coding unit.
 
 <h3 id="decompress"><code>decompress</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_indexed.py#L635-L656">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_indexed.py#L586-L607">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>decompress(
@@ -534,7 +503,7 @@ A `tf.Tensor` of the same shape as `scale_indexes`.
 
 <h3 id="from_config"><code>from_config</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_indexed.py#L453-L457">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_indexed.py#L404-L408">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>@classmethod</code>
@@ -548,7 +517,7 @@ Instantiates an entropy model from a configuration dictionary.
 
 <h3 id="get_config"><code>get_config</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_indexed.py#L448-L451">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_indexed.py#L399-L402">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>get_config()
@@ -559,7 +528,7 @@ Returns the configuration of the entropy model.
 
 <h3 id="get_weights"><code>get_weights</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_base.py#L410-L411">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_base.py#L339-L340">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>get_weights()
@@ -570,11 +539,11 @@ Returns the configuration of the entropy model.
 
 <h3 id="quantize"><code>quantize</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_indexed.py#L574-L602">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_indexed.py#L532-L553">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>quantize(
-    bottleneck, scale_indexes, loc=None
+    bottleneck, loc=None
 )
 </code></pre>
 
@@ -582,9 +551,7 @@ Quantizes a floating-point tensor.
 
 To use this entropy model as an information bottleneck during training, pass
 a tensor through this function. The tensor is rounded to integer values
-modulo a quantization offset, which depends on `indexes`. For instance, for
-Gaussian distributions, the returned values are rounded to the location of
-the mode of the distributions plus or minus an integer.
+modulo the location parameters of the prior distribution given in `loc`.
 
 The gradient of this rounding operation is overridden with the identity
 (straight-through gradient estimator).
@@ -600,14 +567,6 @@ The gradient of this rounding operation is overridden with the identity
 </td>
 <td>
 `tf.Tensor` containing the data to be quantized.
-</td>
-</tr><tr>
-<td>
-`scale_indexes`
-</td>
-<td>
-`tf.Tensor` indexing the scale parameter for each element
-in `bottleneck`. Must have the same shape as `bottleneck`.
 </td>
 </tr><tr>
 <td>
@@ -640,7 +599,7 @@ A `tf.Tensor` containing the quantized values.
 
 <h3 id="set_weights"><code>set_weights</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_base.py#L413-L418">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_base.py#L342-L347">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>set_weights(
@@ -716,7 +675,7 @@ The original method wrapped such that it enters the module's name scope.
 
 <h3 id="__call__"><code>__call__</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_indexed.py#L542-L572">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_indexed.py#L501-L530">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>__call__(

@@ -14,6 +14,9 @@ description: Mixture of logistic distributions with additive i.i.d. uniform nois
 <meta itemprop="property" content="entropy"/>
 <meta itemprop="property" content="event_shape_tensor"/>
 <meta itemprop="property" content="experimental_default_event_space_bijector"/>
+<meta itemprop="property" content="experimental_fit"/>
+<meta itemprop="property" content="experimental_local_measure"/>
+<meta itemprop="property" content="experimental_sample_and_log_prob"/>
 <meta itemprop="property" content="is_scalar_batch"/>
 <meta itemprop="property" content="is_scalar_event"/>
 <meta itemprop="property" content="kl_divergence"/>
@@ -25,6 +28,8 @@ description: Mixture of logistic distributions with additive i.i.d. uniform nois
 <meta itemprop="property" content="param_shapes"/>
 <meta itemprop="property" content="param_static_shapes"/>
 <meta itemprop="property" content="parameter_properties"/>
+<meta itemprop="property" content="posterior_marginal"/>
+<meta itemprop="property" content="posterior_mode"/>
 <meta itemprop="property" content="prob"/>
 <meta itemprop="property" content="quantile"/>
 <meta itemprop="property" content="sample"/>
@@ -41,7 +46,7 @@ description: Mixture of logistic distributions with additive i.i.d. uniform nois
 
 <table class="tfo-notebook-buttons tfo-api nocontent" align="left">
 <td>
-  <a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/distributions/uniform_noise.py#L254-L263">
+  <a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/distributions/uniform_noise.py#L276-L285">
     <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
     View source on GitHub
   </a>
@@ -75,19 +80,19 @@ Inherits From: [`NoisyMixtureSameFamily`](../tfc/NoisyMixtureSameFamily.md)
 `mixture_distribution`
 </td>
 <td>
-`tfp.distributions.Categorical`-like instance.
+`tfd.Categorical`-like instance.
 Manages the probability of selecting components. The number of
 categories must match the rightmost batch dimension of the
-`components_distribution`. Must have either scalar `batch_shape` or
-`batch_shape` matching `components_distribution.batch_shape[:-1]`.
+`components_distribution`. Must have `batch_shape` broadcastable
+with `components_distribution.batch_shape[:-1]`.
 </td>
 </tr><tr>
 <td>
 `components_distribution`
 </td>
 <td>
-`tfp.distributions.Distribution`-like instance.
-Right-most batch dimension indexes components.
+`tfd.Distribution`-like instance.
+The right-most batch dimension indexes the mixture components.
 </td>
 </tr><tr>
 <td>
@@ -102,10 +107,10 @@ for the components parameters are also computed using implicit
 reparameterization (as opposed to ancestral sampling), meaning that
 all components are updated every step.
 Only works when:
-(1) components_distribution is fully reparameterized;
-(2) components_distribution is either a scalar distribution or
-fully factorized (tfd.Independent applied to a scalar distribution);
-(3) batch shape has a known rank.
+  (1) components_distribution is fully reparameterized;
+  (2) components_distribution is either a scalar distribution or
+  fully factorized (tfd.Independent applied to a scalar distribution);
+  (3) batch shape has a known rank.
 Experimental, may be slow and produce infs/NaNs.
 </td>
 </tr><tr>
@@ -797,6 +802,263 @@ Passed to implementation `_default_event_space_bijector`.
 
 
 
+<h3 id="experimental_fit"><code>experimental_fit</code></h3>
+
+<pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
+<code>@classmethod</code>
+<code>experimental_fit(
+    value, sample_ndims=1, validate_args=False, **init_kwargs
+)
+</code></pre>
+
+Instantiates a distribution that maximizes the likelihood of `x`.
+
+
+<!-- Tabular view -->
+ <table class="responsive fixed orange">
+<colgroup><col width="214px"><col></colgroup>
+<tr><th colspan="2">Args</th></tr>
+
+<tr>
+<td>
+`value`
+</td>
+<td>
+a `Tensor` valid sample from this distribution family.
+</td>
+</tr><tr>
+<td>
+`sample_ndims`
+</td>
+<td>
+Positive `int` Tensor number of leftmost dimensions of
+`value` that index i.i.d. samples.
+Default value: `1`.
+</td>
+</tr><tr>
+<td>
+`validate_args`
+</td>
+<td>
+Python `bool`, default `False`. When `True`, distribution
+parameters are checked for validity despite possibly degrading runtime
+performance. When `False`, invalid inputs may silently render incorrect
+outputs.
+Default value: `False`.
+</td>
+</tr><tr>
+<td>
+`**init_kwargs`
+</td>
+<td>
+Additional keyword arguments passed through to
+`cls.__init__`. These take precedence in case of collision with the
+fitted parameters; for example,
+`tfd.Normal.experimental_fit([1., 1.], scale=20.)` returns a Normal
+distribution with `scale=20.` rather than the maximum likelihood
+parameter `scale=0.`.
+</td>
+</tr>
+</table>
+
+
+
+<!-- Tabular view -->
+ <table class="responsive fixed orange">
+<colgroup><col width="214px"><col></colgroup>
+<tr><th colspan="2">Returns</th></tr>
+
+<tr>
+<td>
+`maximum_likelihood_instance`
+</td>
+<td>
+instance of `cls` with parameters that
+maximize the likelihood of `value`.
+</td>
+</tr>
+</table>
+
+
+
+<h3 id="experimental_local_measure"><code>experimental_local_measure</code></h3>
+
+<pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
+<code>experimental_local_measure(
+    value, backward_compat=False, **kwargs
+)
+</code></pre>
+
+Returns a log probability density together with a `TangentSpace`.
+
+A `TangentSpace` allows us to calculate the correct push-forward
+density when we apply a transformation to a `Distribution` on
+a strict submanifold of R^n (typically via a `Bijector` in the
+`TransformedDistribution` subclass). The density correction uses
+the basis of the tangent space.
+
+<!-- Tabular view -->
+ <table class="responsive fixed orange">
+<colgroup><col width="214px"><col></colgroup>
+<tr><th colspan="2">Args</th></tr>
+
+<tr>
+<td>
+`value`
+</td>
+<td>
+`float` or `double` `Tensor`.
+</td>
+</tr><tr>
+<td>
+`backward_compat`
+</td>
+<td>
+`bool` specifying whether to fall back to returning
+`FullSpace` as the tangent space, and representing R^n with the standard
+ basis.
+</td>
+</tr><tr>
+<td>
+`**kwargs`
+</td>
+<td>
+Named arguments forwarded to subclass implementation.
+</td>
+</tr>
+</table>
+
+
+
+<!-- Tabular view -->
+ <table class="responsive fixed orange">
+<colgroup><col width="214px"><col></colgroup>
+<tr><th colspan="2">Returns</th></tr>
+
+<tr>
+<td>
+`log_prob`
+</td>
+<td>
+a `Tensor` representing the log probability density, of shape
+`sample_shape(x) + self.batch_shape` with values of type `self.dtype`.
+</td>
+</tr><tr>
+<td>
+`tangent_space`
+</td>
+<td>
+a `TangentSpace` object (by default `FullSpace`)
+representing the tangent space to the manifold at `value`.
+</td>
+</tr>
+</table>
+
+
+
+<!-- Tabular view -->
+ <table class="responsive fixed orange">
+<colgroup><col width="214px"><col></colgroup>
+<tr><th colspan="2">Raises</th></tr>
+<tr class="alt">
+<td colspan="2">
+UnspecifiedTangentSpaceError if `backward_compat` is False and
+the `_experimental_tangent_space` attribute has not been defined.
+</td>
+</tr>
+
+</table>
+
+
+
+<h3 id="experimental_sample_and_log_prob"><code>experimental_sample_and_log_prob</code></h3>
+
+<pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
+<code>experimental_sample_and_log_prob(
+    sample_shape=(), seed=None, name=&#x27;sample_and_log_prob&#x27;, **kwargs
+)
+</code></pre>
+
+Samples from this distribution and returns the log density of the sample.
+
+The default implementation simply calls `sample` and `log_prob`:
+
+```
+def _sample_and_log_prob(self, sample_shape, seed, **kwargs):
+  x = self.sample(sample_shape=sample_shape, seed=seed, **kwargs)
+  return x, self.log_prob(x, **kwargs)
+```
+
+However, some subclasses may provide more efficient and/or numerically
+stable implementations.
+
+<!-- Tabular view -->
+ <table class="responsive fixed orange">
+<colgroup><col width="214px"><col></colgroup>
+<tr><th colspan="2">Args</th></tr>
+
+<tr>
+<td>
+`sample_shape`
+</td>
+<td>
+integer `Tensor` desired shape of samples to draw.
+Default value: `()`.
+</td>
+</tr><tr>
+<td>
+`seed`
+</td>
+<td>
+PRNG seed; see `tfp.random.sanitize_seed` for details.
+Default value: `None`.
+</td>
+</tr><tr>
+<td>
+`name`
+</td>
+<td>
+name to give to the op.
+Default value: `'sample_and_log_prob'`.
+</td>
+</tr><tr>
+<td>
+`**kwargs`
+</td>
+<td>
+Named arguments forwarded to subclass implementation.
+</td>
+</tr>
+</table>
+
+
+
+<!-- Tabular view -->
+ <table class="responsive fixed orange">
+<colgroup><col width="214px"><col></colgroup>
+<tr><th colspan="2">Returns</th></tr>
+
+<tr>
+<td>
+`samples`
+</td>
+<td>
+a `Tensor`, or structure of `Tensor`s, with prepended dimensions
+`sample_shape`.
+</td>
+</tr><tr>
+<td>
+`log_prob`
+</td>
+<td>
+a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
+values of type `self.dtype`.
+</td>
+</tr>
+</table>
+
+
+
 <h3 id="is_scalar_batch"><code>is_scalar_batch</code></h3>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
@@ -1402,6 +1664,119 @@ if the distribution class does not implement
 
 
 
+<h3 id="posterior_marginal"><code>posterior_marginal</code></h3>
+
+<pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
+<code>posterior_marginal(
+    observations, name=&#x27;posterior_marginals&#x27;
+)
+</code></pre>
+
+Compute the marginal posterior distribution for a batch of observations.
+
+Note: The behavior of this function is undefined if the `observations`
+argument represents impossible observations from the model.
+
+<!-- Tabular view -->
+ <table class="responsive fixed orange">
+<colgroup><col width="214px"><col></colgroup>
+<tr><th colspan="2">Args</th></tr>
+
+<tr>
+<td>
+`observations`
+</td>
+<td>
+A tensor representing observations from the mixture. Must
+be broadcastable with the mixture's batch shape.
+</td>
+</tr><tr>
+<td>
+`name`
+</td>
+<td>
+A string naming a scope.
+</td>
+</tr>
+</table>
+
+
+
+<!-- Tabular view -->
+ <table class="responsive fixed orange">
+<colgroup><col width="214px"><col></colgroup>
+<tr><th colspan="2">Returns</th></tr>
+
+<tr>
+<td>
+`posterior_marginals`
+</td>
+<td>
+A `Categorical` distribution object representing
+the marginal probability of the components of the mixture. The batch
+shape of the `Categorical` will be the broadcast shape of `observations`
+and the mixture batch shape; the number of classes will equal the
+number of mixture components.
+</td>
+</tr>
+</table>
+
+
+
+<h3 id="posterior_mode"><code>posterior_mode</code></h3>
+
+<pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
+<code>posterior_mode(
+    observations, name=&#x27;posterior_mode&#x27;
+)
+</code></pre>
+
+Compute the posterior mode for a batch of distributions.
+
+Note: The behavior of this function is undefined if the `observations`
+argument represents impossible observations from the mixture.
+
+<!-- Tabular view -->
+ <table class="responsive fixed orange">
+<colgroup><col width="214px"><col></colgroup>
+<tr><th colspan="2">Args</th></tr>
+
+<tr>
+<td>
+`observations`
+</td>
+<td>
+A tensor representing observations from the mixture. Must
+be broadcastable with the mixture's batch shape.
+</td>
+</tr><tr>
+<td>
+`name`
+</td>
+<td>
+A string naming a scope.
+</td>
+</tr>
+</table>
+
+
+
+<!-- Tabular view -->
+ <table class="responsive fixed orange">
+<colgroup><col width="214px"><col></colgroup>
+<tr><th colspan="2">Returns</th></tr>
+<tr class="alt">
+<td colspan="2">
+A Tensor representing the mode (most likely component) for each
+observation. The shape will be equal to the broadcast shape of the
+observations and the batch shape.
+</td>
+</tr>
+
+</table>
+
+
+
 <h3 id="prob"><code>prob</code></h3>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
@@ -1557,7 +1932,7 @@ sample.
 `seed`
 </td>
 <td>
-Python integer or `tfp.util.SeedStream` instance, for seeding PRNG.
+PRNG seed; see `tfp.random.sanitize_seed` for details.
 </td>
 </tr><tr>
 <td>

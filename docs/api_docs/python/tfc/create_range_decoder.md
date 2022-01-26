@@ -1,30 +1,25 @@
-description: Inverse of soft_round().
+description: Creates range decoder objects to be used by EntropyDecode* ops.
 
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
-<meta itemprop="name" content="tfc.soft_round_inverse" />
+<meta itemprop="name" content="tfc.create_range_decoder" />
 <meta itemprop="path" content="Stable" />
 </div>
 
-# tfc.soft_round_inverse
+# tfc.create_range_decoder
 
 <!-- Insert buttons and diff -->
 
 <table class="tfo-notebook-buttons tfo-api nocontent" align="left">
-<td>
-  <a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/ops/round_ops.py#L78-L108">
-    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
-    View source on GitHub
-  </a>
-</td>
+
 </table>
 
 
 
-Inverse of soft_round().
+Creates range decoder objects to be used by `EntropyDecode*` ops.
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
-<code>tfc.soft_round_inverse(
-    y, alpha, eps=0.001
+<code>tfc.create_range_decoder(
+    encoded, lookup, name=None
 )
 </code></pre>
 
@@ -32,10 +27,8 @@ Inverse of soft_round().
 
 <!-- Placeholder for "Used in" -->
 
-This is described in Sec. 4.1. in the paper
-> "Universally Quantized Neural Compression"<br />
-> Eirikur Agustsson & Lucas Theis<br />
-> https://arxiv.org/abs/2006.09952
+The input `encoded` is referenced by `handle`. No op should modify the strings
+contained in `encoded` while `handle` is alive.
 
 <!-- Tabular view -->
  <table class="responsive fixed orange">
@@ -44,25 +37,28 @@ This is described in Sec. 4.1. in the paper
 
 <tr>
 <td>
-`y`
+`encoded`
 </td>
 <td>
-tf.Tensor. Inputs to this function.
-</td>
-</tr><tr>
-<td>
-`alpha`
-</td>
-<td>
-Float or tf.Tensor. Controls smoothness of the approximation.
+A `Tensor` of type `string`.
+A string tensor which contains the code stream. Typically produced by
+`EntropyEncodeFinalize`.
 </td>
 </tr><tr>
 <td>
-`eps`
+`lookup`
 </td>
 <td>
-Float. Threshold below which soft_round() is assumed to equal the
-identity function.
+A `Tensor` of type `int32`.
+An int32 1-D or 2-D tensor. This should match the `lookup` argument of
+the corresponding `CreateRangeEncoder` op.
+</td>
+</tr><tr>
+<td>
+`name`
+</td>
+<td>
+A name for the operation (optional).
 </td>
 </tr>
 </table>
@@ -75,7 +71,7 @@ identity function.
 <tr><th colspan="2"><h2 class="add-link">Returns</h2></th></tr>
 <tr class="alt">
 <td colspan="2">
-tf.Tensor
+A `Tensor` of type `variant`.
 </td>
 </tr>
 

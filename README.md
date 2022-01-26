@@ -14,12 +14,18 @@ likelihood models. Once training is completed, they encode floating point
 tensors into optimal bit sequences by automating the design of probability
 tables and calling a range coder implementation behind the scenes.
 
-The main novelty of this method over traditional transform coding is the
-stochastic minimization of the rate-distortion Lagrangian, and using nonlinear
-transforms implemented by neural networks. For an introduction to this, consider
-our [paper on nonlinear transform coding](https://arxiv.org/abs/2007.03034), or
-watch @jonycgn's [talk on learned image
-compression](https://www.youtube.com/watch?v=x_q7cZviXkY).
+Range coding (a.k.a. arithmetic coding) is exposed to TensorFlow models with a
+set of flexible TF ops written in C++. These include an optional "overflow"
+functionality that embeds an Elias gamma code into the range encoded bit
+sequence, making it possible to encode the entire set of signed integers rather
+than just a finite range.
+
+The main novelty of the learned approach over traditional transform coding is
+the stochastic minimization of the rate-distortion Lagrangian, and using
+nonlinear transforms implemented by neural networks. For an introduction to
+this, consider our [paper on nonlinear transform
+coding](https://arxiv.org/abs/2007.03034), or watch @jonycgn's [talk on learned
+image compression](https://www.youtube.com/watch?v=x_q7cZviXkY).
 
 ## Documentation & getting help
 
@@ -37,8 +43,8 @@ for a complete description of the classes and functions this package implements.
 ## Installation
 
 ***Note: Precompiled packages are currently only provided for Linux and
-Darwin/Mac OS and Python 3.6-3.9. To use these packages on Windows, consider
-using a [TensorFlow Docker image](https://www.tensorflow.org/install/docker) and
+Darwin/Mac OS. To use these packages on Windows, consider using a
+[TensorFlow Docker image](https://www.tensorflow.org/install/docker) and
 installing TensorFlow Compression using pip inside the Docker container.***
 
 Set up an environment in which you can install precompiled binary Python
@@ -67,6 +73,15 @@ python -m tensorflow_compression.all_tests
 Once the command finishes, you should see a message ```OK (skipped=29)``` or
 similar in the last line.
 
+### Colab
+
+To try out TFC live in a [Colab](https://colab.research.google.com/), run the
+following command in a cell before executing your Python code:
+
+```
+!pip install tensorflow-compression
+```
+
 ### Docker
 
 To use a Docker container (e.g. on Windows), be sure to install Docker
@@ -76,7 +91,7 @@ and then run the `pip install` command inside the Docker container, not on the
 host. For instance, you can use a command line like this:
 
 ```bash
-docker run tensorflow/tensorflow:2.5.0 bash -c \
+docker run tensorflow/tensorflow:latest bash -c \
     "pip install tensorflow-compression &&
      python -m tensorflow_compression.all_tests"
 ```
@@ -144,8 +159,12 @@ appended (any existing extensions will not be removed).
 The
 [models directory](https://github.com/tensorflow/compression/tree/master/models)
 contains several implementations of published image compression models to enable
-easy experimentation. The instructions below talk about a re-implementation of
-the model published in:
+easy experimentation. Note that in order to reproduce published results, more
+tuning of the code and training dataset may be necessary. Use the `tfci.py`
+script above to access published models.
+
+The following instructions talk about a re-implementation of the model published
+in:
 
 > "End-to-end optimized image compression"<br />
 > J. Ballé, V. Laparra, E. P. Simoncelli<br />
@@ -207,7 +226,7 @@ This section describes the necessary steps to build your own pip packages of
 TensorFlow Compression. This may be necessary to install it on platforms for
 which we don't provide precompiled binaries (currently only Linux and Darwin).
 
-We use the custom-op Docker images (e.g.
+You can use the custom-op Docker images (e.g.
 `tensorflow/tensorflow:nightly-custom-op-ubuntu16`) for building pip packages
 for Linux. Note that this is different from `tensorflow/tensorflow:devel`. To be
 compatible with the TensorFlow pip package, the GCC version must match, but

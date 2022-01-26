@@ -68,8 +68,6 @@ Data compression in TensorFlow.
 
 [`class RDFTParameter`](./tfc/RDFTParameter.md): RDFT reparameterization of a convolution kernel.
 
-[`class Round`](./tfc/Round.md): Applies rounding.
-
 [`class RoundAdapter`](./tfc/RoundAdapter.md): Continuous density function + round.
 
 [`class SignalConv1D`](./tfc/SignalConv1D.md): 1D convolution layer.
@@ -94,6 +92,22 @@ Data compression in TensorFlow.
 
 ## Functions
 
+[`create_range_decoder(...)`](./tfc/create_range_decoder.md): Creates range decoder objects to be used by `EntropyDecode*` ops.
+
+[`create_range_encoder(...)`](./tfc/create_range_encoder.md): Creates range encoder objects to be used by `EntropyEncode*` ops.
+
+[`entropy_decode_channel(...)`](./tfc/entropy_decode_channel.md): Decodes the encoded stream inside `handle`.
+
+[`entropy_decode_finalize(...)`](./tfc/entropy_decode_finalize.md): Finalizes the decoding process. This op performs a *weak* sanity check, and the
+
+[`entropy_decode_index(...)`](./tfc/entropy_decode_index.md): Decodes the encoded stream inside `handle`.
+
+[`entropy_encode_channel(...)`](./tfc/entropy_encode_channel.md): Encodes each input in `value`.
+
+[`entropy_encode_finalize(...)`](./tfc/entropy_encode_finalize.md): Finalizes the encoding process and extracts byte stream from the encoder.
+
+[`entropy_encode_index(...)`](./tfc/entropy_encode_index.md): Encodes each input in `value` according to a distribution selected by `index`.
+
 [`estimate_tails(...)`](./tfc/estimate_tails.md): Estimates approximate tail quantiles.
 
 [`lower_bound(...)`](./tfc/lower_bound.md): Same as `tf.maximum`, but with helpful gradient for `inputs < bound`.
@@ -106,9 +120,7 @@ Data compression in TensorFlow.
 
 [`quantization_offset(...)`](./tfc/quantization_offset.md): Computes distribution-dependent quantization offset.
 
-[`range_decode(...)`](./tfc/range_decode.md): Range-decodes `code` into an int32 tensor of shape `shape`.
-
-[`range_encode(...)`](./tfc/range_encode.md): Range encodes integer `data` with a finite alphabet.
+[`round_st(...)`](./tfc/round_st.md): Straight-through round with optional quantization offset.
 
 [`same_padding_for_kernel(...)`](./tfc/same_padding_for_kernel.md): Determine correct amount of padding for `same` convolution.
 
@@ -117,10 +129,6 @@ Data compression in TensorFlow.
 [`soft_round_conditional_mean(...)`](./tfc/soft_round_conditional_mean.md): Conditional mean of inputs given noisy soft rounded values.
 
 [`soft_round_inverse(...)`](./tfc/soft_round_inverse.md): Inverse of soft_round().
-
-[`unbounded_index_range_decode(...)`](./tfc/unbounded_index_range_decode.md): Range decodes `encoded` using an indexed probability table.
-
-[`unbounded_index_range_encode(...)`](./tfc/unbounded_index_range_encode.md): Range encodes unbounded integer `data` using an indexed probability table.
 
 [`upper_bound(...)`](./tfc/upper_bound.md): Same as `tf.minimum`, but with helpful gradient for `inputs > bound`.
 
