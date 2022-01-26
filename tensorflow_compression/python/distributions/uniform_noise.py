@@ -189,6 +189,11 @@ class UniformNoiseAdapter(tfp.distributions.Distribution):
   def _upper_tail(self, tail_mass):
     return helpers.upper_tail(self.base, tail_mass)
 
+  @classmethod
+  def _parameter_properties(cls, dtype=tf.float32, num_classes=None):
+    raise NotImplementedError(
+        f"`{cls.__name__}` does not implement `_parameter_properties`.")
+
 
 class NoisyMixtureSameFamily(tfp.distributions.MixtureSameFamily):
   """Mixture of distributions with additive i.i.d. uniform noise."""
@@ -211,6 +216,18 @@ class NoisyMixtureSameFamily(tfp.distributions.MixtureSameFamily):
     """The base distribution (without uniform noise)."""
     return self._base
 
+  def _batch_shape_tensor(self):
+    return self.base.batch_shape_tensor()
+
+  def _batch_shape(self):
+    return self.base.batch_shape
+
+  def _event_shape_tensor(self):
+    return self.base.event_shape_tensor()
+
+  def _event_shape(self):
+    return self.base.event_shape
+
   def _quantization_offset(self):
     # Picks the "peakiest" of the component quantization offsets.
     offsets = helpers.quantization_offset(self.components_distribution)
@@ -224,6 +241,11 @@ class NoisyMixtureSameFamily(tfp.distributions.MixtureSameFamily):
 
   def _upper_tail(self, tail_mass):
     return helpers.upper_tail(self.base, tail_mass)
+
+  @classmethod
+  def _parameter_properties(cls, dtype=tf.float32, num_classes=None):
+    raise NotImplementedError(
+        f"`{cls.__name__}` does not implement `_parameter_properties`.")
 
 
 class NoisyNormal(UniformNoiseAdapter):

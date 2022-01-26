@@ -254,6 +254,11 @@ class DeepFactorized(tfp.distributions.Distribution):
     return helpers.estimate_tails(
         self._logits_cumulative, logits, self.batch_shape_tensor(), self.dtype)
 
+  @classmethod
+  def _parameter_properties(cls, dtype=tf.float32, num_classes=None):
+    raise NotImplementedError(
+        f"`{cls.__name__}` does not implement `_parameter_properties`.")
+
 
 class NoisyDeepFactorized(uniform_noise.UniformNoiseAdapter):
   """DeepFactorized that is convolved with uniform noise."""

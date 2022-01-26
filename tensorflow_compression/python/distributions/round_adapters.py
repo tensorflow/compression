@@ -157,6 +157,11 @@ class MonotonicAdapter(tfp.distributions.Distribution):
     return self.transform(helpers.upper_tail(self.base, tail_mass))
   # pylint: enable=protected-access
 
+  @classmethod
+  def _parameter_properties(cls, dtype=tf.float32, num_classes=None):
+    raise NotImplementedError(
+        f"`{cls.__name__}` does not implement `_parameter_properties`.")
+
 
 class RoundAdapter(MonotonicAdapter):
   """Continuous density function + round."""
