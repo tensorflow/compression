@@ -235,7 +235,7 @@ class BMSHJ2018Model(tf.keras.Model):
     x_shape = tf.shape(x)[1:-1]
     y_shape = tf.shape(y)[1:-1]
     z_shape = tf.shape(z)[1:-1]
-    z_hat, _ = self.side_entropy_model(z, training=False)
+    z_hat = self.side_entropy_model.quantize(z)
     indexes = self.hyper_synthesis_transform(z_hat)
     indexes = indexes[:, :y_shape[0], :y_shape[1], :]
     side_string = self.side_entropy_model.compress(z)

@@ -209,7 +209,8 @@ class MS2020Model(tf.keras.Model):
 
     # Build the entropy model for the hyperprior (z).
     em_z = tfc.ContinuousBatchedEntropyModel(
-        self.hyperprior, coding_rank=3, compression=False)
+        self.hyperprior, coding_rank=3, compression=False,
+        offset_heuristic=False)
 
     # When training, z_bpp is based on the noisy version of z (z_tilde).
     _, z_bits = em_z(z, training=training)
@@ -255,7 +256,7 @@ class MS2020Model(tf.keras.Model):
 
       # For the synthesis transform, use rounding. Note that quantize()
       # overrides the gradient to create a straight-through estimator.
-      y_hat_slice = em_y.quantize(y_slice, sigma, loc=mu)
+      y_hat_slice = em_y.quantize(y_slice, loc=mu)
 
       # Add latent residual prediction (LRP).
       lrp_support = tf.concat([mean_support, y_hat_slice], axis=-1)
@@ -318,7 +319,8 @@ class MS2020Model(tf.keras.Model):
     retval = super().fit(*args, **kwargs)
     # After training, fix range coding tables.
     self.em_z = tfc.ContinuousBatchedEntropyModel(
-        self.hyperprior, coding_rank=3, compression=True)
+        self.hyperprior, coding_rank=3, compression=True,
+        offset_heuristic=False)
     self.em_y = tfc.LocationScaleIndexedEntropyModel(
         tfc.NoisyNormal, num_scales=self.num_scales, scale_fn=self.scale_fn,
         coding_rank=3, compression=True)
