@@ -197,7 +197,7 @@ class ContinuousBatchedEntropyModelTest(tf.test.TestCase,
   def test_small_cdfs_for_dirac_prior_without_quantization_offset(self):
     prior = uniform_noise.NoisyNormal(loc=100. * tf.range(16.), scale=1e-10)
     em = ContinuousBatchedEntropyModel(
-        prior, coding_rank=2, non_integer_offset=False, compression=True)
+        prior, coding_rank=2, offset_heuristic=False, compression=True)
     self.assertEqual(em.cdf_offset.shape[0], 16)
     self.assertLessEqual(em.cdf.shape[0], 16 * 6)
 
