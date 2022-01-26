@@ -51,9 +51,10 @@ py_library(
 
 py_test(
     name = "continuous_indexed_test",
+    timeout = "long",
     srcs = ["continuous_indexed_test.py"],
     python_version = "PY3",
-    shard_count = 5,
+    shard_count = 6,
     deps = [
         ":continuous_indexed",
         "//tensorflow_compression/python/distributions:uniform_noise",
