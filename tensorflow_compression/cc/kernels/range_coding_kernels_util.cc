@@ -16,7 +16,10 @@ limitations under the License.
 // DEPRECATED. Use new implementation of range coders in range_coder_kernels.cc.
 
 #include "tensorflow_compression/cc/kernels/range_coding_kernels_util.h"
+
+#include <cstdint>
 #include <vector>
+
 #include "tensorflow/core/framework/tensor_shape.h"
 #include "tensorflow/core/lib/core/status.h"
 #include "tensorflow/core/platform/macros.h"
@@ -26,21 +29,17 @@ namespace tensorflow_compression {
 using tensorflow::Status;
 using tensorflow::TensorShape;
 using tensorflow::errors::InvalidArgument;
-using tensorflow::int32;
-using tensorflow::int64;
 using tensorflow::string;
-using tensorflow::uint8;
-using tensorflow::uint32;
-using tensorflow::uint64;
 
 Status MergeAxes(const TensorShape& broadcast_shape,
                  const TensorShape& storage_shape,
-                 std::vector<int64>* merged_broadcast_shape_pointer,
-                 std::vector<int64>* merged_storage_shape_pointer) {
+                 std::vector<int64_t>* merged_broadcast_shape_pointer,
+                 std::vector<int64_t>* merged_storage_shape_pointer) {
   CHECK_EQ(storage_shape.dims(), broadcast_shape.dims() + 1);
 
-  std::vector<int64>& merged_broadcast_shape = *merged_broadcast_shape_pointer;
-  std::vector<int64>& merged_storage_shape = *merged_storage_shape_pointer;
+  std::vector<int64_t>& merged_broadcast_shape =
+      *merged_broadcast_shape_pointer;
+  std::vector<int64_t>& merged_storage_shape = *merged_storage_shape_pointer;
 
   // The shapes are simplified so that the conversions between linear index
   // and coordinates takes less CPU cycles. Two adjacent dimensions are
@@ -82,7 +81,7 @@ Status MergeAxes(const TensorShape& broadcast_shape,
     }
   }
 
-  int64 storage_stride = 1;
+  int64_t storage_stride = 1;
   for (int i = broadcast_shape.dims(); i < storage_shape.dims(); ++i) {
     storage_stride *= storage_shape.dim_size(i);
   }

@@ -13,6 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
+#include <cstdint>
+
 #include "absl/strings/str_join.h"
 #include "tensorflow/core/framework/dataset.h"
 #include "tensorflow/core/framework/partial_tensor_shape.h"
@@ -28,7 +30,6 @@ using std::string;
 using std::vector;
 using tensorflow::DataTypeVector;
 using tensorflow::DT_UINT8;
-using tensorflow::int64;
 using tensorflow::mutex;
 using tensorflow::mutex_lock;
 using tensorflow::Node;
@@ -37,8 +38,6 @@ using tensorflow::PartialTensorShape;
 using tensorflow::RandomAccessFile;
 using tensorflow::Status;
 using tensorflow::Tensor;
-using tensorflow::uint64;
-using tensorflow::uint8;
 using tensorflow::data::DatasetBase;
 using tensorflow::data::DatasetIterator;
 using tensorflow::data::DatasetOpKernel;
@@ -124,8 +123,8 @@ class Y4MDatasetOp : public DatasetOpKernel {
           if (file_) {
             const string_view frame_header = "FRAME\n";
             size_t frame_size = width_ * height_ * 3;
-            int64 cbcr_width = width_;
-            int64 cbcr_height = height_;
+            int64_t cbcr_width = width_;
+            int64_t cbcr_height = height_;
             string_view frame_buffer;
 
             if (chroma_format_ == ChromaFormat::I420) {
@@ -157,8 +156,8 @@ class Y4MDatasetOp : public DatasetOpKernel {
                               {height_, width_, 1});
               Tensor cbcr_tensor(ctx->allocator({}), DT_UINT8,
                                  {cbcr_height, cbcr_width, 2});
-              auto flat_y = y_tensor.flat<uint8>();
-              auto flat_cbcr = cbcr_tensor.flat<uint8>();
+              auto flat_y = y_tensor.flat<uint8_t>();
+              auto flat_cbcr = cbcr_tensor.flat<uint8_t>();
               std::memcpy(flat_y.data(), frame_buffer.data(), flat_y.size());
               frame_buffer.remove_prefix(flat_y.size());
               for (int i = 0; i < cbcr_size; i++) {
@@ -222,7 +221,7 @@ class Y4MDatasetOp : public DatasetOpKernel {
         TF_RETURN_IF_ERROR(
             writer->WriteScalar(full_name("file_index"), file_index_));
         // We use file_pos == -1 to indicate no file is currently being read.
-        const int64 file_pos = file_ ? file_pos_ : -1;
+        const int64_t file_pos = file_ ? file_pos_ : -1;
         TF_RETURN_IF_ERROR(
             writer->WriteScalar(full_name("file_pos"), file_pos));
 
@@ -233,8 +232,8 @@ class Y4MDatasetOp : public DatasetOpKernel {
           IteratorContext* ctx,
           tensorflow::data::IteratorStateReader* reader) override {
         mutex_lock l(mu_);
-        int64 file_index;
-        int64 file_pos;
+        int64_t file_index;
+        int64_t file_pos;
 
         TF_RETURN_IF_ERROR(
             reader->ReadScalar(full_name("file_index"), &file_index));
@@ -264,7 +263,7 @@ class Y4MDatasetOp : public DatasetOpKernel {
         const size_t chunk_size = 256;
         header.clear();
         do {
-          const uint64 offset = header.size();
+          const uint64_t offset = header.size();
           header.resize(offset + chunk_size);
           string_view chunk;
           Status status = file.Read(
@@ -294,7 +293,7 @@ class Y4MDatasetOp : public DatasetOpKernel {
       }
 
       Status ParseHeader(string_view header, const size_t file_index,
-                         int64& width, int64& height,
+                         int64_t& width, int64_t& height,
                          ChromaFormat& chroma_format) {
         const string_view digits = "0123456789";
 
@@ -397,10 +396,10 @@ class Y4MDatasetOp : public DatasetOpKernel {
       mutex mu_;
       size_t file_index_ TF_GUARDED_BY(mu_) = 0;
       std::unique_ptr<RandomAccessFile> file_ TF_GUARDED_BY(mu_);
-      uint64 file_pos_ TF_GUARDED_BY(mu_);
+      uint64_t file_pos_ TF_GUARDED_BY(mu_);
       string buffer_ TF_GUARDED_BY(mu_);
-      int64 width_ TF_GUARDED_BY(mu_);
-      int64 height_ TF_GUARDED_BY(mu_);
+      int64_t width_ TF_GUARDED_BY(mu_);
+      int64_t height_ TF_GUARDED_BY(mu_);
       ChromaFormat chroma_format_ TF_GUARDED_BY(mu_);
     };
 

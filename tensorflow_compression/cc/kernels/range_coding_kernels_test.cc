@@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
+#include <cstdint>
 #include <memory>
 #include <random>
 #include <vector>
@@ -61,7 +62,7 @@ using tensorflow::TensorShapeUtils;
 using tensorflow::tstring;
 using tensorflow::TTypes;
 
-int LogUniform(random::SimplePhilox* gen, uint32 n) {
+int LogUniform(random::SimplePhilox* gen, uint32_t n) {
   CHECK_GT(n, 0);
 
   // Split [0, n) into {0}, [1, 2), [2, 4), [4, 8), ..., [2^(m-1), n).
@@ -85,9 +86,9 @@ int LogUniform(random::SimplePhilox* gen, uint32 n) {
   return outcome;
 }
 
-std::vector<int64> ComputeStrides(const TensorShape& shape) {
-  std::vector<int64> stride(shape.dims());
-  int64 current = 1;
+std::vector<int64_t> ComputeStrides(const TensorShape& shape) {
+  std::vector<int64_t> stride(shape.dims());
+  int64_t current = 1;
   for (int i = shape.dims() - 1; i >= 0; --i) {
     stride[i] = current;
     current *= shape.dim_size(i);
@@ -176,7 +177,7 @@ class RangeCoderOpsTest : public OpsTestBase {
     const TensorShape& data_shape = data.shape();
     Tensor shape{DT_INT32, {data_shape.dims()}};
     for (int i = 0; i < data_shape.dims(); ++i) {
-      shape.flat<int32>()(i) = data_shape.dim_size(i);
+      shape.flat<int32_t>()(i) = data_shape.dim_size(i);
     }
 
     Tensor decoded;
@@ -190,9 +191,9 @@ class RangeCoderOpsTest : public OpsTestBase {
   void PopulateMaxValues(random::SimplePhilox* gen, Tensor* maxvalue_tensor,
                          int min_maxvalue, int max_maxvalue) {
     const int range = max_maxvalue - min_maxvalue;
-    TTypes<int16>::Flat flat = maxvalue_tensor->flat<int16>();
+    TTypes<int16_t>::Flat flat = maxvalue_tensor->flat<int16_t>();
 
-    for (int64 i = 0; i < flat.size(); ++i) {
+    for (int64_t i = 0; i < flat.size(); ++i) {
       flat(i) = min_maxvalue + gen->Uniform(range);
     }
   }
@@ -202,10 +203,10 @@ class RangeCoderOpsTest : public OpsTestBase {
     CHECK(TensorShapeUtils::StartsWith(cdf_tensor->shape(),
                                        maxvalue_tensor.shape()));
     CHECK_EQ(cdf_tensor->dims(), maxvalue_tensor.dims() + 1);
-    const int64 chip_size = cdf_tensor->dim_size(cdf_tensor->dims() - 1);
+    const int64_t chip_size = cdf_tensor->dim_size(cdf_tensor->dims() - 1);
 
-    std::vector<int64> data_stride = ComputeStrides(data_tensor->shape());
-    std::vector<int64> cdf_stride = ComputeStrides(cdf_tensor->shape());
+    std::vector<int64_t> data_stride = ComputeStrides(data_tensor->shape());
+    std::vector<int64_t> cdf_stride = ComputeStrides(cdf_tensor->shape());
 
     for (int i = 0; i < cdf_tensor->dims(); ++i) {
       if (cdf_tensor->dim_size(i) == 1) {
@@ -214,22 +215,22 @@ class RangeCoderOpsTest : public OpsTestBase {
     }
 
     Tensor histogram_tensor{DT_INT32, cdf_tensor->shape()};
-    TTypes<int16>::Flat data = data_tensor->flat<int16>();
-    TTypes<int32>::Flat histogram = histogram_tensor.flat<int32>();
-    TTypes<int16>::ConstFlat maxvalue = maxvalue_tensor.flat<int16>();
+    TTypes<int16_t>::Flat data = data_tensor->flat<int16_t>();
+    TTypes<int32_t>::Flat histogram = histogram_tensor.flat<int32_t>();
+    TTypes<int16_t>::ConstFlat maxvalue = maxvalue_tensor.flat<int16_t>();
     histogram.setZero();
 
-    for (int64 index = 0; index < data.size(); ++index) {
-      int64 temp = index;
-      int64 offset = 0;
+    for (int64_t index = 0; index < data.size(); ++index) {
+      int64_t temp = index;
+      int64_t offset = 0;
       for (int dim = 0; dim < data_stride.size(); ++dim) {
-        const int64 coord = temp / data_stride[dim];
+        const int64_t coord = temp / data_stride[dim];
         offset += coord * cdf_stride[dim];
         temp -= coord * data_stride[dim];
       }
       ASSERT_EQ(temp, 0);
 
-      const int64 maxvalue_offset = offset / chip_size;
+      const int64_t maxvalue_offset = offset / chip_size;
       CHECK_EQ(maxvalue_offset * chip_size, offset);
       CHECK_LT(maxvalue(maxvalue_offset) + 1, chip_size);
       const int value = LogUniform(gen, maxvalue(maxvalue_offset));
@@ -237,8 +238,8 @@ class RangeCoderOpsTest : public OpsTestBase {
       histogram(offset + value + 1) += 1;
     }
 
-    cdf_tensor->flat_inner_dims<int32, 2>() =
-        histogram_tensor.flat_inner_dims<int32, 2>().cumsum(1);
+    cdf_tensor->flat_inner_dims<int32_t, 2>() =
+        histogram_tensor.flat_inner_dims<int32_t, 2>().cumsum(1);
   }
 };
 
@@ -249,7 +250,7 @@ TEST_F(RangeCoderOpsTest, NoBroadcast) {
   Tensor data{DT_INT16, {1, 32, 32, 16}};
   Tensor temp{DT_INT32, {1, 1, 1, 1, kMaxValue + 2}};
   Tensor maxvalue{DT_INT16, {1, 1, 1, 1}};
-  maxvalue.flat<int16>()(0) = kMaxValue;
+  maxvalue.flat<int16_t>()(0) = kMaxValue;
 
   ASSERT_LE(data.shape().num_elements(), 1 << kPrecision);
 
@@ -258,10 +259,10 @@ TEST_F(RangeCoderOpsTest, NoBroadcast) {
   random::SimplePhilox gen(&philox);
   BuildCdf(&gen, &data, &temp, maxvalue);
 
-  const Eigen::array<int32, 5> broadcast = {1, 32, 32, 16, 1};
+  const Eigen::array<int32_t, 5> broadcast = {1, 32, 32, 16, 1};
 
   Tensor cdf{DT_INT32, {1, 32, 32, 16, kMaxValue + 2}};
-  cdf.tensor<int32, 5>() = temp.tensor<int32, 5>().broadcast(broadcast);
+  cdf.tensor<int32_t, 5>() = temp.tensor<int32_t, 5>().broadcast(broadcast);
 
   TestEncodeAndDecode(kPrecision, data, cdf);
 }
@@ -334,7 +335,7 @@ TEST_F(RangeCoderOpsTest, InvalidCdfShape) {
 
   Tensor empty{DT_STRING, {}};
   Tensor shape{DT_INT32, {2}};
-  shape.vec<int32>().setValues({3, 3});
+  shape.vec<int32_t>().setValues({3, 3});
   {
     const Status status = RunDecodeOp(10, {empty, shape, cdf}, &unused);
     EXPECT_FALSE(status.ok());
@@ -364,7 +365,7 @@ TEST_F(RangeCoderOpsTest, DecoderShapeFn) {
   Tensor shape_tensor{DT_INT32, {3}};
   Tensor cdf_tensor{DT_INT32, {4, 6, 8, 2}};
 
-  shape_tensor.flat<int32>().setValues({4, 6, 8});
+  shape_tensor.flat<int32_t>().setValues({4, 6, 8});
 
   Graph g{OpRegistry::Global()};
   Node* encoded = test::graph::Constant(&g, encoded_tensor);
@@ -412,7 +413,7 @@ TEST_F(RangeCoderOpsTest, InvalidBroadcast) {
   cdf = Tensor{DT_INT32, {3, 3, 2}};
   Tensor empty{DT_STRING, {}};
   Tensor shape{DT_INT32, {2}};
-  shape.vec<int32>().setValues({3, 1});
+  shape.vec<int32_t>().setValues({3, 1});
   {
     const Status status = RunDecodeOp(10, {empty, shape, cdf}, &unused);
     EXPECT_FALSE(status.ok());
@@ -420,7 +421,7 @@ TEST_F(RangeCoderOpsTest, InvalidBroadcast) {
               std::string::npos);
   }
 
-  std::vector<int64> shape_vector = {2, 2, 2, 2, 2, 2, 2, 2, 2};
+  std::vector<int64_t> shape_vector = {2, 2, 2, 2, 2, 2, 2, 2, 2};
   data = Tensor{DT_INT16, TensorShape{shape_vector}};
   cdf = Tensor{DT_INT32, {2, 1, 2, 1, 2, 1, 2, 1, 2, 2}};
   {
@@ -430,9 +431,9 @@ TEST_F(RangeCoderOpsTest, InvalidBroadcast) {
               std::string::npos);
   }
 
-  shape = Tensor{DT_INT32, {static_cast<int64>(shape_vector.size())}};
+  shape = Tensor{DT_INT32, {static_cast<int64_t>(shape_vector.size())}};
   for (int i = 0; i < shape_vector.size(); ++i) {
-    shape.flat<int32>()(i) = shape_vector[i];
+    shape.flat<int32_t>()(i) = shape_vector[i];
   }
   {
     const Status status = RunDecodeOp(10, {empty, shape, cdf}, &unused);
@@ -452,20 +453,20 @@ TEST_F(RangeCoderOpsTest, InvalidBroadcast) {
 
 TEST_F(RangeCoderOpsTest, EncoderDebug) {
   Tensor data(DT_INT16, {});
-  data.scalar<int16>()() = 1;
+  data.scalar<int16_t>()() = 1;
 
   Tensor cdf(DT_INT32, {4});
-  cdf.vec<int32>().setValues({0, 16, 18, 32});
+  cdf.vec<int32_t>().setValues({0, 16, 18, 32});
 
   Tensor unused;
   auto status = RunEncodeOpDebug(5, {data, cdf}, &unused);
   EXPECT_TRUE(status.ok());
 
-  data.scalar<int16>()() = -1;
+  data.scalar<int16_t>()() = -1;
   EXPECT_STATUS_SUBSTR(RunEncodeOpDebug(5, {data, cdf}, &unused),
                        "value not in [0, 3)");
 
-  data.scalar<int16>()() = 5;
+  data.scalar<int16_t>()() = 5;
   EXPECT_STATUS_SUBSTR(RunEncodeOpDebug(5, {data, cdf}, &unused),
                        "value not in [0, 3)");
 }
@@ -483,26 +484,26 @@ TEST_F(RangeCoderOpsTest, DecoderDebug) {
   Tensor shape(DT_INT32, {0});
 
   Tensor cdf(DT_INT32, {4});
-  cdf.vec<int32>().setValues({0, 16, 18, 32});
+  cdf.vec<int32_t>().setValues({0, 16, 18, 32});
 
   Tensor unused;
   auto status = RunDecodeOpDebug(5, {encoded, shape, cdf}, &unused);
   EXPECT_TRUE(status.ok());
 
-  cdf.vec<int32>().setValues({1, 16, 18, 32});
+  cdf.vec<int32_t>().setValues({1, 16, 18, 32});
   EXPECT_STATUS_SUBSTR(RunDecodeOpDebug(5, {encoded, shape, cdf}, &unused),
                        "cdf[0]=1");
 
-  cdf.vec<int32>().setValues({0, 16, 18, 31});
+  cdf.vec<int32_t>().setValues({0, 16, 18, 31});
   EXPECT_STATUS_SUBSTR(RunDecodeOpDebug(5, {encoded, shape, cdf}, &unused),
                        "cdf[^1]=31");
 
-  cdf.vec<int32>().setValues({0, 18, 16, 32});
+  cdf.vec<int32_t>().setValues({0, 18, 16, 32});
   EXPECT_STATUS_SUBSTR(RunDecodeOpDebug(5, {encoded, shape, cdf}, &unused),
                        "monotonic");
 
   cdf = Tensor(DT_INT32, {2});
-  cdf.vec<int32>().setValues({0, 32});
+  cdf.vec<int32_t>().setValues({0, 32});
   EXPECT_STATUS_SUBSTR(RunDecodeOpDebug(5, {encoded, shape, cdf}, &unused),
                        "CDF size");
 }

@@ -18,6 +18,7 @@ limitations under the License.
 #ifndef TENSORFLOW_COMPRESSION_CC_KERNELS_RANGE_CODING_KERNELS_UTIL_H_
 #define TENSORFLOW_COMPRESSION_CC_KERNELS_RANGE_CODING_KERNELS_UTIL_H_
 
+#include <cstdint>
 #include <vector>
 
 #include "tensorflow/core/framework/tensor_shape.h"
@@ -30,8 +31,8 @@ namespace tensorflow_compression {
 tensorflow::Status MergeAxes(
     const tensorflow::TensorShape& broadcast_shape,
     const tensorflow::TensorShape& storage_shape,
-    std::vector<tensorflow::int64>* merged_broadcast_shape_pointer,
-    std::vector<tensorflow::int64>* merged_storage_shape_pointer);
+    std::vector<int64_t>* merged_broadcast_shape_pointer,
+    std::vector<int64_t>* merged_storage_shape_pointer);
 
 }  // namespace tensorflow_compression
 

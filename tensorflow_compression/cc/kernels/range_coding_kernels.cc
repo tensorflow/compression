@@ -19,6 +19,7 @@ limitations under the License.
 
 #include <algorithm>
 #include <array>
+#include <cstdint>
 #include <limits>
 #include <type_traits>
 #include <vector>
@@ -40,9 +41,6 @@ namespace tensorflow_compression {
 namespace {
 namespace errors = tensorflow::errors;
 using tensorflow::DEVICE_CPU;
-using tensorflow::int16;
-using tensorflow::int32;
-using tensorflow::int64;
 using tensorflow::OpKernel;
 using tensorflow::OpKernelConstruction;
 using tensorflow::OpKernelContext;
@@ -53,9 +51,6 @@ using tensorflow::TensorShape;
 using tensorflow::TensorShapeUtils;
 using tensorflow::tstring;
 using tensorflow::TTypes;
-using tensorflow::uint32;
-using tensorflow::uint64;
-using tensorflow::uint8;
 
 // A helper class to iterate over data and cdf simultaneously, while cdf is
 // broadcasted to data.
@@ -65,8 +60,8 @@ using tensorflow::uint8;
 template <typename T, typename U, int N>
 class BroadcastRange {
  public:
-  BroadcastRange(T* data_pointer, absl::Span<const int64> data_shape,
-                 const U* cdf_pointer, absl::Span<const int64> cdf_shape)
+  BroadcastRange(T* data_pointer, absl::Span<const int64_t> data_shape,
+                 const U* cdf_pointer, absl::Span<const int64_t> cdf_shape)
       : data_pointer_(data_pointer), cdf_pointer_(cdf_pointer) {
     CHECK(!data_shape.empty());
     CHECK_EQ(data_shape.size(), N);
@@ -75,11 +70,11 @@ class BroadcastRange {
     std::copy(data_shape.begin(), data_shape.end(), &data_shape_[0]);
     data_index_.fill(0);
 
-    const int64 innermost_stride = cdf_shape[N];
+    const int64_t innermost_stride = cdf_shape[N];
     cdf_displace_.fill(innermost_stride);
 
     // Pre-compute the pointer displacement for cdf.
-    int64 stride = innermost_stride;
+    int64_t stride = innermost_stride;
     for (int i = N - 1; i >= 0; --i) {
       const bool broadcasting = (cdf_shape[i] <= 1);
 
@@ -128,9 +123,9 @@ class BroadcastRange {
   }
 
  private:
-  std::array<int64, N> data_shape_;
-  std::array<int64, N> cdf_displace_;
-  std::array<int64, N> data_index_;
+  std::array<int64_t, N> data_shape_;
+  std::array<int64_t, N> cdf_displace_;
+  std::array<int64_t, N> data_index_;
 
   T* data_pointer_;
   const U* cdf_pointer_;
@@ -154,21 +149,21 @@ Status CheckCdfShape(const TensorShape& data_shape,
 
 tensorflow::Status CheckCdfValues(int precision,
                                   const tensorflow::Tensor& cdf_tensor) {
-  const auto cdf = cdf_tensor.flat_inner_dims<int32, 2>();
+  const auto cdf = cdf_tensor.flat_inner_dims<int32_t, 2>();
   const auto size = cdf.dimension(1);
   if (size <= 2) {
     return errors::InvalidArgument("CDF size should be > 2: ", size);
   }
 
-  const int32 upper_bound = 1 << precision;
-  for (int64 i = 0; i < cdf.dimension(0); ++i) {
-    auto slice = absl::Span<const int32>(&cdf(i, 0), size);
+  const int32_t upper_bound = 1 << precision;
+  for (int64_t i = 0; i < cdf.dimension(0); ++i) {
+    auto slice = absl::Span<const int32_t>(&cdf(i, 0), size);
     if (slice[0] != 0 || slice[size - 1] != upper_bound) {
       return errors::InvalidArgument("CDF should start from 0 and end at ",
                                      upper_bound, ": cdf[0]=", slice[0],
                                      ", cdf[^1]=", slice[size - 1]);
     }
-    for (int64 j = 0; j + 1 < size; ++j) {
+    for (int64_t j = 0; j + 1 < size; ++j) {
       if (slice[j + 1] <= slice[j]) {
         return errors::InvalidArgument("CDF is not monotonic");
       }
@@ -200,7 +195,7 @@ class RangeEncodeOp : public OpKernel {
       OP_REQUIRES_OK(context, CheckCdfValues(precision_, cdf));
     }
 
-    std::vector<int64> data_shape, cdf_shape;
+    std::vector<int64_t> data_shape, cdf_shape;
     OP_REQUIRES_OK(
         context, MergeAxes(data.shape(), cdf.shape(), &data_shape, &cdf_shape));
 
@@ -210,12 +205,12 @@ class RangeEncodeOp : public OpKernel {
     std::string output;
 
     switch (data_shape.size()) {
-#define RANGE_ENCODE_CASE(dims)                                           \
-  case dims: {                                                            \
-    OP_REQUIRES_OK(context,                                               \
-                   RangeEncodeImpl<dims>(data.flat<int16>(), data_shape,  \
-                                         cdf.flat_inner_dims<int32, 2>(), \
-                                         cdf_shape, &output));            \
+#define RANGE_ENCODE_CASE(dims)                       \
+  case dims: {                                        \
+    OP_REQUIRES_OK(context, RangeEncodeImpl<dims>(    \
+        data.flat<int16_t>(), data_shape,             \
+        cdf.flat_inner_dims<int32_t, 2>(), cdf_shape, \
+        &output));                                    \
   } break
       RANGE_ENCODE_CASE(1);
       RANGE_ENCODE_CASE(2);
@@ -235,22 +230,22 @@ class RangeEncodeOp : public OpKernel {
 
  private:
   template <int N>
-  tensorflow::Status RangeEncodeImpl(TTypes<int16>::ConstFlat data,
-                                     absl::Span<const int64> data_shape,
-                                     TTypes<int32>::ConstMatrix cdf,
-                                     absl::Span<const int64> cdf_shape,
+  tensorflow::Status RangeEncodeImpl(TTypes<int16_t>::ConstFlat data,
+                                     absl::Span<const int64_t> data_shape,
+                                     TTypes<int32_t>::ConstMatrix cdf,
+                                     absl::Span<const int64_t> cdf_shape,
                                      std::string* output) const {
-    const int64 data_size = data.size();
-    const int64 cdf_size = cdf.size();
-    const int64 chip_size = cdf.dimension(1);
+    const int64_t data_size = data.size();
+    const int64_t cdf_size = cdf.size();
+    const int64_t chip_size = cdf.dimension(1);
 
-    BroadcastRange<const int16, int32, N> view{data.data(), data_shape,
+    BroadcastRange<const int16_t, int32_t, N> view{data.data(), data_shape,
                                                cdf.data(), cdf_shape};
     RangeEncoder encoder;
-    for (int64 linear = 0; linear < data_size; ++linear) {
+    for (int64_t linear = 0; linear < data_size; ++linear) {
       const auto pair = view.Next();
 
-      const int64 index = *pair.first;
+      const int64_t index = *pair.first;
       if (debug_level_ > 0) {
         if (index < 0 || chip_size <= index + 1) {
           return errors::InvalidArgument("'data' value not in [0, ",
@@ -261,11 +256,11 @@ class RangeEncodeOp : public OpKernel {
         DCHECK_LT(index + 1, chip_size);
       }
 
-      const int32* cdf_slice = pair.second;
+      const int32_t* cdf_slice = pair.second;
       DCHECK_LE(cdf_slice + chip_size, cdf.data() + cdf_size);
 
-      const int32 lower = cdf_slice[index];
-      const int32 upper = cdf_slice[index + 1];
+      const int32_t lower = cdf_slice[index];
+      const int32_t upper = cdf_slice[index + 1];
       encoder.Encode(lower, upper, precision_, output);
     }
 
@@ -305,7 +300,7 @@ class RangeDecodeOp : public OpKernel {
                                         shape.shape().DebugString()));
 
     TensorShape output_shape;
-    OP_REQUIRES_OK(context, TensorShapeUtils::MakeShape(shape.vec<int32>(),
+    OP_REQUIRES_OK(context, TensorShapeUtils::MakeShape(shape.vec<int32_t>(),
                                                         &output_shape));
     OP_REQUIRES_OK(context, CheckCdfShape(output_shape, cdf.shape()));
 
@@ -313,7 +308,7 @@ class RangeDecodeOp : public OpKernel {
       OP_REQUIRES_OK(context, CheckCdfValues(precision_, cdf));
     }
 
-    std::vector<int64> data_shape, cdf_shape;
+    std::vector<int64_t> data_shape, cdf_shape;
     OP_REQUIRES_OK(
         context, MergeAxes(output_shape, cdf.shape(), &data_shape, &cdf_shape));
 
@@ -323,12 +318,13 @@ class RangeDecodeOp : public OpKernel {
     OP_REQUIRES_OK(context, context->allocate_output(0, output_shape, &output));
 
     switch (data_shape.size()) {
-#define RANGE_DECODE_CASE(dim)                                                 \
-  case dim: {                                                                  \
-    OP_REQUIRES_OK(                                                            \
-        context, RangeDecodeImpl<dim>(output->flat<int16>(), data_shape,       \
-                                      cdf.flat_inner_dims<int32>(), cdf_shape, \
-                                      encoded));                               \
+#define RANGE_DECODE_CASE(dim)                         \
+  case dim: {                                          \
+    OP_REQUIRES_OK(                                    \
+        context, RangeDecodeImpl<dim>(                 \
+            output->flat<int16_t>(), data_shape,       \
+            cdf.flat_inner_dims<int32_t>(), cdf_shape, \
+            encoded));                                 \
   } break
       RANGE_DECODE_CASE(1);
       RANGE_DECODE_CASE(2);
@@ -347,28 +343,28 @@ class RangeDecodeOp : public OpKernel {
 
  private:
   template <int N>
-  tensorflow::Status RangeDecodeImpl(TTypes<int16>::Flat output,
-                                     absl::Span<const int64> output_shape,
-                                     TTypes<int32>::ConstMatrix cdf,
-                                     absl::Span<const int64> cdf_shape,
+  tensorflow::Status RangeDecodeImpl(TTypes<int16_t>::Flat output,
+                                     absl::Span<const int64_t> output_shape,
+                                     TTypes<int32_t>::ConstMatrix cdf,
+                                     absl::Span<const int64_t> cdf_shape,
                                      const tstring& encoded) const {
-    BroadcastRange<int16, int32, N> view{output.data(), output_shape,
+    BroadcastRange<int16_t, int32_t, N> view{output.data(), output_shape,
                                          cdf.data(), cdf_shape};
 
     RangeDecoder decoder(encoded);
 
-    const int64 output_size = output.size();
-    const int64 cdf_size = cdf.size();
+    const int64_t output_size = output.size();
+    const int64_t cdf_size = cdf.size();
     const auto chip_size =
-        static_cast<absl::Span<const int32>::size_type>(cdf.dimension(1));
+        static_cast<absl::Span<const int32_t>::size_type>(cdf.dimension(1));
 
-    for (int64 i = 0; i < output_size; ++i) {
+    for (int64_t i = 0; i < output_size; ++i) {
       const auto pair = view.Next();
 
-      int16* data = pair.first;
+      int16_t* data = pair.first;
       DCHECK_LT(data, output.data() + output_size);
 
-      const int32* cdf_slice = pair.second;
+      const int32_t* cdf_slice = pair.second;
       DCHECK_LE(cdf_slice + chip_size, cdf.data() + cdf_size);
 
       *data = decoder.Decode({cdf_slice, chip_size}, precision_);

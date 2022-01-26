@@ -17,6 +17,7 @@ limitations under the License.
 
 #include <algorithm>
 #include <array>
+#include <cstdint>
 #include <limits>
 #include <numeric>
 #include <type_traits>
@@ -40,26 +41,19 @@ namespace tensorflow_compression {
 namespace {
 namespace errors = tensorflow::errors;
 using tensorflow::DEVICE_CPU;
-using tensorflow::int16;
-using tensorflow::int32;
-using tensorflow::int64;
 using tensorflow::OpKernel;
 using tensorflow::OpKernelConstruction;
 using tensorflow::OpKernelContext;
-using tensorflow::Status;
 using tensorflow::string;
 using tensorflow::Tensor;
 using tensorflow::TensorShape;
 using tensorflow::TensorShapeUtils;
 using tensorflow::tstring;
 using tensorflow::TTypes;
-using tensorflow::uint32;
-using tensorflow::uint64;
-using tensorflow::uint8;
 
-tensorflow::Status CheckIndex(int64 upper_bound, const Tensor& index) {
-  auto flat = index.flat<int32>();
-  for (int64 i = 0; i < flat.size(); ++i) {
+tensorflow::Status CheckIndex(int64_t upper_bound, const Tensor& index) {
+  auto flat = index.flat<int32_t>();
+  for (int64_t i = 0; i < flat.size(); ++i) {
     if (flat(i) < 0 || upper_bound <= flat(i)) {
       return errors::InvalidArgument("'index' has a value not in [0, ",
                                      upper_bound, "): value=", flat(i));
@@ -68,9 +62,9 @@ tensorflow::Status CheckIndex(int64 upper_bound, const Tensor& index) {
   return tensorflow::Status::OK();
 }
 
-tensorflow::Status CheckCdfSize(int64 upper_bound, const Tensor& cdf_size) {
-  auto flat = cdf_size.vec<int32>();
-  for (int64 i = 0; i < flat.size(); ++i) {
+tensorflow::Status CheckCdfSize(int64_t upper_bound, const Tensor& cdf_size) {
+  auto flat = cdf_size.vec<int32_t>();
+  for (int64_t i = 0; i < flat.size(); ++i) {
     if (flat(i) < 3 || upper_bound < flat(i)) {
       return errors::InvalidArgument("'cdf_size' has a value not in [3, ",
                                      upper_bound, "]: value=", flat(i));
@@ -81,22 +75,22 @@ tensorflow::Status CheckCdfSize(int64 upper_bound, const Tensor& cdf_size) {
 
 tensorflow::Status CheckCdf(int precision, const Tensor& cdf,
                             const Tensor& cdf_size) {
-  auto matrix = cdf.matrix<int32>();
-  auto size = cdf_size.vec<int32>();
+  auto matrix = cdf.matrix<int32_t>();
+  auto size = cdf_size.vec<int32_t>();
   CHECK_EQ(matrix.dimension(0), size.size());
   CHECK_GT(matrix.dimension(1), 2);
 
-  const int32 upper_bound = 1 << precision;
+  const int32_t upper_bound = 1 << precision;
 
-  for (int64 i = 0; i < matrix.dimension(0); ++i) {
-    const TTypes<int32, 1>::ConstVec slice(&matrix(i, 0), size(i));
+  for (int64_t i = 0; i < matrix.dimension(0); ++i) {
+    const TTypes<int32_t, 1>::ConstVec slice(&matrix(i, 0), size(i));
     if (slice(0) != 0 || slice(slice.size() - 1) != upper_bound) {
       return errors::InvalidArgument("Each cdf should start from 0 and end at ",
                                      upper_bound, ": cdf[0]=", slice(0),
                                      ", cdf[^1]=", slice(slice.size() - 1));
     }
 
-    for (int64 j = 0; j + 1 < slice.size(); ++j) {
+    for (int64_t j = 0; j + 1 < slice.size(); ++j) {
       if (slice(j + 1) <= slice(j)) {
         return errors::InvalidArgument("CDF is not monotonic");
       }
@@ -183,44 +177,44 @@ class UnboundedIndexRangeEncodeOp : public OpKernel {
                    context->allocate_output(0, TensorShape{}, &output_tensor));
     std::string output;
 
-    RangeEncodeImpl(data.flat<int32>(), index.flat<int32>(),
-                    cdf.matrix<int32>(), cdf_size.vec<int32>(),
-                    offset.vec<int32>(), &output);
+    RangeEncodeImpl(data.flat<int32_t>(), index.flat<int32_t>(),
+                    cdf.matrix<int32_t>(), cdf_size.vec<int32_t>(),
+                    offset.vec<int32_t>(), &output);
     output_tensor->flat<tstring>()(0) = output;
   }
 
  private:
-  void RangeEncodeImpl(TTypes<int32>::ConstFlat data,
-                       TTypes<int32>::ConstFlat index,
-                       TTypes<int32>::ConstMatrix cdf,
-                       TTypes<int32>::ConstVec cdf_size,
-                       TTypes<int32>::ConstVec offset,
+  void RangeEncodeImpl(TTypes<int32_t>::ConstFlat data,
+                       TTypes<int32_t>::ConstFlat index,
+                       TTypes<int32_t>::ConstMatrix cdf,
+                       TTypes<int32_t>::ConstVec cdf_size,
+                       TTypes<int32_t>::ConstVec offset,
                        std::string* output) const {
     RangeEncoder encoder;
 
     DCHECK_GE(cdf.dimension(1), 2);
-    DCHECK_LE(cdf.dimension(1), std::numeric_limits<int16>::max());
+    DCHECK_LE(cdf.dimension(1), std::numeric_limits<int16_t>::max());
     DCHECK_EQ(cdf.dimension(0), cdf_size.size());
 
-    const uint32 max_overflow = (1 << overflow_width_) - 1;
+    const uint32_t max_overflow = (1 << overflow_width_) - 1;
 
-    const int64 data_size = data.size();
-    for (int64 i = 0; i < data_size; ++i) {
-      const int32 cdf_index = index(i);
+    const int64_t data_size = data.size();
+    for (int64_t i = 0; i < data_size; ++i) {
+      const int32_t cdf_index = index(i);
 
       DCHECK_GE(cdf_index, 0);
       DCHECK_LT(cdf_index, cdf.dimension(0));
 
-      const int32 max_value = cdf_size(cdf_index) - 2;
+      const int32_t max_value = cdf_size(cdf_index) - 2;
       DCHECK_GE(max_value, 0);
       DCHECK_LT(max_value + 1, cdf.dimension(1));
 
-      int32 value = data(i);
+      int32_t value = data(i);
       // Map values with tracked probabilities to 0..max_value range.
       value -= offset(cdf_index);
       // If outside of this range, map value to non-negative integer overflow.
       // NOTE: It might be a good idea to check overflow is within uint32 range.
-      uint32 overflow = 0;
+      uint32_t overflow = 0;
       if (value < 0) {
         overflow = -2 * value - 1;
         value = max_value;
@@ -229,25 +223,26 @@ class UnboundedIndexRangeEncodeOp : public OpKernel {
         value = max_value;
       }
 
-      const int32* cdf_slice = &cdf(cdf_index, 0);
+      const int32_t* cdf_slice = &cdf(cdf_index, 0);
       encoder.Encode(cdf_slice[value], cdf_slice[value + 1], precision_,
                      output);
 
       // Encode overflow using variable length code.
       if (value == max_value) {
-        int32 widths = 0;
+        int32_t widths = 0;
         while (overflow >> (widths * overflow_width_) != 0) {
           ++widths;
         }
-        uint32 val = widths;
+        uint32_t val = widths;
         while (val >= max_overflow) {
           encoder.Encode(max_overflow, max_overflow + 1, overflow_width_,
                          output);
           val -= max_overflow;
         }
         encoder.Encode(val, val + 1, overflow_width_, output);
-        for (int32 j = 0; j < widths; ++j) {
-          const uint32 val = (overflow >> (j * overflow_width_)) & max_overflow;
+        for (int32_t j = 0; j < widths; ++j) {
+          const uint32_t val =
+              (overflow >> (j * overflow_width_)) & max_overflow;
           encoder.Encode(val, val + 1, overflow_width_, output);
         }
       }
@@ -304,54 +299,55 @@ class UnboundedIndexRangeDecodeOp : public OpKernel {
                    context->allocate_output(0, index.shape(), &output));
 
     OP_REQUIRES_OK(
-        context, RangeDecodeImpl(output->flat<int32>(), index.flat<int32>(),
-                                 cdf.matrix<int32>(), cdf_size.vec<int32>(),
-                                 offset.vec<int32>(), encoded.flat<tstring>()));
+        context,
+        RangeDecodeImpl(output->flat<int32_t>(), index.flat<int32_t>(),
+                        cdf.matrix<int32_t>(), cdf_size.vec<int32_t>(),
+                        offset.vec<int32_t>(), encoded.flat<tstring>()));
   }
 
  private:
-  tensorflow::Status RangeDecodeImpl(TTypes<int32>::Flat output,
-                                     TTypes<int32>::ConstFlat index,
-                                     TTypes<int32>::ConstMatrix cdf,
-                                     TTypes<int32>::ConstVec cdf_size,
-                                     TTypes<int32>::ConstVec offset,
+  tensorflow::Status RangeDecodeImpl(TTypes<int32_t>::Flat output,
+                                     TTypes<int32_t>::ConstFlat index,
+                                     TTypes<int32_t>::ConstMatrix cdf,
+                                     TTypes<int32_t>::ConstVec cdf_size,
+                                     TTypes<int32_t>::ConstVec offset,
                                      TTypes<tstring>::ConstFlat encoded) const {
     RangeDecoder decoder(encoded(0));
 
     DCHECK_GE(cdf.dimension(1), 2);
-    DCHECK_LE(cdf.dimension(1), std::numeric_limits<int16>::max());
+    DCHECK_LE(cdf.dimension(1), std::numeric_limits<int16_t>::max());
 
-    const uint32 max_overflow = (1 << overflow_width_) - 1;
-    const int32 overflow_cdf_size = (1 << overflow_width_) + 1;
-    std::vector<int32> overflow_cdf(overflow_cdf_size);
+    const uint32_t max_overflow = (1 << overflow_width_) - 1;
+    const int32_t overflow_cdf_size = (1 << overflow_width_) + 1;
+    std::vector<int32_t> overflow_cdf(overflow_cdf_size);
     std::iota(overflow_cdf.begin(), overflow_cdf.end(), 0);
 
-    const int64 output_size = output.size();
-    for (int64 i = 0; i < output_size; ++i) {
-      const int32 cdf_index = index(i);
+    const int64_t output_size = output.size();
+    for (int64_t i = 0; i < output_size; ++i) {
+      const int32_t cdf_index = index(i);
 
       DCHECK_GE(cdf_index, 0);
       DCHECK_LT(cdf_index, cdf.dimension(0));
 
-      const int32 max_value = cdf_size(cdf_index) - 2;
+      const int32_t max_value = cdf_size(cdf_index) - 2;
       DCHECK_GE(max_value, 0);
       DCHECK_LT(max_value + 1, cdf.dimension(1));
 
-      const int32* cdf_slice = &cdf(cdf_index, 0);
-      int32 value = decoder.Decode(
-          absl::Span<const int32>(cdf_slice, max_value + 2), precision_);
+      const int32_t* cdf_slice = &cdf(cdf_index, 0);
+      int32_t value = decoder.Decode(
+          absl::Span<const int32_t>(cdf_slice, max_value + 2), precision_);
 
       // Decode overflow using variable length code.
       if (value == max_value) {
-        int32 widths = 0;
-        uint32 val;
+        int32_t widths = 0;
+        uint32_t val;
         do {
           val = decoder.Decode(overflow_cdf, overflow_width_);
           widths += val;
         } while (val == max_overflow);
-        uint32 overflow = 0;
-        for (int32 j = 0; j < widths; ++j) {
-          const uint32 val = decoder.Decode(overflow_cdf, overflow_width_);
+        uint32_t overflow = 0;
+        for (int32_t j = 0; j < widths; ++j) {
+          const uint32_t val = decoder.Decode(overflow_cdf, overflow_width_);
           DCHECK_LE(val, max_overflow);
           overflow |= val << (j * overflow_width_);
         }

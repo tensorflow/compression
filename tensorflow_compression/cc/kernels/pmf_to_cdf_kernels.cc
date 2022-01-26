@@ -16,6 +16,7 @@ limitations under the License.
 #define EIGEN_USE_THREADS
 
 #include <algorithm>
+#include <cstdint>
 #include <functional>
 #include <iterator>
 #include <numeric>
@@ -36,8 +37,6 @@ namespace tensorflow_compression {
 namespace {
 namespace thread = tensorflow::thread;
 using tensorflow::DEVICE_CPU;
-using tensorflow::int32;
-using tensorflow::int64;
 using tensorflow::OpKernel;
 using tensorflow::OpKernelConstruction;
 using tensorflow::OpKernelContext;
@@ -45,9 +44,6 @@ using tensorflow::string;
 using tensorflow::Tensor;
 using tensorflow::TensorShape;
 using tensorflow::TensorShapeUtils;
-using tensorflow::uint32;
-using tensorflow::uint64;
-using tensorflow::uint8;
 using tensorflow::errors::InvalidArgument;
 
 class PmfToCdfOp : public OpKernel {
@@ -74,12 +70,12 @@ class PmfToCdfOp : public OpKernel {
     OP_REQUIRES_OK(context, context->allocate_output(0, shape, &cdf_tensor));
 
     auto pmf = pmf_tensor.flat_inner_dims<float, 2>();
-    auto cdf = cdf_tensor->flat_inner_dims<int32, 2>();
+    auto cdf = cdf_tensor->flat_inner_dims<int32_t, 2>();
     CHECK_EQ(pmf.dimension(0), cdf.dimension(0));
     CHECK_EQ(pmf.dimension(1) + 1, cdf.dimension(1));
 
-    for (int64 i = 0; i < pmf.dimension(0); ++i) {
-      for (int64 j = 0; j < pmf.dimension(1); ++j) {
+    for (int64_t i = 0; i < pmf.dimension(0); ++i) {
+      for (int64_t j = 0; j < pmf.dimension(1); ++j) {
         auto value = pmf(i, j);
         OP_REQUIRES(
             context, std::isfinite(value) && value >= 0,
@@ -90,14 +86,14 @@ class PmfToCdfOp : public OpKernel {
     }
 
     const double n = pmf.dimension(1);
-    const int64 cost_per_unit = static_cast<int64>(50.0 * n * std::log2(n));
+    const int64_t cost_per_unit = static_cast<int64_t>(50.0 * n * std::log2(n));
     thread::ThreadPool* thread_pool =
         context->device()->tensorflow_cpu_worker_threads()->workers;
     thread_pool->ParallelFor(
         pmf.dimension(0), cost_per_unit,
-        [this, pmf, &cdf](int64 start, int64 limit) {
+        [this, pmf, &cdf](int64_t start, int64_t limit) {
           const absl::Span<const float>::size_type pmf_size = pmf.dimension(1);
-          for (int64 i = start; i < limit; ++i) {
+          for (int64_t i = start; i < limit; ++i) {
             cdf(i, 0) = 0;
             PerShard({&pmf(i, 0), pmf_size}, {&cdf(i, 1), pmf_size});
           }
@@ -106,7 +102,7 @@ class PmfToCdfOp : public OpKernel {
 
  private:
   struct PenaltyItem {
-    PenaltyItem(int32* p, double mass) : pointer(p), mass(mass) {
+    PenaltyItem(int32_t* p, double mass) : pointer(p), mass(mass) {
       penalty = ComputeNextPenalty();
     }
 
@@ -127,13 +123,13 @@ class PmfToCdfOp : public OpKernel {
       return mass * (std::log2(*pointer) - std::log2(*pointer - 1));
     }
 
-    int32* pointer;
+    int32_t* pointer;
     double mass;
     double penalty;
   };
 
   struct GainItem {
-    GainItem(int32* p, double mass) : pointer(p), mass(mass) {
+    GainItem(int32_t* p, double mass) : pointer(p), mass(mass) {
       gain = ComputeNextGain();
     }
 
@@ -155,28 +151,28 @@ class PmfToCdfOp : public OpKernel {
       return mass * (std::log2(*pointer + 1) - std::log2(*pointer));
     }
 
-    int32* pointer;
+    int32_t* pointer;
     double mass;
     double gain;
   };
 
-  void PerShard(absl::Span<const float> pmf, absl::Span<int32> cdf) const {
+  void PerShard(absl::Span<const float> pmf, absl::Span<int32_t> cdf) const {
     CHECK_EQ(pmf.size(), cdf.size());
 
-    const int32 normalizer = 1 << precision_;
+    const int32_t normalizer = 1 << precision_;
     std::transform(pmf.begin(), pmf.end(), cdf.begin(),
                    [normalizer](float mass) {
-                     int32 value = std::rint(mass * normalizer);
+                     int32_t value = std::rint(mass * normalizer);
                      // NOTE: Consider checking if mass > 0.
                      value = std::max(value, 1);
                      return value;
                    });
 
-    int32 sum = std::accumulate(cdf.begin(), cdf.end(), 0);
+    int32_t sum = std::accumulate(cdf.begin(), cdf.end(), 0);
     if (sum > normalizer) {
       std::vector<PenaltyItem> queue;
       queue.reserve(cdf.size());
-      for (absl::Span<int32>::size_type i = 0; i < cdf.size(); ++i) {
+      for (absl::Span<int32_t>::size_type i = 0; i < cdf.size(); ++i) {
         queue.emplace_back(&cdf[i], pmf[i]);
       }
 
@@ -193,7 +189,7 @@ class PmfToCdfOp : public OpKernel {
     } else if (sum < normalizer) {
       std::vector<GainItem> queue;
       queue.reserve(cdf.size());
-      for (absl::Span<int32>::size_type i = 0; i < cdf.size(); ++i) {
+      for (absl::Span<int32_t>::size_type i = 0; i < cdf.size(); ++i) {
         queue.emplace_back(&cdf[i], pmf[i]);
       }
 

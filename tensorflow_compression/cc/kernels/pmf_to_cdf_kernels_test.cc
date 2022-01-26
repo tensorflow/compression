@@ -14,6 +14,7 @@ limitations under the License.
 ==============================================================================*/
 
 #include <algorithm>
+#include <cstdint>
 #include <limits>
 #include <random>
 
@@ -39,7 +40,6 @@ using tensorflow::NodeDefBuilder;
 using tensorflow::OpsTestBase;
 using tensorflow::ShapeInferenceTestOp;
 using tensorflow::Tensor;
-using tensorflow::TensorShape;
 using tensorflow::TTypes;
 
 class PmfToQuantizedCdfOpTest : public OpsTestBase {
@@ -77,17 +77,18 @@ class PmfToQuantizedCdfOpTest : public OpsTestBase {
     }
 
     auto pmf = pmf_tensor.flat_inner_dims<float, 2>();
-    auto cdf = cdf_tensor.flat_inner_dims<int32, 2>();
+    auto cdf = cdf_tensor.flat_inner_dims<int32_t, 2>();
     EXPECT_EQ(pmf.dimension(1) + 1, cdf.dimension(1));
 
     const int normalizer = 1 << precision;
     for (int i = 0; i < pmf.dimension(0); ++i) {
       EXPECT_EQ(0, cdf(i, 0));
 
-      TTypes<int32>::UnalignedConstVec cdf_slice(&cdf(i, 0), cdf.dimension(1));
+      TTypes<int32_t>::UnalignedConstVec cdf_slice(&cdf(i, 0),
+                                                   cdf.dimension(1));
 
       for (int j = 1; j < cdf_slice.size(); ++j) {
-        const int32 diff = cdf_slice(j) - cdf_slice(j - 1);
+        const int32_t diff = cdf_slice(j) - cdf_slice(j - 1);
         EXPECT_GT(diff, 0);
       }
 
@@ -104,7 +105,7 @@ TEST_F(PmfToQuantizedCdfOpTest, UnderSum) {
   std::random_device rd;
   random::PhiloxRandom gen(rd(), rd());
   random::SimplePhilox rand(&gen);
-  for (int64 i = 0; i < matrix.dimension(0); ++i) {
+  for (int64_t i = 0; i < matrix.dimension(0); ++i) {
     GenerateData(&rand, {&matrix(i, 0), n});
   }
 
@@ -130,7 +131,7 @@ TEST_F(PmfToQuantizedCdfOpTest, OverSum) {
   std::random_device rd;
   random::PhiloxRandom gen(rd(), rd());
   random::SimplePhilox rand(&gen);
-  for (int64 i = 0; i < matrix.dimension(0); ++i) {
+  for (int64_t i = 0; i < matrix.dimension(0); ++i) {
     GenerateData(&rand, {&matrix(i, 0), n});
   }
 

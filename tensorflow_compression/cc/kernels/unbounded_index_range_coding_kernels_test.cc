@@ -15,6 +15,7 @@ limitations under the License.
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <memory>
 #include <random>
 #include <vector>
@@ -48,9 +49,6 @@ namespace test = tensorflow::test;
 using tensorflow::DT_INT32;
 using tensorflow::DT_STRING;
 using tensorflow::Graph;
-using tensorflow::int16;
-using tensorflow::int32;
-using tensorflow::int64;
 using tensorflow::Node;
 using tensorflow::NodeBuilder;
 using tensorflow::NodeDefBuilder;
@@ -62,9 +60,6 @@ using tensorflow::string;
 using tensorflow::Tensor;
 using tensorflow::TensorShape;
 using tensorflow::TTypes;
-using tensorflow::uint32;
-using tensorflow::uint64;
-using tensorflow::uint8;
 
 void BuildDataAndCdf(random::SimplePhilox* gen, Tensor* data_tensor,
                      const Tensor& index_tensor, Tensor* cdf_tensor,
@@ -72,17 +67,17 @@ void BuildDataAndCdf(random::SimplePhilox* gen, Tensor* data_tensor,
                      int precision, float over_estimate = 1.2f) {
   CHECK_GT(precision, 0);
 
-  TTypes<int32>::Flat data = data_tensor->flat<int32>();
-  TTypes<int32>::ConstFlat index = index_tensor.flat<int32>();
+  TTypes<int32_t>::Flat data = data_tensor->flat<int32_t>();
+  TTypes<int32_t>::ConstFlat index = index_tensor.flat<int32_t>();
   CHECK_EQ(data.size(), index.size());
 
-  TTypes<int32>::Matrix cdf = cdf_tensor->matrix<int32>();
+  TTypes<int32_t>::Matrix cdf = cdf_tensor->matrix<int32_t>();
   CHECK_GE(cdf.dimension(1), 2);
 
-  TTypes<int32>::Vec cdf_size = cdf_size_tensor->vec<int32>();
+  TTypes<int32_t>::Vec cdf_size = cdf_size_tensor->vec<int32_t>();
   CHECK_EQ(cdf_size.size(), cdf.dimension(0));
 
-  TTypes<int32>::Vec offset = offset_tensor->vec<int32>();
+  TTypes<int32_t>::Vec offset = offset_tensor->vec<int32_t>();
   CHECK_EQ(offset.size(), cdf.dimension(0));
 
   std::vector<std::unique_ptr<random::DistributionSampler>> sampler;
@@ -94,18 +89,18 @@ void BuildDataAndCdf(random::SimplePhilox* gen, Tensor* data_tensor,
 
     std::vector<float> weights(2 * cdf.dimension(1));
     CHECK_LE(cdf.dimension(1), weights.size());
-    for (int64 i = 0; i < cdf.dimension(0); ++i) {
-      int32* slice = &cdf(i, 0);
+    for (int64_t i = 0; i < cdf.dimension(0); ++i) {
+      int32_t* slice = &cdf(i, 0);
       slice[0] = 0;
 
       // Random p in [kMinParam, kMaxParam).
       const float p = kMinParam + (kMaxParam - kMinParam) * gen->RandFloat();
 
       float mass = (1 - p) * over_estimate;
-      for (int64 j = 0; j < weights.size(); ++j) {
+      for (int64_t j = 0; j < weights.size(); ++j) {
         if (j < cdf.dimension(1) - 1) {
-          const int32 inc =
-              std::max<int32>(1, std::rint(std::ldexp(mass, precision)));
+          const int32_t inc =
+              std::max<int32_t>(1, std::rint(std::ldexp(mass, precision)));
           slice[j + 1] = std::min(slice[j] + inc, 1 << precision);
 
           if (slice[j] < slice[j + 1]) {
@@ -126,8 +121,8 @@ void BuildDataAndCdf(random::SimplePhilox* gen, Tensor* data_tensor,
     }
   }
 
-  for (int64 i = 0; i < data.size(); ++i) {
-    const int32 current_index = index(i);
+  for (int64_t i = 0; i < data.size(); ++i) {
+    const int32_t current_index = index(i);
     CHECK_GE(current_index, 0);
     CHECK_LT(current_index, sampler.size());
 
@@ -237,7 +232,7 @@ class UnboundedIndexRangeCoderOpsTest : public OpsTestBase {
     CHECK_EQ(N, shape.dims());
 
     std::vector<bool> broadcasting(shape.dims(), false);
-    for (int32 axis : broadcasting_axes) {
+    for (int32_t axis : broadcasting_axes) {
       broadcasting[axis] = true;
     }
 
@@ -247,7 +242,7 @@ class UnboundedIndexRangeCoderOpsTest : public OpsTestBase {
     }
 
     Tensor temp(DT_INT32, temp_shape);
-    auto temp_buffer = temp.flat<int32>();
+    auto temp_buffer = temp.flat<int32_t>();
     std::iota(temp_buffer.data(), temp_buffer.data() + temp_buffer.size(), 0);
 
     Eigen::array<Eigen::DenseIndex, N> broadcast;
@@ -256,7 +251,7 @@ class UnboundedIndexRangeCoderOpsTest : public OpsTestBase {
     }
 
     Tensor index(DT_INT32, shape);
-    index.tensor<int32, N>() = temp.tensor<int32, N>().broadcast(broadcast);
+    index.tensor<int32_t, N>() = temp.tensor<int32_t, N>().broadcast(broadcast);
     return index;
   }
 };
@@ -274,8 +269,8 @@ TEST_F(UnboundedIndexRangeCoderOpsTest, RandomIndex) {
   random::PhiloxRandom philox(rd(), rd());
   random::SimplePhilox gen(&philox);
 
-  auto flat = index.flat<int32>();
-  for (int64 i = 0; i < flat.size(); ++i) {
+  auto flat = index.flat<int32_t>();
+  for (int64_t i = 0; i < flat.size(); ++i) {
     flat(i) = gen.Uniform(kCdfCount);
   }
 
@@ -285,7 +280,7 @@ TEST_F(UnboundedIndexRangeCoderOpsTest, RandomIndex) {
   BuildDataAndCdf(&gen, &data, index, &cdf, &cdf_size, &offset, kPrecision);
 
   // Insert some out-of-range values manually.
-  auto data_flat = data.flat<int32>();
+  auto data_flat = data.flat<int32_t>();
   data_flat(0) = -3;
   data_flat(data_flat.size() - 1) = kCdfWidth + 5;
 
@@ -295,19 +290,19 @@ TEST_F(UnboundedIndexRangeCoderOpsTest, RandomIndex) {
 
 TEST_F(UnboundedIndexRangeCoderOpsTest, EncoderDebug) {
   Tensor data(DT_INT32, {});
-  data.scalar<int32>()() = 0;
+  data.scalar<int32_t>()() = 0;
 
   Tensor index(DT_INT32, {});
-  index.scalar<int32>()() = 0;
+  index.scalar<int32_t>()() = 0;
 
   Tensor cdf(DT_INT32, {1, 4});
-  cdf.flat<int32>().setValues({0, 16, 18, 32});
+  cdf.flat<int32_t>().setValues({0, 16, 18, 32});
 
   Tensor cdf_size(DT_INT32, {1});
-  cdf_size.vec<int32>().setValues({4});
+  cdf_size.vec<int32_t>().setValues({4});
 
   Tensor offset(DT_INT32, {1});
-  offset.vec<int32>().setValues({1});
+  offset.vec<int32_t>().setValues({1});
 
   auto status = RunEncodeOpDebug(5, 2, {data, index, cdf, cdf_size, offset});
   EXPECT_TRUE(status.ok());
@@ -321,23 +316,23 @@ TEST_F(UnboundedIndexRangeCoderOpsTest, EncoderDebug) {
         << status.error_message();                                    \
   }
 
-  index.scalar<int32>()() = -1;
+  index.scalar<int32_t>()() = -1;
   EXPECT_STATUS_SUBSTR("'index' has a value not in");
-  index.scalar<int32>()() = 0;
+  index.scalar<int32_t>()() = 0;
 
-  cdf_size.vec<int32>().setValues({1});
+  cdf_size.vec<int32_t>().setValues({1});
   EXPECT_STATUS_SUBSTR("'cdf_size' has a value not in");
-  cdf_size.vec<int32>().setValues({5});
+  cdf_size.vec<int32_t>().setValues({5});
   EXPECT_STATUS_SUBSTR("'cdf_size' has a value not in");
-  cdf_size.vec<int32>().setValues({4});
+  cdf_size.vec<int32_t>().setValues({4});
 
-  cdf.flat<int32>().setValues({1, 16, 18, 32});
+  cdf.flat<int32_t>().setValues({1, 16, 18, 32});
   EXPECT_STATUS_SUBSTR("cdf[0]=");
-  cdf.flat<int32>().setValues({0, 16, 18, 31});
+  cdf.flat<int32_t>().setValues({0, 16, 18, 31});
   EXPECT_STATUS_SUBSTR("cdf[^1]=");
-  cdf.flat<int32>().setValues({0, 18, 16, 32});
+  cdf.flat<int32_t>().setValues({0, 18, 16, 32});
   EXPECT_STATUS_SUBSTR("monotonic");
-  cdf.flat<int32>().setValues({0, 16, 18, 32});
+  cdf.flat<int32_t>().setValues({0, 16, 18, 32});
 
   Tensor temp = cdf;
   cdf = Tensor(DT_INT32, {4});
@@ -367,16 +362,16 @@ TEST_F(UnboundedIndexRangeCoderOpsTest, DecoderDebug) {
   Tensor encoded(DT_STRING, {});
 
   Tensor index(DT_INT32, {});
-  index.scalar<int32>()() = 0;
+  index.scalar<int32_t>()() = 0;
 
   Tensor cdf(DT_INT32, {1, 4});
-  cdf.flat<int32>().setValues({0, 16, 18, 32});
+  cdf.flat<int32_t>().setValues({0, 16, 18, 32});
 
   Tensor cdf_size(DT_INT32, {1});
-  cdf_size.vec<int32>().setValues({4});
+  cdf_size.vec<int32_t>().setValues({4});
 
   Tensor offset(DT_INT32, {1});
-  offset.vec<int32>().setValues({1});
+  offset.vec<int32_t>().setValues({1});
 
   auto status = RunDecodeOpDebug(5, 2, {encoded, index, cdf, cdf_size, offset});
   EXPECT_TRUE(status.ok());

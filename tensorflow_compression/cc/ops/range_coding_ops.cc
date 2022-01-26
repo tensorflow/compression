@@ -24,7 +24,6 @@ namespace tensorflow_compression {
 namespace {
 namespace shape_inference = tensorflow::shape_inference;
 using tensorflow::Status;
-using tensorflow::shape_inference::DimensionHandle;
 using tensorflow::shape_inference::InferenceContext;
 using tensorflow::shape_inference::ShapeHandle;
 
