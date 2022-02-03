@@ -71,6 +71,8 @@ class PackedTensors:
         raise RuntimeError(f"Unexpected tensor rank: {tensor.shape.rank}.")
       if tensor.dtype.is_integer:
         feature.int64_list.value[:] = tensor.numpy()
+      elif tensor.dtype.is_floating:
+        feature.float_list.value[:] = tensor.numpy()
       elif tensor.dtype == tf.string:
         feature.bytes_list.value[:] = tensor.numpy()
       else:
@@ -89,6 +91,8 @@ class PackedTensors:
       feature = self._example.features.feature[chr(i + 1)]
       if dtype.is_integer:
         tensors.append(tf.constant(feature.int64_list.value, dtype=dtype))
+      elif dtype.is_floating:
+        tensors.append(tf.constant(feature.float_list.value, dtype=dtype))
       elif dtype == tf.string:
         tensors.append(tf.constant(feature.bytes_list.value, dtype=dtype))
       else:

@@ -96,17 +96,34 @@ def instantiate_model_signature(model, signature, inputs=None, outputs=None):
   return wrapped_import.prune(inputs, outputs)
 
 
-def compress_image(model, input_image):
+def compress_image(model, input_image, rd_parameter=None):
   """Compresses an image tensor into a bitstring."""
   sender = instantiate_model_signature(model, "sender")
-  tensors = sender(input_image)
+  if len(sender.inputs) == 1:
+    if rd_parameter is not None:
+      raise ValueError("This model doesn't expect an RD parameter.")
+    tensors = sender(input_image)
+  elif len(sender.inputs) == 2:
+    if rd_parameter is None:
+      raise ValueError("This model expects an RD parameter.")
+    rd_parameter = tf.constant(rd_parameter, dtype=sender.inputs[1].dtype)
+    tensors = sender(input_image, rd_parameter)
+    # Find RD parameter and expand it to a 1D tensor so it fits into the
+    # PackedTensors format.
+    for i, t in enumerate(tensors):
+      if t.dtype.is_floating and t.shape.rank == 0:
+        tensors[i] = tf.expand_dims(t, 0)
+  else:
+    raise RuntimeError("Unexpected model signature.")
   packed = tfc.PackedTensors()
   packed.model = model
   packed.pack(tensors)
   return packed.string
 
 
-def compress(model, input_file, output_file, target_bpp=None, bpp_strict=False):
+def compress(model, input_file, output_file,
+             rd_parameter=None, rd_parameter_tolerance=None,
+             target_bpp=None, bpp_strict=False):
   """Compresses a PNG file to a TFCI file."""
   if not output_file:
     output_file = input_file + ".tfci"
@@ -117,21 +134,35 @@ def compress(model, input_file, output_file, target_bpp=None, bpp_strict=False):
 
   if not target_bpp:
     # Just compress with a specific model.
-    bitstring = compress_image(model, input_image)
+    bitstring = compress_image(model, input_image, rd_parameter=rd_parameter)
   else:
     # Get model list.
     models = load_cached(model + ".models")
     models = models.decode("ascii").split()
 
-    # Do a binary search over all RD points.
-    lower = -1
-    upper = len(models)
+    try:
+      lower, upper = [float(m) for m in models]
+      use_rd_parameter = True
+    except ValueError:
+      lower = -1
+      upper = len(models)
+      use_rd_parameter = False
+
+    # Do a binary search over RD points.
     bpp = None
     best_bitstring = None
     best_bpp = None
-    while bpp != target_bpp and upper - lower > 1:
-      i = (upper + lower) // 2
-      bitstring = compress_image(models[i], input_image)
+    while bpp != target_bpp:
+      if use_rd_parameter:
+        if upper - lower <= rd_parameter_tolerance:
+          break
+        i = (upper + lower) / 2
+        bitstring = compress_image(model, input_image, rd_parameter=i)
+      else:
+        if upper - lower < 2:
+          break
+        i = (upper + lower) // 2
+        bitstring = compress_image(models[i], input_image)
       bpp = 8 * len(bitstring) / num_pixels
       is_admissible = bpp <= target_bpp or not bpp_strict
       is_better = (best_bpp is None or
@@ -162,6 +193,10 @@ def decompress(input_file, output_file):
     packed = tfc.PackedTensors(f.read())
   receiver = instantiate_model_signature(packed.model, "receiver")
   tensors = packed.unpack([t.dtype for t in receiver.inputs])
+  # Find potential RD parameter and turn it back into a scalar.
+  for i, t in enumerate(tensors):
+    if t.dtype.is_floating and t.shape == (1,):
+      tensors[i] = tf.squeeze(t, 0)
   output_image, = receiver(*tensors)
   write_png(output_file, output_image)
 
@@ -247,7 +282,17 @@ def parse_args(argv):
            "'target_bpp' is provided, don't specify the index at the end of "
            "the model identifier.")
   compress_cmd.add_argument(
-      "--target_bpp", type=float,
+      "--rd_parameter", "-r", type=float,
+      help="Rate-distortion parameter (for some models). Ignored if "
+           "'target_bpp' is set.")
+  compress_cmd.add_argument(
+      "--rd_parameter_tolerance", type=float,
+      default=2 ** -4,
+      help="Tolerance for rate-distortion parameter. Only used if 'target_bpp' "
+           "is set for some models, to determine when to stop the binary "
+           "search.")
+  compress_cmd.add_argument(
+      "--target_bpp", "-b", type=float,
       help="Target bits per pixel. If provided, a binary search is used to try "
            "to match the given bpp as close as possible. In this case, don't "
            "specify the index at the end of the model identifier. It will be "
@@ -323,6 +368,7 @@ def main(args):
   # Invoke subcommand.
   if args.command == "compress":
     compress(args.model, args.input_file, args.output_file,
+             args.rd_parameter, args.rd_parameter_tolerance,
              args.target_bpp, args.bpp_strict)
   elif args.command == "decompress":
     decompress(args.input_file, args.output_file)
