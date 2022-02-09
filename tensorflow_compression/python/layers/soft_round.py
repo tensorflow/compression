@@ -27,18 +27,16 @@ __all__ = [
 class SoftRound(tf.keras.layers.Layer):
   """Applies a differentiable approximation of rounding."""
 
-  def __init__(self,
-               alpha=5.0,
-               inverse=False,
-               **kwargs):
+  def __init__(self, alpha=5.0, inverse=False, **kwargs):
     super().__init__(**kwargs)
     self._alpha = alpha
-    self._transform = (
-        round_ops.soft_round_inverse if inverse else round_ops.soft_round)
+    if inverse:
+      self._transform = round_ops.soft_round_inverse
+    else:
+      self._transform = round_ops.soft_round
 
   def call(self, inputs):
-    outputs = self._transform(inputs, self._alpha)
-    return outputs
+    return self._transform(inputs, self._alpha)
 
   def compute_output_shape(self, input_shape):
     return input_shape
@@ -47,9 +45,7 @@ class SoftRound(tf.keras.layers.Layer):
 class SoftRoundConditionalMean(tf.keras.layers.Layer):
   """Conditional mean of inputs given noisy soft rounded values."""
 
-  def __init__(self,
-               alpha=5.0,
-               **kwargs):
+  def __init__(self, alpha=5.0, **kwargs):
     super().__init__(**kwargs)
     self._alpha = alpha
 

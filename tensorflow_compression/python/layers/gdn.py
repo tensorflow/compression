@@ -27,6 +27,16 @@ __all__ = [
 ParameterType = Union[None, tf.Tensor, Callable[[], tf.Tensor]]
 
 
+def _convert_parameter(param, dtype):
+  try:
+    return tf.convert_to_tensor(param, dtype=dtype)
+  except ValueError:
+    try:
+      return tf.cast(param, dtype)
+    except ValueError:
+      return tf.cast(param(), dtype)
+
+
 @tf.keras.utils.register_keras_serializable(package="tensorflow_compression")
 class GDN(tf.keras.layers.Layer):
   """Generalized divisive normalization layer.
@@ -210,7 +220,8 @@ class GDN(tf.keras.layers.Layer):
     if isinstance(value, dict):
       value = tf.keras.utils.deserialize_keras_object(value)
     if value is not None and not callable(value):
-      value = tf.convert_to_tensor(value, dtype=self.dtype)
+      # It's a constant, so keep it in compute_dtype.
+      value = tf.convert_to_tensor(value, dtype=self.compute_dtype)
     self._alpha_parameter = value
 
   @property
@@ -224,7 +235,8 @@ class GDN(tf.keras.layers.Layer):
     if isinstance(value, dict):
       value = tf.keras.utils.deserialize_keras_object(value)
     if value is not None and not callable(value):
-      value = tf.convert_to_tensor(value, dtype=self.dtype)
+      # It's a constant, so keep it in compute_dtype.
+      value = tf.convert_to_tensor(value, dtype=self.compute_dtype)
     self._beta_parameter = value
 
   @property
@@ -238,7 +250,8 @@ class GDN(tf.keras.layers.Layer):
     if isinstance(value, dict):
       value = tf.keras.utils.deserialize_keras_object(value)
     if value is not None and not callable(value):
-      value = tf.convert_to_tensor(value, dtype=self.dtype)
+      # It's a constant, so keep it in compute_dtype.
+      value = tf.convert_to_tensor(value, dtype=self.compute_dtype)
     self._gamma_parameter = value
 
   @property
@@ -252,7 +265,8 @@ class GDN(tf.keras.layers.Layer):
     if isinstance(value, dict):
       value = tf.keras.utils.deserialize_keras_object(value)
     if value is not None and not callable(value):
-      value = tf.convert_to_tensor(value, dtype=self.dtype)
+      # It's a constant, so keep it in compute_dtype.
+      value = tf.convert_to_tensor(value, dtype=self.compute_dtype)
     self._epsilon_parameter = value
 
   @property
@@ -295,33 +309,25 @@ class GDN(tf.keras.layers.Layer):
   def alpha(self) -> tf.Tensor:
     if self.alpha_parameter is None:
       raise RuntimeError("alpha is not initialized yet. Call build().")
-    if callable(self.alpha_parameter):
-      return tf.convert_to_tensor(self.alpha_parameter(), dtype=self.dtype)
-    return self.alpha_parameter
+    return _convert_parameter(self.alpha_parameter, self.compute_dtype)
 
   @property
   def beta(self) -> tf.Tensor:
     if self.beta_parameter is None:
       raise RuntimeError("beta is not initialized yet. Call build().")
-    if callable(self.beta_parameter):
-      return tf.convert_to_tensor(self.beta_parameter(), dtype=self.dtype)
-    return self.beta_parameter
+    return _convert_parameter(self.beta_parameter, self.compute_dtype)
 
   @property
   def gamma(self) -> tf.Tensor:
     if self.gamma_parameter is None:
       raise RuntimeError("gamma is not initialized yet. Call build().")
-    if callable(self.gamma_parameter):
-      return tf.convert_to_tensor(self.gamma_parameter(), dtype=self.dtype)
-    return self.gamma_parameter
+    return _convert_parameter(self.gamma_parameter, self.compute_dtype)
 
   @property
   def epsilon(self) -> tf.Tensor:
     if self.epsilon_parameter is None:
       raise RuntimeError("epsilon is not initialized yet. Call build().")
-    if callable(self.epsilon_parameter):
-      return tf.convert_to_tensor(self.epsilon_parameter(), dtype=self.dtype)
-    return self.epsilon_parameter
+    return _convert_parameter(self.epsilon_parameter, self.compute_dtype)
 
   @property
   def _channel_axis(self):
@@ -338,32 +344,31 @@ class GDN(tf.keras.layers.Layer):
 
     if self.alpha_parameter is None:
       initial_value = self.alpha_initializer(
-          shape=[], dtype=self.dtype)
+          shape=[], dtype=self.variable_dtype)
       self.alpha_parameter = parameters.GDNParameter(
           initial_value, name="alpha", minimum=1)
 
     if self.beta_parameter is None:
       initial_value = self.beta_initializer(
-          shape=[num_channels], dtype=self.dtype)
+          shape=[num_channels], dtype=self.variable_dtype)
       self.beta_parameter = parameters.GDNParameter(
           initial_value, name="beta", minimum=1e-6)
 
     if self.gamma_parameter is None:
       initial_value = self.gamma_initializer(
-          shape=[num_channels, num_channels], dtype=self.dtype)
+          shape=[num_channels, num_channels], dtype=self.variable_dtype)
       self.gamma_parameter = parameters.GDNParameter(
           initial_value, name="gamma", minimum=0)
 
     if self.epsilon_parameter is None:
       initial_value = self.epsilon_initializer(
-          shape=[], dtype=self.dtype)
+          shape=[], dtype=self.variable_dtype)
       self.epsilon_parameter = parameters.GDNParameter(
           initial_value, name="epsilon", minimum=1e-6)
 
     super().build(input_shape)
 
   def call(self, inputs) -> tf.Tensor:
-    inputs = tf.convert_to_tensor(inputs, dtype=self.dtype)
     rank = inputs.shape.rank
     if rank is None or rank < 2:
       raise ValueError(f"Input tensor must have at least rank 2, received "

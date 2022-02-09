@@ -163,7 +163,8 @@ class UniversalIndexedEntropyModelTest(tf.test.TestCase,
     self.assertEqual(em.coding_rank, 1)
     self.assertEqual(em._laplace_tail_mass, 0.0)
     self.assertEqual(em.tail_mass, 2**-8)
-    self.assertEqual(em.dtype, tf.float32)
+    self.assertEqual(em.bottleneck_dtype, tf.float32)
+    self.assertEqual(em.prior_dtype, tf.float32)
 
   def test_can_instantiate_and_compress_n_dimensional(self):
     em = universal.UniversalIndexedEntropyModel(
@@ -236,7 +237,6 @@ class UniversalIndexedEntropyModelTest(tf.test.TestCase,
     self.assertEqual(em._laplace_tail_mass, 0.0)
     self.assertEqual(em.tail_mass, 2**-8)
     self.assertEqual(em.range_coder_precision, 12)
-    self.assertEqual(em.dtype, tf.float32)
     num_symbols = 1000
     # Source distribution is gaussian with stddev 1.
     x = tf.random.stateless_normal((1, 1, num_symbols), seed=(0, 0))

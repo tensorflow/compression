@@ -30,7 +30,8 @@ class ContinuousBatchedEntropyModelTest(tf.test.TestCase,
     self.assertIs(em.prior, noisy)
     self.assertEqual(em.coding_rank, 1)
     self.assertEqual(em.tail_mass, 2**-8)
-    self.assertEqual(em.dtype, noisy.dtype)
+    self.assertEqual(em.bottleneck_dtype, tf.float32)
+    self.assertEqual(em.prior.dtype, tf.float32)
 
   def test_can_instantiate_statelessly(self):
     noisy = uniform_noise.NoisyNormal(loc=.25, scale=1.)
@@ -41,8 +42,7 @@ class ContinuousBatchedEntropyModelTest(tf.test.TestCase,
     self.assertAllEqual(.25, em.quantization_offset)
     em = ContinuousBatchedEntropyModel(
         compression=True, stateless=True, coding_rank=1,
-        prior_shape=noisy.batch_shape, dtype=noisy.dtype,
-        cdf=em.cdf, cdf_offset=em.cdf_offset,
+        prior_shape=noisy.batch_shape, cdf=em.cdf, cdf_offset=em.cdf_offset,
         quantization_offset=em.quantization_offset,
     )
     self.assertEqual(em.compression, True)
@@ -53,7 +53,7 @@ class ContinuousBatchedEntropyModelTest(tf.test.TestCase,
     self.assertEqual(em.coding_rank, 1)
     self.assertEqual(em.tail_mass, 2**-8)
     self.assertEqual(em.range_coder_precision, 12)
-    self.assertEqual(em.dtype, noisy.dtype)
+    self.assertEqual(em.bottleneck_dtype, tf.float32)
 
   def test_requires_scalar_distributions(self):
     noisy = uniform_noise.UniformNoiseAdapter(
@@ -193,6 +193,29 @@ class ContinuousBatchedEntropyModelTest(tf.test.TestCase,
     values_function = tf.function(Compressor().compress)(samples)
     self.assertAllClose(samples, values_eager, rtol=0., atol=.5)
     self.assertAllEqual(values_eager, values_function)
+
+  def test_dtypes_are_correct_with_mixed_precision(self):
+    tf.keras.mixed_precision.set_global_policy("mixed_float16")
+    try:
+      noisy = uniform_noise.NoisyNormal(
+          loc=tf.constant(0, dtype=tf.float64),
+          scale=tf.constant(1, dtype=tf.float64))
+      em = ContinuousBatchedEntropyModel(noisy, 1, compression=True)
+      self.assertEqual(em.bottleneck_dtype, tf.float16)
+      self.assertEqual(em.prior.dtype, tf.float64)
+      x = tf.random.stateless_normal((2, 5), seed=(0, 1), dtype=tf.float16)
+      x_tilde, bits = em(x)
+      bitstring = em.compress(x)
+      x_hat = em.decompress(bitstring, (5,))
+      self.assertEqual(x_hat.dtype, tf.float16)
+      self.assertAllClose(x, x_hat, rtol=0, atol=.5)
+      self.assertEqual(x_tilde.dtype, tf.float16)
+      self.assertAllClose(x, x_tilde, rtol=0, atol=.5)
+      self.assertEqual(bits.dtype, tf.float64)
+      self.assertEqual(bits.shape, (2,))
+      self.assertAllGreaterEqual(bits, 0.)
+    finally:
+      tf.keras.mixed_precision.set_global_policy(None)
 
   def test_small_cdfs_for_dirac_prior_without_quantization_offset(self):
     prior = uniform_noise.NoisyNormal(loc=100. * tf.range(16.), scale=1e-10)

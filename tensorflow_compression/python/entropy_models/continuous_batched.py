@@ -115,7 +115,7 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
                expected_grads=False,
                tail_mass=2**-8,
                range_coder_precision=12,
-               dtype=None,
+               bottleneck_dtype=None,
                prior_shape=None,
                cdf=None,
                cdf_offset=None,
@@ -153,8 +153,8 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       tail_mass: Float. Approximate probability mass which is encoded using an
         Elias gamma code embedded into the range coder.
       range_coder_precision: Integer. Precision passed to the range coding op.
-      dtype: `tf.dtypes.DType`. Data type of this entropy model (i.e. dtype of
-        prior, decompressed values). Must be provided if `prior` is omitted.
+      bottleneck_dtype: `tf.dtypes.DType`. Data type of bottleneck tensor.
+        Defaults to `tf.keras.mixed_precision.global_policy().compute_dtype`.
       prior_shape: Batch shape of the prior (dimensions which are not assumed
         i.i.d.). Must be provided if `prior` is omitted.
       cdf: `tf.Tensor` or `None`. If provided, is used for range coding rather
@@ -171,9 +171,8 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       laplace_tail_mass: Float. If positive, will augment the prior with a
         Laplace mixture for training stability. (experimental)
     """
-    if not (prior is not None) == (dtype is None) == (prior_shape is None):
-      raise ValueError(
-          "Either `prior` or both `dtype` and `prior_shape` must be provided.")
+    if (prior is None) == (prior_shape is None):
+      raise ValueError("Either `prior` or `prior_shape` must be provided.")
     if (prior is None) + (cdf_shapes is None) + (cdf is None) != 2:
       raise ValueError(
           "Must provide exactly one of `prior`, `cdf`, or `cdf_shapes`.")
@@ -189,7 +188,7 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         stateless=stateless,
         expected_grads=expected_grads,
         tail_mass=tail_mass,
-        dtype=dtype if dtype is not None else prior.dtype,
+        bottleneck_dtype=bottleneck_dtype,
         laplace_tail_mass=laplace_tail_mass,
     )
     self._prior = prior
@@ -209,8 +208,7 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         assert isinstance(quantization_offset, bool)
         assert self.compression
         if quantization_offset:
-          quantization_offset = tf.zeros(
-              self.prior_shape_tensor, dtype=self.dtype)
+          quantization_offset = tf.zeros(self.prior_shape_tensor)
         else:
           quantization_offset = None
       elif quantization_offset is not None:
@@ -236,12 +234,15 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       if quantization_offset is None:
         self._quantization_offset = None
       elif self.compression and not self.stateless:
+        quantization_offset = tf.cast(
+            quantization_offset, self.bottleneck_dtype)
         self._quantization_offset = tf.Variable(
-            quantization_offset, dtype=self.dtype, trainable=False,
-            name="quantization_offset")
+            quantization_offset, trainable=False, name="quantization_offset")
       else:
+        quantization_offset = tf.cast(
+            quantization_offset, self.bottleneck_dtype)
         self._quantization_offset = tf.convert_to_tensor(
-            quantization_offset, dtype=self.dtype, name="quantization_offset")
+            quantization_offset, name="quantization_offset")
       if self.compression:
         if cdf is None and cdf_shapes is None:
           cdf, cdf_offset = self._build_tables(
@@ -276,7 +277,8 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
             "tf.function. Ideally, the offset heuristic should only be used "
             "to determine offsets once after training. Depending on the prior, "
             "estimating the offset might be computationally expensive.")
-      return helpers.quantization_offset(self.prior)
+      return tf.cast(
+          helpers.quantization_offset(self.prior), self.bottleneck_dtype)
     return None
 
   @tf.Module.with_name_scope
@@ -299,6 +301,7 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       `bits` has the same shape as `bottleneck` without the `self.coding_rank`
       innermost dimensions.
     """
+    bottleneck = tf.convert_to_tensor(bottleneck, dtype=self.bottleneck_dtype)
     log_prob_fn = functools.partial(self._log_prob, self.prior)
     if training:
       log_probs, bottleneck_perturbed = math_ops.perturb_and_apply(
@@ -331,6 +334,7 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     Returns:
       A `tf.Tensor` containing the quantized values.
     """
+    bottleneck = tf.convert_to_tensor(bottleneck, dtype=self.bottleneck_dtype)
     return round_ops.round_st(bottleneck, self.quantization_offset)
 
   @tf.Module.with_name_scope
@@ -356,6 +360,7 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       `self.coding_rank` innermost dimensions, containing a string for each
       coding unit.
     """
+    bottleneck = tf.convert_to_tensor(bottleneck, dtype=self.bottleneck_dtype)
     input_shape = tf.shape(bottleneck)
     all_but_last_n_elems = lambda t, n: t[:-n] if n else t
     batch_shape = all_but_last_n_elems(input_shape, self.coding_rank)
@@ -400,7 +405,7 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     tf.debugging.assert_equal(sanity, True, message="Sanity check failed.")
     symbols += self.cdf_offset
     symbols = tf.reshape(symbols, output_shape)
-    outputs = tf.cast(symbols, self.dtype)
+    outputs = tf.cast(symbols, self.bottleneck_dtype)
     offset = self.quantization_offset
     if offset is not None:
       outputs += offset

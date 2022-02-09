@@ -43,7 +43,7 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
                stateless=False,
                expected_grads=False,
                tail_mass=2**-8,
-               dtype=None,
+               bottleneck_dtype=None,
                laplace_tail_mass=0):
     """Initializes the instance.
 
@@ -66,8 +66,8 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
         backpropagation w.r.t. additive uniform noise.
       tail_mass: Float. Approximate probability mass which is encoded using an
         Elias gamma code embedded into the range coder.
-      dtype: `tf.dtypes.DType`. Data type of this entropy model (i.e. dtype of
-        prior, decompressed values).
+      bottleneck_dtype: `tf.dtypes.DType`. Data type of bottleneck tensor.
+        Defaults to `tf.keras.mixed_precision.global_policy().compute_dtype`.
       laplace_tail_mass: Float. If non-zero, will augment the prior with a
         Laplace mixture for training stability. (experimental)
     """
@@ -78,7 +78,9 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
     self._stateless = bool(stateless)
     self._expected_grads = bool(expected_grads)
     self._tail_mass = float(tail_mass)
-    self._dtype = tf.as_dtype(dtype)
+    if bottleneck_dtype is None:
+      bottleneck_dtype = tf.keras.mixed_precision.global_policy().compute_dtype
+    self._bottleneck_dtype = tf.as_dtype(bottleneck_dtype)
     self._laplace_tail_mass = float(laplace_tail_mass)
 
     if self.coding_rank < 0:
@@ -87,10 +89,6 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
       raise ValueError("`tail_mass` must be between 0 and 1.")
     if not 0 <= self.laplace_tail_mass < 1:
       raise ValueError("`laplace_tail_mass` must be between 0 and 1.")
-
-    with self.name_scope:
-      self._laplace_prior = (tfp.distributions.Laplace(loc=0., scale=1.)
-                             if laplace_tail_mass else None)
 
   def _check_compression(self):
     if not self.compression:
@@ -123,9 +121,9 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
     return tf.convert_to_tensor(self._cdf_offset)
 
   @property
-  def dtype(self):
-    """Data type of this entropy model."""
-    return self._dtype
+  def bottleneck_dtype(self):
+    """Data type of the bottleneck tensor."""
+    return self._bottleneck_dtype
 
   @property
   def expected_grads(self):
@@ -247,7 +245,7 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
     maxima = tf.cast(tf.math.ceil(upper_tail - offset), tf.int32)
 
     # PMF starting positions and lengths.
-    pmf_start = tf.cast(minima, self.dtype) + offset
+    pmf_start = tf.cast(minima, prior.dtype) + offset
     pmf_length = maxima - minima + 1
 
     # Sample the densities in the computed ranges, possibly computing more
@@ -258,7 +256,7 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
           "Very wide PMF with %d elements may lead to out of memory issues. "
           "Consider priors with smaller variance, or increasing `tail_mass` "
           "parameter.", int(max_length))
-    samples = tf.range(tf.cast(max_length, self.dtype), dtype=self.dtype)
+    samples = tf.range(tf.cast(max_length, prior.dtype), dtype=prior.dtype)
     samples = tf.reshape(samples, [-1] + pmf_length.shape.rank * [1])
     samples += pmf_start
     pmf = prior.prob(samples)
@@ -294,8 +292,11 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
 
   def _log_prob(self, prior, bottleneck_perturbed):
     """Evaluates prior.log_prob(bottleneck + noise)."""
+    bottleneck_perturbed = tf.cast(bottleneck_perturbed, prior.dtype)
     if self.laplace_tail_mass:
-      laplace_prior = self._laplace_prior
+      laplace_prior = tfp.distributions.Laplace(
+          loc=tf.constant(0, dtype=prior.dtype),
+          scale=tf.constant(1, dtype=prior.dtype))
       probs = prior.prob(bottleneck_perturbed)
       probs = ((1 - self.laplace_tail_mass) * probs +
                self.laplace_tail_mass *
@@ -332,7 +333,7 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
         expected_grads=self.expected_grads,
         tail_mass=self.tail_mass,
         cdf_shapes=(self.cdf.shape[0], self.cdf_offset.shape[0]),
-        dtype=self.dtype.name,
+        bottleneck_dtype=self.bottleneck_dtype.name,
         laplace_tail_mass=self.laplace_tail_mass,
     )
 

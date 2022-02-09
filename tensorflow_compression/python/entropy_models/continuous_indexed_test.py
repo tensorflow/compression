@@ -60,7 +60,9 @@ class ContinuousIndexedEntropyModelTest(tf.test.TestCase,
     self.assertEqual(em.channel_axis, -1)
     self.assertEqual(em.tail_mass, 2**-8)
     self.assertEqual(em.range_coder_precision, 12)
-    self.assertEqual(em.dtype, tf.float32)
+    self.assertEqual(em.bottleneck_dtype, tf.float32)
+    self.assertEqual(em.prior.dtype, tf.float32)
+    self.assertEqual(em.prior_dtype, tf.float32)
     x, indexes = self.get_samples((2, 5))
     x_tilde, bits = em(x, indexes)
     bitstring = em.compress(x, indexes)
@@ -71,15 +73,18 @@ class ContinuousIndexedEntropyModelTest(tf.test.TestCase,
     self.assertAllGreaterEqual(bits, 0.)
 
   def test_can_instantiate_and_compress_statelessly(self):
-    em = self.get_model(compression=True, stateless=True, dtype=tf.float64)
+    em = self.get_model(
+        compression=True, stateless=True, prior_dtype=tf.float64)
     self.assertEqual(em.compression, True)
     self.assertEqual(em.stateless, True)
     self.assertIsInstance(em.prior, uniform_noise.NoisyLogisticMixture)
     self.assertEqual(em.coding_rank, 1)
     self.assertEqual(em.tail_mass, 2**-8)
     self.assertEqual(em.range_coder_precision, 12)
-    self.assertEqual(em.dtype, tf.float64)
-    x, indexes = self.get_samples((7,), dtype=tf.float64)
+    self.assertEqual(em.bottleneck_dtype, tf.float32)
+    self.assertEqual(em.prior.dtype, tf.float64)
+    self.assertEqual(em.prior_dtype, tf.float64)
+    x, indexes = self.get_samples((7,), dtype=tf.float32)
     x_tilde, bits = em(x, indexes)
     bitstring = em.compress(x, indexes)
     x_hat = em.decompress(bitstring, indexes)
@@ -195,6 +200,28 @@ class ContinuousIndexedEntropyModelTest(tf.test.TestCase,
     self.assertAllClose(samples, values_eager, rtol=0., atol=.5)
     self.assertAllEqual(values_eager, values_function)
 
+  def test_dtypes_are_correct_with_mixed_precision(self):
+    tf.keras.mixed_precision.set_global_policy("mixed_float16")
+    try:
+      em = self.get_model(compression=True, prior_dtype=tf.float64)
+      self.assertIsInstance(em.prior, uniform_noise.NoisyLogisticMixture)
+      self.assertEqual(em.bottleneck_dtype, tf.float16)
+      self.assertEqual(em.prior.dtype, tf.float64)
+      self.assertEqual(em.prior_dtype, tf.float64)
+      x, indexes = self.get_samples((2, 5), dtype=tf.float16)
+      x_tilde, bits = em(x, indexes)
+      bitstring = em.compress(x, indexes)
+      x_hat = em.decompress(bitstring, indexes)
+      self.assertEqual(x_hat.dtype, tf.float16)
+      self.assertAllClose(x, x_hat, rtol=0, atol=.5)
+      self.assertEqual(x_tilde.dtype, tf.float16)
+      self.assertAllClose(x, x_tilde, rtol=0, atol=.5)
+      self.assertEqual(bits.dtype, tf.float64)
+      self.assertEqual(bits.shape, (2,))
+      self.assertAllGreaterEqual(bits, 0.)
+    finally:
+      tf.keras.mixed_precision.set_global_policy(None)
+
 
 class LocationScaleIndexedEntropyModelTest(tf.test.TestCase):
 
@@ -220,7 +247,9 @@ class LocationScaleIndexedEntropyModelTest(tf.test.TestCase):
     self.assertEqual(em.coding_rank, 1)
     self.assertEqual(em.tail_mass, 2**-8)
     self.assertEqual(em.range_coder_precision, 12)
-    self.assertEqual(em.dtype, tf.float32)
+    self.assertEqual(em.bottleneck_dtype, tf.float32)
+    self.assertEqual(em.prior.dtype, tf.float32)
+    self.assertEqual(em.prior_dtype, tf.float32)
     x, indexes, loc = self.get_samples((7, 4))
     x_tilde, bits = em(x, indexes, loc=loc)
     bitstring = em.compress(x, indexes, loc=loc)

@@ -152,6 +152,18 @@ class SignalConvTest(tf.test.TestCase, parameterized.TestCase):
       with self.subTest(name="model_weights_identical"):
         self.assertSameElements(weight_names, [w.name for w in model.weights])
 
+  def test_dtypes_are_correct_with_mixed_precision(self):
+    tf.keras.mixed_precision.set_global_policy("mixed_float16")
+    try:
+      x = tf.random.uniform((1, 4, 4, 3), dtype=tf.float16)
+      layer = signal_conv.SignalConv2D(2, 3, use_bias=True)
+      y = layer(x)
+      for variable in layer.variables:
+        self.assertEqual(variable.dtype, tf.float32)
+      self.assertEqual(y.dtype, tf.float16)
+    finally:
+      tf.keras.mixed_precision.set_global_policy(None)
+
 
 class ConvolutionsTest(tf.test.TestCase):
   """Tests SignalConv against scipy.signal."""

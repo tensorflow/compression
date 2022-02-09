@@ -48,6 +48,16 @@ def _greatest_common_factor(iterable) -> int:
   return 1
 
 
+def _convert_parameter(param, dtype):
+  try:
+    return tf.convert_to_tensor(param, dtype=dtype)
+  except ValueError:
+    try:
+      return tf.cast(param, dtype)
+    except ValueError:
+      return tf.cast(param(), dtype)
+
+
 class _SignalConv(tf.keras.layers.Layer):
   """{rank}D convolution layer.
 
@@ -473,7 +483,8 @@ class _SignalConv(tf.keras.layers.Layer):
       if value not in ("variable", "rdft"):
         raise ValueError(f"Unsupported value for kernel_parameter: '{value}'.")
     elif not callable(value) and not isinstance(value, tf.Variable):
-      value = tf.convert_to_tensor(value, dtype=self.dtype)
+      # It's a constant, so keep it in compute_dtype.
+      value = tf.convert_to_tensor(value, dtype=self.compute_dtype)
     self._kernel_parameter = value
 
   @property
@@ -490,7 +501,8 @@ class _SignalConv(tf.keras.layers.Layer):
       if value != "variable":
         raise ValueError(f"Unsupported value for bias_parameter: '{value}'.")
     elif not callable(value) and not isinstance(value, tf.Variable):
-      value = tf.convert_to_tensor(value, dtype=self.dtype)
+      # It's a constant, so keep it in compute_dtype.
+      value = tf.convert_to_tensor(value, dtype=self.compute_dtype)
     self._bias_parameter = value
 
   @property
@@ -533,17 +545,13 @@ class _SignalConv(tf.keras.layers.Layer):
   def kernel(self) -> tf.Tensor:
     if isinstance(self.kernel_parameter, str):
       raise RuntimeError("Kernel is not initialized yet. Call build().")
-    if callable(self.kernel_parameter):
-      return tf.convert_to_tensor(self.kernel_parameter(), dtype=self.dtype)
-    return self.kernel_parameter
+    return _convert_parameter(self.kernel_parameter, self.compute_dtype)
 
   @property
   def bias(self) -> tf.Tensor:
     if isinstance(self.bias_parameter, str):
       raise RuntimeError("Bias is not initialized yet. Call build().")
-    if callable(self.bias_parameter):
-      return tf.convert_to_tensor(self.bias_parameter(), dtype=self.dtype)
-    return self.bias_parameter
+    return _convert_parameter(self.bias_parameter, self.compute_dtype)
 
   def _check_not_built(self):
     if self.built:
@@ -589,7 +597,7 @@ class _SignalConv(tf.keras.layers.Layer):
 
     if isinstance(self.kernel_parameter, str):
       initial_value = self.kernel_initializer(
-          shape=kernel_shape, dtype=self.dtype)
+          shape=kernel_shape, dtype=self.variable_dtype)
       self.kernel_parameter = dict(
           variable=tf.Variable,
           rdft=parameters.RDFTParameter,
@@ -597,7 +605,7 @@ class _SignalConv(tf.keras.layers.Layer):
 
     if self.use_bias and isinstance(self.bias_parameter, str):
       initial_value = self.bias_initializer(
-          shape=[output_channels], dtype=self.dtype)
+          shape=[output_channels], dtype=self.variable_dtype)
       self.bias_parameter = dict(
           variable=tf.Variable,
       )[self.bias_parameter](initial_value, name="bias")
@@ -837,7 +845,6 @@ class _SignalConv(tf.keras.layers.Layer):
     return outputs
 
   def call(self, inputs) -> tf.Tensor:
-    inputs = tf.convert_to_tensor(inputs, dtype=self.dtype)
     if inputs.shape.rank != self._rank + 2:
       raise ValueError(f"Input tensor must have rank {self._rank + 2}, "
                        f"received shape {inputs.shape}.")

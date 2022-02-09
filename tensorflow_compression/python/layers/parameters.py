@@ -36,7 +36,7 @@ class Parameter(tf.Module, metaclass=abc.ABCMeta):
   """
 
   @abc.abstractmethod
-  def __call__(self):
+  def __call__(self, compute_dtype=None):
     """Computes and returns the parameter value as a `tf.Tensor`."""
 
   @abc.abstractmethod
@@ -56,9 +56,10 @@ class Parameter(tf.Module, metaclass=abc.ABCMeta):
 
 
 def _parameter_conversion_func(value, dtype=None, name=None, as_ref=False):
+  del name  # not supported
   if as_ref:
     raise ValueError("as_ref=True is not supported.")
-  return tf.convert_to_tensor(value(), dtype=dtype, name=name)
+  return value(compute_dtype=dtype)
 
 
 tf.register_tensor_conversion_function(
@@ -118,9 +119,9 @@ class RDFTParameter(Parameter):
       raise ValueError(
           f"Expected kernel tensor of rank 3, 4, or 5; received shape "
           f"{self._shape}.")
-    self._norm = tf.constant(
+    norm = tf.constant(
         self.shape[:-2].num_elements() ** .5, initial_value.dtype)
-    initial_value /= self._norm
+    initial_value /= norm
     # We split the variable into real and imaginary parts to avoid issues with
     # complex-valued variables being unsupported when saving models, etc.
     real = tf.math.real(initial_value)
@@ -141,19 +142,35 @@ class RDFTParameter(Parameter):
     return self._shape
 
   @tf.Module.with_name_scope
-  def __call__(self) -> tf.Tensor:
+  def __call__(self, compute_dtype=None) -> tf.Tensor:
     """Computes and returns the convolution kernel as a `tf.Tensor`."""
-    rdft = tf.dtypes.complex(self.real, self.imag) * self._norm
+    real, imag = self.real, self.imag
+    if compute_dtype in (tf.bfloat16, tf.float16):
+      # As of 2022-02, there is no half precision complex math in TensorFlow.
+      # So, we need to use at least 32 bits.
+      real = tf.cast(real, tf.float32)
+      imag = tf.cast(imag, tf.float32)
+    elif compute_dtype is not None:
+      real = tf.cast(real, compute_dtype)
+      imag = tf.cast(imag, compute_dtype)
+    rdft = tf.dtypes.complex(real, imag)
+    norm = tf.constant(self.shape[:-2].num_elements() ** .5, rdft.dtype)
+    rdft *= norm
     if self.shape.rank == 3:
       kernel = tf.signal.irfft(rdft, fft_length=self.shape[:-2])
-      return tf.transpose(kernel, (2, 0, 1))
+      kernel = tf.transpose(kernel, (2, 0, 1))
     elif self.shape.rank == 4:
       kernel = tf.signal.irfft2d(rdft, fft_length=self.shape[:-2])
-      return tf.transpose(kernel, (2, 3, 0, 1))
+      kernel = tf.transpose(kernel, (2, 3, 0, 1))
     else:
       assert self.shape.rank == 5, self.shape
       kernel = tf.signal.irfft3d(rdft, fft_length=self.shape[:-2])
-      return tf.transpose(kernel, (2, 3, 4, 0, 1))
+      kernel = tf.transpose(kernel, (2, 3, 4, 0, 1))
+    if compute_dtype is not None:
+      # If we had to bump up precision to 32 bits, finally cast to compute_dtype
+      # here. In other cases, this should be a no-op.
+      kernel = tf.cast(kernel, compute_dtype)
+    return kernel
 
   def get_config(self) -> Dict[str, Any]:
     config = super().get_config()
@@ -213,20 +230,24 @@ class GDNParameter(Parameter):
       initial_value = tf.zeros(shape, dtype=dtype)
     else:
       initial_value = tf.convert_to_tensor(initial_value, dtype=dtype)
-    self._pedestal = tf.constant(self.offset ** 2, dtype=initial_value.dtype)
-    self._bound = tf.constant(
-        (self.minimum + self.offset ** 2) ** .5, dtype=initial_value.dtype)
+    pedestal = tf.constant(self.offset ** 2, dtype=initial_value.dtype)
     initial_value = tf.math.sqrt(
-        tf.math.maximum(initial_value + self._pedestal, self._pedestal))
+        tf.math.maximum(initial_value + pedestal, pedestal))
     if name is not None:
       name = f"reparam_{name}"
     self.variable = tf.Variable(initial_value, name=name)
 
   @tf.Module.with_name_scope
-  def __call__(self) -> tf.Tensor:
+  def __call__(self, compute_dtype=None) -> tf.Tensor:
     """Computes and returns the non-negative value as a `tf.Tensor`."""
-    reparam_value = math_ops.lower_bound(self.variable, self._bound)
-    return tf.math.square(reparam_value) - self._pedestal
+    variable = self.variable
+    if compute_dtype is not None:
+      variable = tf.cast(variable, compute_dtype)
+    pedestal = tf.constant(self.offset ** 2, dtype=variable.dtype)
+    bound = tf.constant(
+        (self.minimum + self.offset ** 2) ** .5, dtype=variable.dtype)
+    reparam_value = math_ops.lower_bound(variable, bound)
+    return tf.math.square(reparam_value) - pedestal
 
   @property
   def minimum(self) -> float:

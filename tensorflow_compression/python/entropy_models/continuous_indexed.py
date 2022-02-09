@@ -136,7 +136,8 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
                expected_grads=False,
                tail_mass=2**-8,
                range_coder_precision=12,
-               dtype=tf.float32,
+               bottleneck_dtype=None,
+               prior_dtype=tf.float32,
                laplace_tail_mass=0):
     """Initializes the instance.
 
@@ -181,8 +182,10 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       tail_mass: Float. Approximate probability mass which is encoded using an
         Elias gamma code embedded into the range coder.
       range_coder_precision: Integer. Precision passed to the range coding op.
-      dtype: `tf.dtypes.DType`. Data type of this entropy model (i.e. dtype of
-        prior, decompressed values).
+      bottleneck_dtype: `tf.dtypes.DType`. Data type of bottleneck tensor.
+        Defaults to `tf.keras.mixed_precision.global_policy().compute_dtype`.
+      prior_dtype: `tf.dtypes.DType`. Data type of prior and probability
+        computations. Defaults to `tf.float32`.
       laplace_tail_mass: Float. If positive, will augment the prior with a
         laplace mixture for training stability. (experimental)
     """
@@ -200,7 +203,7 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         stateless=stateless,
         expected_grads=expected_grads,
         tail_mass=tail_mass,
-        dtype=dtype,
+        bottleneck_dtype=bottleneck_dtype,
         laplace_tail_mass=laplace_tail_mass,
     )
     self._index_ranges = tuple(int(r) for r in index_ranges)
@@ -212,14 +215,15 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
           "`channel_axis` can't be `None` for `len(index_ranges) > 1`.")
     self._prior_fn = prior_fn
     self._parameter_fns = dict(parameter_fns)
+    self._prior_dtype = tf.as_dtype(prior_dtype)
 
     with self.name_scope:
       if self.compression:
         if self.channel_axis is None:
           index_range, = index_ranges
-          indexes = tf.range(index_range, dtype=self.dtype)
+          indexes = tf.range(index_range, dtype=tf.int32)
         else:
-          indexes = [tf.range(r, dtype=self.dtype) for r in index_ranges]
+          indexes = [tf.range(r, dtype=tf.int32) for r in index_ranges]
           indexes = tf.meshgrid(*indexes, indexing="ij")
           indexes = tf.stack(indexes, axis=self.channel_axis)
         self._prior = self._make_prior(indexes)
@@ -237,6 +241,11 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     return self._parameter_fns
 
   @property
+  def prior_dtype(self):
+    """Data type of `prior`."""
+    return self._prior_dtype
+
+  @property
   def prior_fn(self):
     """Class or factory function returning a `Distribution` object."""
     return self._prior_fn
@@ -247,10 +256,10 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     return self._channel_axis
 
   def _make_prior(self, indexes):
-    indexes = tf.cast(indexes, self.dtype)
+    indexes = tf.cast(indexes, self.prior_dtype)
     parameters = {k: f(indexes) for k, f in self.parameter_fns.items()}
     prior = self.prior_fn(**parameters)
-    assert prior.dtype == self.dtype
+    assert prior.dtype == self.prior_dtype
     if prior.event_shape.rank:
       raise ValueError("`prior` must be a (batch of) scalar distribution(s).")
     return prior
@@ -294,6 +303,7 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       `bits` has the same shape as `bottleneck` without the `self.coding_rank`
       innermost dimensions.
     """
+    bottleneck = tf.convert_to_tensor(bottleneck, dtype=self.bottleneck_dtype)
     indexes = self._normalize_indexes(indexes)
     if training:
       def log_prob_fn(bottleneck_perturbed, indexes):
@@ -333,6 +343,7 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     Returns:
       A `tf.Tensor` containing the quantized values.
     """
+    bottleneck = tf.convert_to_tensor(bottleneck, dtype=self.bottleneck_dtype)
     return round_ops.round_st(bottleneck)
 
   @tf.Module.with_name_scope
@@ -358,6 +369,7 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       `self.coding_rank` innermost dimensions, containing a string for each
       coding unit.
     """
+    bottleneck = tf.convert_to_tensor(bottleneck, dtype=self.bottleneck_dtype)
     indexes = self._normalize_indexes(indexes)
     flat_indexes = self._flatten_indexes(indexes)
     all_but_last_n_elems = lambda t, n: t[:-n] if n else t
@@ -394,7 +406,7 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     sanity = gen_ops.entropy_decode_finalize(handle)
     tf.debugging.assert_equal(sanity, True, message="Sanity check failed.")
     symbols += tf.gather(self.cdf_offset, flat_indexes)
-    return tf.cast(symbols, self.dtype)
+    return tf.cast(symbols, self.bottleneck_dtype)
 
   def get_config(self):
     """Returns the configuration of the entropy model."""
@@ -437,7 +449,8 @@ class LocationScaleIndexedEntropyModel(ContinuousIndexedEntropyModel):
                expected_grads=False,
                tail_mass=2**-8,
                range_coder_precision=12,
-               dtype=tf.float32,
+               bottleneck_dtype=None,
+               prior_dtype=tf.float32,
                laplace_tail_mass=0):
     """Initializes the instance.
 
@@ -474,8 +487,10 @@ class LocationScaleIndexedEntropyModel(ContinuousIndexedEntropyModel):
       tail_mass: Float. Approximate probability mass which is encoded using an
         Elias gamma code embedded into the range coder.
       range_coder_precision: Integer. Precision passed to the range coding op.
-      dtype: `tf.dtypes.DType`. The data type of all floating-point
-        computations carried out in this class.
+      bottleneck_dtype: `tf.dtypes.DType`. Data type of bottleneck tensor.
+        Defaults to `tf.keras.mixed_precision.global_policy().compute_dtype`.
+      prior_dtype: `tf.dtypes.DType`. Data type of prior and probability
+        computations. Defaults to `tf.float32`.
       laplace_tail_mass: Float. If positive, will augment the prior with a
         laplace mixture for training stability. (experimental)
     """
@@ -494,7 +509,8 @@ class LocationScaleIndexedEntropyModel(ContinuousIndexedEntropyModel):
         expected_grads=expected_grads,
         tail_mass=tail_mass,
         range_coder_precision=range_coder_precision,
-        dtype=dtype,
+        bottleneck_dtype=bottleneck_dtype,
+        prior_dtype=prior_dtype,
         laplace_tail_mass=laplace_tail_mass,
     )
 
@@ -550,6 +566,7 @@ class LocationScaleIndexedEntropyModel(ContinuousIndexedEntropyModel):
     Returns:
       A `tf.Tensor` containing the quantized values.
     """
+    bottleneck = tf.convert_to_tensor(bottleneck, dtype=self.bottleneck_dtype)
     return round_ops.round_st(bottleneck, loc)
 
   @tf.Module.with_name_scope

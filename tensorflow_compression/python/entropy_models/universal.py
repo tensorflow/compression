@@ -39,9 +39,7 @@ def _add_offset_indexes(indexes, num_noise_levels):
   return tf.concat((offset_indexes[..., None], indexes), axis=-1)
 
 
-def _offset_indexes_to_offset(offset_indexes,
-                              num_noise_levels,
-                              dtype=tf.float32):
+def _offset_indexes_to_offset(offset_indexes, num_noise_levels, dtype):
   return tf.cast(
       (offset_indexes + 1) / (num_noise_levels + 1) - 0.5, dtype=dtype)
 
@@ -51,7 +49,7 @@ def _index_ranges_without_offsets(index_ranges_with_offsets):
   return index_ranges_with_offsets[1:]
 
 
-def _range_coding_offsets(num_noise_levels, prior_shape, dtype=tf.float32):
+def _range_coding_offsets(num_noise_levels, prior_shape, dtype):
   """Computes the prior offsets for building range coding tables."""
   offset_indexes = tf.range(num_noise_levels, dtype=dtype)
   offset_indexes = tf.reshape(
@@ -82,6 +80,7 @@ class UniversalBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
                expected_grads=False,
                tail_mass=2**-8,
                range_coder_precision=12,
+               bottleneck_dtype=None,
                num_noise_levels=15,
                stateless=False):
     """Initializes the instance.
@@ -110,6 +109,8 @@ class UniversalBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       tail_mass: Float. Approximate probability mass which is encoded using an
         Elias gamma code embedded into the range coder.
       range_coder_precision: Integer. Precision passed to the range coding op.
+      bottleneck_dtype: `tf.dtypes.DType`. Data type of bottleneck tensor.
+        Defaults to `tf.keras.mixed_precision.global_policy().compute_dtype`.
       num_noise_levels: Integer. The number of levels used to quantize the
         uniform noise.
       stateless: Boolean. If `True`, creates range coding tables as `Tensor`s
@@ -127,7 +128,7 @@ class UniversalBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         stateless=stateless,
         expected_grads=expected_grads,
         tail_mass=tail_mass,
-        dtype=prior.dtype,
+        bottleneck_dtype=bottleneck_dtype,
         laplace_tail_mass=laplace_tail_mass,
     )
     self._prior = prior
@@ -138,7 +139,7 @@ class UniversalBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     with self.name_scope:
       if self.compression:
         offset = _range_coding_offsets(
-            self._num_noise_levels, self.prior_shape, self.dtype)
+            self._num_noise_levels, self.prior_shape, self.bottleneck_dtype)
         cdf, cdf_offset = self._build_tables(
             self.prior, range_coder_precision, offset=offset)
         self._init_compression(cdf, cdf_offset, None)
@@ -166,7 +167,7 @@ class UniversalBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     indexes = _add_offset_indexes(indexes, self._num_noise_levels)
     offset_indexes = indexes[..., 0]
     offset = _offset_indexes_to_offset(offset_indexes, self._num_noise_levels,
-                                       self.dtype)
+                                       self.bottleneck_dtype)
 
     # Flatten prior + offset indexes.
     index_ranges = [self._num_noise_levels, prior_size]
@@ -196,6 +197,7 @@ class UniversalBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       and `bits` is the bitcost of transmitting such a sample having the same
       shape as `bottleneck` without the `self.coding_rank` innermost dimensions.
     """
+    bottleneck = tf.convert_to_tensor(bottleneck, dtype=self.bottleneck_dtype)
     log_prob_fn = functools.partial(self._log_prob, self.prior)
     if training:
       log_probs, bottleneck_perturbed = math_ops.perturb_and_apply(
@@ -240,6 +242,7 @@ class UniversalBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       `self.coding_rank` innermost dimensions, containing a string for each
       coding unit.
     """
+    bottleneck = tf.convert_to_tensor(bottleneck, dtype=self.bottleneck_dtype)
     input_shape = tf.shape(bottleneck)
     input_rank = tf.shape(input_shape)[0]
     batch_shape, coding_shape = tf.split(
@@ -284,7 +287,7 @@ class UniversalBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     sanity = gen_ops.entropy_decode_finalize(handle)
     tf.debugging.assert_equal(sanity, True, message="Sanity check failed.")
     symbols += tf.gather(self.cdf_offset, indexes)
-    outputs = tf.cast(symbols, self.dtype)
+    outputs = tf.cast(symbols, self.bottleneck_dtype)
     return outputs + offset
 
   def get_config(self):
@@ -311,11 +314,12 @@ class UniversalIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
                parameter_fns,
                coding_rank,
                compression=False,
-               dtype=tf.float32,
                laplace_tail_mass=0.0,
                expected_grads=False,
                tail_mass=2**-8,
                range_coder_precision=12,
+               bottleneck_dtype=None,
+               prior_dtype=tf.float32,
                stateless=False,
                num_noise_levels=15):
     """Initializes the instance.
@@ -345,8 +349,6 @@ class UniversalIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         assumes eager mode (throws an error if in graph mode or inside a
         `tf.function` call). If set to `False`, these two methods will not be
         accessible.
-      dtype: `tf.dtypes.DType`. The data type of all floating-point computations
-        carried out in this class.
       laplace_tail_mass: Float. If positive, will augment the prior with a
         laplace mixture for training stability. (experimental)
       expected_grads: If True, will use analytical expected gradients during
@@ -354,6 +356,10 @@ class UniversalIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       tail_mass: Float. Approximate probability mass which is encoded using an
         Elias gamma code embedded into the range coder.
       range_coder_precision: Integer. Precision passed to the range coding op.
+      bottleneck_dtype: `tf.dtypes.DType`. Data type of bottleneck tensor.
+        Defaults to `tf.keras.mixed_precision.global_policy().compute_dtype`.
+      prior_dtype: `tf.dtypes.DType`. Data type of prior and probability
+        computations. Defaults to `tf.float32`.
       stateless: Boolean. If True, creates range coding tables as `Tensor`s
         rather than `Variable`s.
       num_noise_levels: Integer. The number of levels used to quantize the
@@ -375,7 +381,7 @@ class UniversalIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         stateless=stateless,
         expected_grads=expected_grads,
         tail_mass=tail_mass,
-        dtype=dtype,
+        bottleneck_dtype=bottleneck_dtype,
         laplace_tail_mass=laplace_tail_mass,
     )
     # Add extra indexes for noise levels.
@@ -385,17 +391,19 @@ class UniversalIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       raise ValueError("`index_ranges` must have at least one element.")
     self._prior_fn = prior_fn
     self._parameter_fns = dict(parameter_fns)
+    self._prior_dtype = tf.as_dtype(prior_dtype)
     self._num_noise_levels = num_noise_levels
 
     with self.name_scope:
       if self.compression:
         index_ranges = self.index_ranges_without_offsets
-        indexes = [tf.range(r, dtype=self.dtype) for r in index_ranges]
+        indexes = [tf.range(r, dtype=tf.int32) for r in index_ranges]
         indexes = tf.meshgrid(*indexes, indexing="ij")
         indexes = tf.stack(indexes, axis=-1)
         self._prior = self._make_prior(indexes)
         offset = _range_coding_offsets(
-            self._num_noise_levels, self.prior.batch_shape, self.dtype)
+            self._num_noise_levels, self.prior.batch_shape,
+            self.bottleneck_dtype)
         cdf, cdf_offset = self._build_tables(
             self.prior, range_coder_precision, offset=offset)
         self._init_compression(cdf, cdf_offset, None)
@@ -411,6 +419,11 @@ class UniversalIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     return self._parameter_fns
 
   @property
+  def prior_dtype(self):
+    """Data type of `prior`."""
+    return self._prior_dtype
+
+  @property
   def prior_fn(self):
     """Class or factory function returning a `Distribution` object."""
     return self._prior_fn
@@ -421,7 +434,7 @@ class UniversalIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     return _index_ranges_without_offsets(self.index_ranges)
 
   def _make_prior(self, indexes):
-    indexes = tf.cast(indexes, self.dtype)
+    indexes = tf.cast(indexes, self.prior_dtype)
     parameters = {k: f(indexes) for k, f in self.parameter_fns.items()}
     return self.prior_fn(**parameters)
 
@@ -449,9 +462,8 @@ class UniversalIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
   def _offset_from_indexes(self, indexes_with_offsets):
     """Computes the offset for universal quantization."""
     offset_indexes = indexes_with_offsets[..., 0]
-    offset = _offset_indexes_to_offset(
-        offset_indexes, self._num_noise_levels, dtype=self.dtype)
-    return offset
+    return _offset_indexes_to_offset(
+        offset_indexes, self._num_noise_levels, dtype=self.bottleneck_dtype)
 
   @tf.Module.with_name_scope
   def __call__(self, bottleneck, indexes, training=True):
@@ -473,6 +485,7 @@ class UniversalIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       and `bits` is the bitcost of transmitting such a sample having the same
       shape as `bottleneck` without the `self.coding_rank` innermost dimensions.
     """
+    bottleneck = tf.convert_to_tensor(bottleneck, dtype=self.bottleneck_dtype)
     indexes = self._normalize_indexes(indexes)
     if training:
       # Here we compute `h(bottleneck + noise)`.
@@ -494,7 +507,7 @@ class UniversalIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       # Here we compute `H(round(bottleneck - noise) | noise )`.
       offset = _offset_indexes_to_offset(
           _add_offset_indexes(indexes, self._num_noise_levels)[..., 0],
-          self._num_noise_levels, self.dtype)
+          self._num_noise_levels, self.bottleneck_dtype)
       symbols = tf.round(bottleneck - offset)
       bottleneck_perturbed = symbols + offset
       log_probs = self._log_prob(prior, bottleneck_perturbed)
@@ -527,6 +540,7 @@ class UniversalIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
       `self.coding_rank` innermost dimensions, containing a string for each
       coding unit.
     """
+    bottleneck = tf.convert_to_tensor(bottleneck, dtype=self.bottleneck_dtype)
     indexes = _add_offset_indexes(indexes, self._num_noise_levels)
     indexes = self._normalize_indexes(indexes)
     flat_indexes = self._flatten_indexes(indexes)
@@ -566,7 +580,7 @@ class UniversalIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     tf.debugging.assert_equal(sanity, True, message="Sanity check failed.")
     symbols += tf.gather(self.cdf_offset, flat_indexes)
     offset = self._offset_from_indexes(indexes)
-    return tf.cast(symbols, self.dtype) + offset
+    return tf.cast(symbols, self.bottleneck_dtype) + offset
 
   def get_config(self):
     # TODO(relational): Implement this when we need serialization.
