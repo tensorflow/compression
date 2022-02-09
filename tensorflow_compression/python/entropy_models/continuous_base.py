@@ -80,6 +80,8 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
     self._tail_mass = float(tail_mass)
     if bottleneck_dtype is None:
       bottleneck_dtype = tf.keras.mixed_precision.global_policy().compute_dtype
+    if bottleneck_dtype is None:
+      bottleneck_dtype = tf.keras.backend.floatx()
     self._bottleneck_dtype = tf.as_dtype(bottleneck_dtype)
     self._laplace_tail_mass = float(laplace_tail_mass)
 
