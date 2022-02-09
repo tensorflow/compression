@@ -20,7 +20,7 @@ description: Batched entropy model for continuous random variables.
 
 <table class="tfo-notebook-buttons tfo-api nocontent" align="left">
 <td>
-  <a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_batched.py#L33-L421">
+  <a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_batched.py#L33-L426">
     <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
     View source on GitHub
   </a>
@@ -34,9 +34,10 @@ Batched entropy model for continuous random variables.
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>tfc.ContinuousBatchedEntropyModel(
     prior=None, coding_rank=None, compression=False, stateless=False,
-    expected_grads=False, tail_mass=(2 ** -8), range_coder_precision=12, dtype=None,
-    prior_shape=None, cdf=None, cdf_offset=None, cdf_shapes=None,
-    offset_heuristic=True, quantization_offset=None, laplace_tail_mass=0
+    expected_grads=False, tail_mass=(2 ** -8), range_coder_precision=12,
+    bottleneck_dtype=None, prior_shape=None, cdf=None, cdf_offset=None,
+    cdf_shapes=None, offset_heuristic=True, quantization_offset=None,
+    laplace_tail_mass=0
 )
 </code></pre>
 
@@ -193,11 +194,11 @@ Integer. Precision passed to the range coding op.
 </td>
 </tr><tr>
 <td>
-`dtype`
+`bottleneck_dtype`
 </td>
 <td>
-`tf.dtypes.DType`. Data type of this entropy model (i.e. dtype of
-prior, decompressed values). Must be provided if `prior` is omitted.
+`tf.dtypes.DType`. Data type of bottleneck tensor.
+Defaults to `tf.keras.mixed_precision.global_policy().compute_dtype`.
 </td>
 </tr><tr>
 <td>
@@ -270,6 +271,13 @@ Laplace mixture for training stability. (experimental)
 
 <tr>
 <td>
+`bottleneck_dtype`
+</td>
+<td>
+Data type of the bottleneck tensor.
+</td>
+</tr><tr>
+<td>
 `cdf`
 </td>
 <td>
@@ -295,13 +303,6 @@ Number of innermost dimensions considered a coding unit.
 </td>
 <td>
 Whether this entropy model is prepared for compression.
-</td>
-</tr><tr>
-<td>
-`dtype`
-</td>
-<td>
-Data type of this entropy model.
 </td>
 </tr><tr>
 <td>
@@ -456,7 +457,7 @@ of calling this method if you don't expect the return value to change.
 
 <h3 id="compress"><code>compress</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_batched.py#L336-L371">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_batched.py#L340-L376">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>compress(
@@ -512,7 +513,7 @@ coding unit.
 
 <h3 id="decompress"><code>decompress</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_batched.py#L373-L407">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_batched.py#L378-L412">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>decompress(
@@ -568,7 +569,7 @@ self.prior_shape`.
 
 <h3 id="get_config"><code>get_config</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_batched.py#L409-L421">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_batched.py#L414-L426">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>get_config()
@@ -593,7 +594,7 @@ A JSON-serializable Python dict.
 
 <h3 id="get_weights"><code>get_weights</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_base.py#L339-L340">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_base.py#L340-L341">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>get_weights()
@@ -604,7 +605,7 @@ A JSON-serializable Python dict.
 
 <h3 id="quantize"><code>quantize</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_batched.py#L314-L334">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_batched.py#L317-L338">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>quantize(
@@ -657,7 +658,7 @@ A `tf.Tensor` containing the quantized values.
 
 <h3 id="set_weights"><code>set_weights</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_base.py#L342-L347">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_base.py#L343-L348">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>set_weights(
@@ -733,7 +734,7 @@ The original method wrapped such that it enters the module's name scope.
 
 <h3 id="__call__"><code>__call__</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_batched.py#L282-L312">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_batched.py#L284-L315">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>__call__(

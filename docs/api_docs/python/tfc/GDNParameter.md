@@ -17,7 +17,7 @@ description: Nonnegative parameterization as needed for GDN parameters.
 
 <table class="tfo-notebook-buttons tfo-api nocontent" align="left">
 <td>
-  <a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/parameters.py#L169-L248">
+  <a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/parameters.py#L186-L269">
     <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
     View source on GitHub
   </a>
@@ -220,7 +220,7 @@ of calling this method if you don't expect the return value to change.
 
 <h3 id="get_config"><code>get_config</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/parameters.py#L239-L248">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/parameters.py#L260-L269">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>get_config() -> Dict[str, Any]
@@ -318,10 +318,12 @@ The original method wrapped such that it enters the module's name scope.
 
 <h3 id="__call__"><code>__call__</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/parameters.py#L225-L229">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/parameters.py#L240-L250">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
-<code>__call__() -> tf.Tensor
+<code>__call__(
+    compute_dtype=None
+) -> tf.Tensor
 </code></pre>
 
 Computes and returns the non-negative value as a `tf.Tensor`.

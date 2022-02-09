@@ -990,7 +990,7 @@ using a `keras.Metric.Mean`.
 
 <h3 id="build"><code>build</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/signal_conv.py#L574-L611">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/signal_conv.py#L582-L619">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>build(
@@ -1079,7 +1079,7 @@ one per output tensor of the layer).
 
 <h3 id="compute_output_shape"><code>compute_output_shape</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/signal_conv.py#L945-L974">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/signal_conv.py#L952-L981">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>compute_output_shape(
@@ -1218,7 +1218,7 @@ A layer instance.
 
 <h3 id="get_config"><code>get_config</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/signal_conv.py#L976-L1019">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/layers/signal_conv.py#L983-L1026">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>get_config() -> Dict[str, Any]

@@ -6,6 +6,7 @@ description: Mixture of distributions with additive i.i.d. uniform noise.
 <meta itemprop="property" content="__getitem__"/>
 <meta itemprop="property" content="__init__"/>
 <meta itemprop="property" content="__iter__"/>
+<meta itemprop="property" content="__new__"/>
 <meta itemprop="property" content="batch_shape_tensor"/>
 <meta itemprop="property" content="cdf"/>
 <meta itemprop="property" content="copy"/>

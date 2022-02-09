@@ -235,7 +235,9 @@ The original method wrapped such that it enters the module's name scope.
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>@abc.abstractmethod</code>
-<code>__call__()
+<code>__call__(
+    compute_dtype=None
+)
 </code></pre>
 
 Computes and returns the parameter value as a `tf.Tensor`.

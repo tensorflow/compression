@@ -14,7 +14,7 @@ description: Packed representation of compressed tensors.
 
 <table class="tfo-notebook-buttons tfo-api nocontent" align="left">
 <td>
-  <a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/util/packed_tensors.py#L25-L96">
+  <a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/util/packed_tensors.py#L25-L100">
     <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
     View source on GitHub
   </a>
@@ -71,7 +71,7 @@ The string representation of this object.
 
 <h3 id="pack"><code>pack</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/util/packed_tensors.py#L64-L82">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/util/packed_tensors.py#L64-L84">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>pack(
@@ -84,7 +84,7 @@ Packs `Tensor` values into this object.
 
 <h3 id="unpack"><code>unpack</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/util/packed_tensors.py#L84-L96">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/util/packed_tensors.py#L86-L100">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>unpack(

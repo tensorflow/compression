@@ -19,7 +19,7 @@ description: Batched entropy model model which implements Universal Quantization
 
 <table class="tfo-notebook-buttons tfo-api nocontent" align="left">
 <td>
-  <a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/universal.py#L64-L292">
+  <a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/universal.py#L62-L295">
     <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
     View source on GitHub
   </a>
@@ -34,7 +34,7 @@ Batched entropy model model which implements Universal Quantization.
 <code>tfc.UniversalBatchedEntropyModel(
     prior, coding_rank, compression=False, laplace_tail_mass=0.0,
     expected_grads=False, tail_mass=(2 ** -8), range_coder_precision=12,
-    num_noise_levels=15, stateless=False
+    bottleneck_dtype=None, num_noise_levels=15, stateless=False
 )
 </code></pre>
 
@@ -123,6 +123,14 @@ Integer. Precision passed to the range coding op.
 </td>
 </tr><tr>
 <td>
+`bottleneck_dtype`
+</td>
+<td>
+`tf.dtypes.DType`. Data type of bottleneck tensor.
+Defaults to `tf.keras.mixed_precision.global_policy().compute_dtype`.
+</td>
+</tr><tr>
+<td>
 `num_noise_levels`
 </td>
 <td>
@@ -154,6 +162,13 @@ value is ignored.
 
 <tr>
 <td>
+`bottleneck_dtype`
+</td>
+<td>
+Data type of the bottleneck tensor.
+</td>
+</tr><tr>
+<td>
 `cdf`
 </td>
 <td>
@@ -179,13 +194,6 @@ Number of innermost dimensions considered a coding unit.
 </td>
 <td>
 Whether this entropy model is prepared for compression.
-</td>
-</tr><tr>
-<td>
-`dtype`
-</td>
-<td>
-Data type of this entropy model.
 </td>
 </tr><tr>
 <td>
@@ -326,7 +334,7 @@ of calling this method if you don't expect the return value to change.
 
 <h3 id="compress"><code>compress</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/universal.py#L220-L256">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/universal.py#L222-L259">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>compress(
@@ -382,7 +390,7 @@ coding unit.
 
 <h3 id="decompress"><code>decompress</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/universal.py#L258-L288">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/universal.py#L261-L291">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>decompress(
@@ -438,7 +446,7 @@ self.prior_shape`.
 
 <h3 id="get_config"><code>get_config</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/universal.py#L290-L292">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/universal.py#L293-L295">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>get_config()
@@ -481,7 +489,7 @@ with `compression=False` or with `stateless=True`.
 
 <h3 id="get_weights"><code>get_weights</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_base.py#L339-L340">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_base.py#L340-L341">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>get_weights()
@@ -492,7 +500,7 @@ with `compression=False` or with `stateless=True`.
 
 <h3 id="set_weights"><code>set_weights</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_base.py#L342-L347">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/continuous_base.py#L343-L348">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>set_weights(
@@ -568,7 +576,7 @@ The original method wrapped such that it enters the module's name scope.
 
 <h3 id="__call__"><code>__call__</code></h3>
 
-<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/universal.py#L181-L218">View source</a>
+<a target="_blank" href="https://github.com/tensorflow/compression/tree/master/tensorflow_compression/python/entropy_models/universal.py#L182-L220">View source</a>
 
 <pre class="devsite-click-to-copy prettyprint lang-py tfo-signature-link">
 <code>__call__(
