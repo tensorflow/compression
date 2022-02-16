@@ -198,7 +198,7 @@ class ContinuousBatchedEntropyModelTest(tf.test.TestCase,
     tf.keras.mixed_precision.set_global_policy("mixed_float16")
     try:
       noisy = uniform_noise.NoisyNormal(
-          loc=tf.constant(0, dtype=tf.float64),
+          loc=tf.constant(.5, dtype=tf.float64),
           scale=tf.constant(1, dtype=tf.float64))
       em = ContinuousBatchedEntropyModel(noisy, 1, compression=True)
       self.assertEqual(em.bottleneck_dtype, tf.float16)

@@ -233,8 +233,7 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
       CDF table, CDF offsets, CDF lengths.
     """
     precision = int(precision)
-    if offset is None:
-      offset = 0.
+    offset = tf.cast(0 if offset is None else offset, prior.dtype)
     # Subclasses should have already caught this, but better be safe.
     assert not prior.event_shape.rank
 

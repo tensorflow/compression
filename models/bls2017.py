@@ -107,6 +107,7 @@ class BLS2017Model(tf.keras.Model):
     """Computes rate and distortion losses."""
     entropy_model = tfc.ContinuousBatchedEntropyModel(
         self.prior, coding_rank=3, compression=False)
+    x = tf.cast(x, self.compute_dtype)  # TODO(jonycgn): Why is this necessary?
     y = self.analysis_transform(x)
     y_hat, bits = entropy_model(y, training=training)
     x_hat = self.synthesis_transform(y_hat)
@@ -115,6 +116,7 @@ class BLS2017Model(tf.keras.Model):
     bpp = tf.reduce_sum(bits) / num_pixels
     # Mean squared error across pixels.
     mse = tf.reduce_mean(tf.math.squared_difference(x, x_hat))
+    mse = tf.cast(mse, bpp.dtype)
     # The rate-distortion Lagrangian.
     loss = bpp + self.lmbda * mse
     return loss, bpp, mse
@@ -166,7 +168,7 @@ class BLS2017Model(tf.keras.Model):
     """Compresses an image."""
     # Add batch dimension and cast to float.
     x = tf.expand_dims(x, 0)
-    x = tf.cast(x, dtype=tf.float32)
+    x = tf.cast(x, dtype=self.compute_dtype)
     y = self.analysis_transform(x)
     # Preserve spatial shapes of both image and latents.
     x_shape = tf.shape(x)[1:-1]
@@ -195,7 +197,7 @@ def check_image_size(image, patchsize):
 
 def crop_image(image, patchsize):
   image = tf.image.random_crop(image, (patchsize, patchsize, 3))
-  return tf.cast(image, tf.float32)
+  return tf.cast(image, tf.keras.mixed_precision.global_policy().compute_dtype)
 
 
 def get_dataset(name, split, args):
@@ -232,6 +234,8 @@ def get_custom_dataset(split, args):
 
 def train(args):
   """Instantiates and trains the model."""
+  if args.precision_policy:
+    tf.keras.mixed_precision.set_global_policy(args.precision_policy)
   if args.check_numerics:
     tf.debugging.enable_check_numerics()
 
@@ -391,6 +395,9 @@ def parse_args(argv):
       "--preprocess_threads", type=int, default=16,
       help="Number of CPU threads to use for parallel decoding of training "
            "images.")
+  train_cmd.add_argument(
+      "--precision_policy", type=str, default=None,
+      help="Policy for `tf.keras.mixed_precision` training.")
   train_cmd.add_argument(
       "--check_numerics", action="store_true",
       help="Enable TF support for catching NaN and Inf in tensors.")
