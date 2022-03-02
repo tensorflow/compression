@@ -51,6 +51,8 @@
 *  <a href="../tfc/pmf_to_quantized_cdf.md"><code>tfc.pmf_to_quantized_cdf</code></a>
 *  <a href="../tfc/quantization_offset.md"><code>tfc.quantization_offset</code></a>
 *  <a href="../tfc/round_st.md"><code>tfc.round_st</code></a>
+*  <a href="../tfc/run_length_gamma_decode.md"><code>tfc.run_length_gamma_decode</code></a>
+*  <a href="../tfc/run_length_gamma_encode.md"><code>tfc.run_length_gamma_encode</code></a>
 *  <a href="../tfc/same_padding_for_kernel.md"><code>tfc.same_padding_for_kernel</code></a>
 *  <a href="../tfc/soft_round.md"><code>tfc.soft_round</code></a>
 *  <a href="../tfc/soft_round_conditional_mean.md"><code>tfc.soft_round_conditional_mean</code></a>

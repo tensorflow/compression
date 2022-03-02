@@ -122,6 +122,10 @@ Data compression in TensorFlow.
 
 [`round_st(...)`](./tfc/round_st.md): Straight-through round with optional quantization offset.
 
+[`run_length_gamma_decode(...)`](./tfc/run_length_gamma_decode.md): Decodes `data` using run-length and Elias gamma coding.
+
+[`run_length_gamma_encode(...)`](./tfc/run_length_gamma_encode.md): Encodes `data` using run-length and Elias gamma coding.
+
 [`same_padding_for_kernel(...)`](./tfc/same_padding_for_kernel.md): Determine correct amount of padding for `same` convolution.
 
 [`soft_round(...)`](./tfc/soft_round.md): Differentiable approximation to round().

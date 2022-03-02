@@ -893,9 +893,7 @@ may also be zero-argument callables which create a loss tensor.
 `**kwargs`
 </td>
 <td>
-Additional keyword arguments for backward compatibility.
-Accepted values:
-  inputs - Deprecated, will be automatically inferred.
+Used for backwards compatibility only.
 </td>
 </tr>
 </table>
