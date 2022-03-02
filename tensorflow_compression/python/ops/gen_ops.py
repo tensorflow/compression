@@ -32,5 +32,7 @@ __all__ = [
     "entropy_encode_finalize",
     "entropy_encode_index",
     "pmf_to_quantized_cdf",
+    "run_length_gamma_decode",
+    "run_length_gamma_encode",
 ]
 # pylint:enable=undefined-all-variable
