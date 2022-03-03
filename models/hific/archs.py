@@ -24,7 +24,6 @@ from compare_gan.architectures import abstract_arch
 from compare_gan.architectures import arch_ops
 import numpy as np
 import tensorflow.compat.v1 as tf
-
 import tensorflow_compression as tfc
 
 from hific.helpers import ModelMode

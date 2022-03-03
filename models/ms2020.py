@@ -35,8 +35,8 @@ import sys
 from absl import app
 from absl.flags import argparse_flags
 import tensorflow as tf
-import tensorflow_datasets as tfds
 import tensorflow_compression as tfc
+import tensorflow_datasets as tfds
 
 
 def read_png(filename):
