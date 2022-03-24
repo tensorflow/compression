@@ -4,18 +4,17 @@ TensorFlow Compression (TFC) contains data compression tools for TensorFlow.
 
 You can use this library to build your own ML models with end-to-end optimized
 data compression built in. It's useful to find storage-efficient representations
-of your data (images, features, examples, etc.) while only sacrificing a tiny
-fraction of model performance. It can compress any floating point tensor to a
-much smaller sequence of bits.
+of your data (images, features, examples, etc.) while only sacrificing a small
+fraction of model performance.
 
 Specifically, the entropy model classes in this library simplify the process of
 designing rate–distortion optimized codes. During training, they act like
 likelihood models. Once training is completed, they encode floating point
-tensors into optimal bit sequences by automating the design of probability
+tensors into optimized bit sequences by automating the design of probability
 tables and calling a range coder implementation behind the scenes.
 
-Range coding (a.k.a. arithmetic coding) is exposed to TensorFlow models with a
-set of flexible TF ops written in C++. These include an optional "overflow"
+The library implements range coding (a.k.a. arithmetic coding) using a set of
+flexible TF ops written in C++. These include an optional "overflow"
 functionality that embeds an Elias gamma code into the range encoded bit
 sequence, making it possible to encode the entire set of signed integers rather
 than just a finite range.
@@ -23,22 +22,23 @@ than just a finite range.
 The main novelty of the learned approach over traditional transform coding is
 the stochastic minimization of the rate-distortion Lagrangian, and using
 nonlinear transforms implemented by neural networks. For an introduction to
-this, consider our [paper on nonlinear transform
-coding](https://arxiv.org/abs/2007.03034), or watch @jonycgn's [talk on learned
-image compression](https://www.youtube.com/watch?v=x_q7cZviXkY).
+this from a data compression perspective, consider our [paper on nonlinear
+transform coding](https://arxiv.org/abs/2007.03034), or watch @jonycgn's [talk
+on learned image compression](https://www.youtube.com/watch?v=x_q7cZviXkY). For
+an introduction to lossy data compression from a machine learning perspective,
+take a look at @yiboyang's [review paper](https://arxiv.org/abs/2202.06533).
 
 ## Documentation & getting help
-
-Please post all questions or comments on
-[Discussions](https://github.com/tensorflow/compression/discussions) or on the
-[Google Group](https://groups.google.com/g/tensorflow-compression). Only file
-[Issues](https://github.com/tensorflow/compression/issues) for actual bugs or
-feature requests. On Discussions, you may get a faster answer, and you help
-other people find the question or answer more easily later.
 
 Refer to [the API
 documentation](https://tensorflow.github.io/compression/docs/api_docs/python/tfc.html)
 for a complete description of the classes and functions this package implements.
+
+Please post all questions or comments on
+[Discussions](https://github.com/tensorflow/compression/discussions). Only file
+[Issues](https://github.com/tensorflow/compression/issues) for actual bugs or
+feature requests. On Discussions, you may get a faster answer, and you help
+other people find the question or answer more easily later.
 
 ## Installation
 
