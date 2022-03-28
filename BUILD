@@ -1,5 +1,5 @@
 package(
-    default_visibility = ["//visibility:private"],
+    default_visibility = ["//visibility:public"],
 )
 
 licenses(["notice"])
@@ -9,7 +9,6 @@ exports_files(["LICENSE"])
 py_library(
     name = "tensorflow_compression",
     srcs = ["tensorflow_compression/__init__.py"],
-    srcs_version = "PY3",
     visibility = ["//visibility:public"],
     deps = [
         "//tensorflow_compression/python/datasets:y4m_dataset",
@@ -34,6 +33,11 @@ py_library(
 )
 
 py_binary(
+    name = "build_docs",
+    srcs = ["build_docs.py"],
+)
+
+py_binary(
     name = "build_pip_pkg",
     srcs = ["build_pip_pkg.py"],
     data = [
@@ -51,5 +55,4 @@ py_binary(
         "//tensorflow_compression/python/ops:py_src",
         "//tensorflow_compression/python/util:py_src",
     ],
-    python_version = "PY3",
 )
