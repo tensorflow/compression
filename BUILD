@@ -33,8 +33,8 @@ py_library(
 )
 
 py_binary(
-    name = "build_docs",
-    srcs = ["build_docs.py"],
+    name = "build_api_docs",
+    srcs = ["tools/build_api_docs.py"],
 )
 
 py_binary(

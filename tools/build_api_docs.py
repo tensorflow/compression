@@ -19,6 +19,7 @@ from absl import app
 from absl import flags
 import tensorflow_compression as tfc
 from tensorflow_docs.api_generator import generate_lib
+from tensorflow_docs.api_generator import public_api
 
 
 _OUTPUT_DIR = flags.DEFINE_string(
@@ -43,12 +44,9 @@ def gen_api_docs():
       py_modules=[("tfc", tfc)],
       base_dir=os.path.dirname(tfc.__file__),
       code_url_prefix=_CODE_URL_PREFIX.value,
-      private_map=dict(
-          tfc=["python"],
-      ),
       search_hints=_SEARCH_HINTS.value,
       site_path=_SITE_PATH.value,
-  )
+      callbacks=[public_api.explicit_package_contents_filter])
   doc_generator.build(_OUTPUT_DIR.value)
   print("Output docs to: ", _OUTPUT_DIR.value)
 
