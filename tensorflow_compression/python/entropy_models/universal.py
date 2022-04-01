@@ -82,7 +82,8 @@ class UniversalBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
                range_coder_precision=12,
                bottleneck_dtype=None,
                num_noise_levels=15,
-               stateless=False):
+               stateless=False,
+               decode_sanity_check=True):
     """Initializes the instance.
 
     Args:
@@ -118,6 +119,8 @@ class UniversalBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         allows it to be constructed within a `tf.function` body. If
         `compression=False`, then `stateless=True` is implied and the provided
         value is ignored.
+      decode_sanity_check: Boolean. If `True`, an raises an error if the binary
+        strings passed into `decompress` are not completely decoded.
     """
     if prior.event_shape.rank:
       raise ValueError("`prior` must be a (batch of) scalar distribution(s).")
@@ -135,6 +138,7 @@ class UniversalBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     self._num_noise_levels = num_noise_levels
     if self.coding_rank < self.prior_shape.rank:
       raise ValueError("`coding_rank` can't be smaller than `prior_shape`.")
+    self.decode_sanity_check = decode_sanity_check
 
     with self.name_scope:
       if self.compression:
@@ -285,7 +289,8 @@ class UniversalBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     handle, symbols = gen_ops.entropy_decode_index(
         handle, decode_indexes, decode_shape, self.cdf_offset.dtype)
     sanity = gen_ops.entropy_decode_finalize(handle)
-    tf.debugging.assert_equal(sanity, True, message="Sanity check failed.")
+    if self.decode_sanity_check:
+      tf.debugging.assert_equal(sanity, True, message="Sanity check failed.")
     symbols += tf.gather(self.cdf_offset, indexes)
     outputs = tf.cast(symbols, self.bottleneck_dtype)
     return outputs + offset
@@ -321,7 +326,8 @@ class UniversalIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
                bottleneck_dtype=None,
                prior_dtype=tf.float32,
                stateless=False,
-               num_noise_levels=15):
+               num_noise_levels=15,
+               decode_sanity_check=True):
     """Initializes the instance.
 
     Args:
@@ -364,6 +370,8 @@ class UniversalIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         rather than `Variable`s.
       num_noise_levels: Integer. The number of levels used to quantize the
         uniform noise.
+      decode_sanity_check: Boolean. If `True`, an raises an error if the binary
+        strings passed into `decompress` are not completely decoded.
     """
     if coding_rank <= 0:
       raise ValueError("`coding_rank` must be larger than 0.")
@@ -393,6 +401,7 @@ class UniversalIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     self._parameter_fns = dict(parameter_fns)
     self._prior_dtype = tf.as_dtype(prior_dtype)
     self._num_noise_levels = num_noise_levels
+    self.decode_sanity_check = decode_sanity_check
 
     with self.name_scope:
       if self.compression:
@@ -577,7 +586,8 @@ class UniversalIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     handle, symbols = gen_ops.entropy_decode_index(
         handle, flat_indexes, decode_shape, self.cdf_offset.dtype)
     sanity = gen_ops.entropy_decode_finalize(handle)
-    tf.debugging.assert_equal(sanity, True, message="Sanity check failed.")
+    if self.decode_sanity_check:
+      tf.debugging.assert_equal(sanity, True, message="Sanity check failed.")
     symbols += tf.gather(self.cdf_offset, flat_indexes)
     offset = self._offset_from_indexes(indexes)
     return tf.cast(symbols, self.bottleneck_dtype) + offset

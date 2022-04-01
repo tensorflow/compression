@@ -122,6 +122,7 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
                cdf_shapes=None,
                offset_heuristic=True,
                quantization_offset=None,
+               decode_sanity_check=True,
                laplace_tail_mass=0):
     """Initializes the instance.
 
@@ -168,6 +169,8 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         if you are using soft quantization during training.
       quantization_offset: `tf.Tensor` or `None`. The quantization offsets to
         use. If provided (not `None`), then `offset_heuristic` is ineffective.
+      decode_sanity_check: Boolean. If `True`, an raises an error if the binary
+        strings passed into `decompress` are not completely decoded.
       laplace_tail_mass: Float. If positive, will augment the prior with a
         Laplace mixture for training stability. (experimental)
     """
@@ -197,6 +200,7 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         prior_shape if prior is None else prior.batch_shape)
     if self.coding_rank < self.prior_shape.rank:
       raise ValueError("`coding_rank` can't be smaller than `prior_shape`.")
+    self.decode_sanity_check = decode_sanity_check
 
     with self.name_scope:
       if cdf_shapes is not None:
@@ -402,7 +406,8 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     handle, symbols = gen_ops.entropy_decode_channel(
         handle, decode_shape, self.cdf_offset.dtype)
     sanity = gen_ops.entropy_decode_finalize(handle)
-    tf.debugging.assert_equal(sanity, True, message="Sanity check failed.")
+    if self.decode_sanity_check:
+      tf.debugging.assert_equal(sanity, True, message="Sanity check failed.")
     symbols += self.cdf_offset
     symbols = tf.reshape(symbols, output_shape)
     outputs = tf.cast(symbols, self.bottleneck_dtype)

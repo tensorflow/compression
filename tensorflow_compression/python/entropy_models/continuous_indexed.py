@@ -138,6 +138,7 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
                range_coder_precision=12,
                bottleneck_dtype=None,
                prior_dtype=tf.float32,
+               decode_sanity_check=True,
                laplace_tail_mass=0):
     """Initializes the instance.
 
@@ -186,6 +187,8 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         Defaults to `tf.keras.mixed_precision.global_policy().compute_dtype`.
       prior_dtype: `tf.dtypes.DType`. Data type of prior and probability
         computations. Defaults to `tf.float32`.
+      decode_sanity_check: Boolean. If `True`, an raises an error if the binary
+        strings passed into `decompress` are not completely decoded.
       laplace_tail_mass: Float. If positive, will augment the prior with a
         laplace mixture for training stability. (experimental)
     """
@@ -216,6 +219,7 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     self._prior_fn = prior_fn
     self._parameter_fns = dict(parameter_fns)
     self._prior_dtype = tf.as_dtype(prior_dtype)
+    self.decode_sanity_check = decode_sanity_check
 
     with self.name_scope:
       if self.compression:
@@ -404,7 +408,8 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
     handle, symbols = gen_ops.entropy_decode_index(
         handle, flat_indexes, decode_shape, self.cdf_offset.dtype)
     sanity = gen_ops.entropy_decode_finalize(handle)
-    tf.debugging.assert_equal(sanity, True, message="Sanity check failed.")
+    if self.decode_sanity_check:
+      tf.debugging.assert_equal(sanity, True, message="Sanity check failed.")
     symbols += tf.gather(self.cdf_offset, flat_indexes)
     return tf.cast(symbols, self.bottleneck_dtype)
 
