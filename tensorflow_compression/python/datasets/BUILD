@@ -5,6 +5,14 @@ package(
 licenses(["notice"])
 
 py_library(
+    name = "datasets",
+    srcs = ["__init__.py"],
+    deps = [
+        ":y4m_dataset",
+    ],
+)
+
+py_library(
     name = "y4m_dataset",
     srcs = ["y4m_dataset.py"],
     deps = ["//tensorflow_compression/python/ops:gen_ops"],

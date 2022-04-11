@@ -15,11 +15,14 @@
 """Generates API docs for the TensorFlow Compression library."""
 
 import os
+
 from absl import app
 from absl import flags
-import tensorflow_compression as tfc
+
 from tensorflow_docs.api_generator import generate_lib
 from tensorflow_docs.api_generator import public_api
+
+import tensorflow_compression as tfc
 
 
 _OUTPUT_DIR = flags.DEFINE_string(

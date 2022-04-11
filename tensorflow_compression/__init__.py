@@ -14,28 +14,16 @@
 # ==============================================================================
 """Data compression in TensorFlow."""
 
+from tensorflow_compression.python import distributions
+from tensorflow_compression.python import entropy_models
+from tensorflow_compression.python import layers
+from tensorflow_compression.python import ops
+
 # pylint: disable=wildcard-import
-from tensorflow_compression.python.datasets.y4m_dataset import *
-
-from tensorflow_compression.python.distributions.deep_factorized import *
-from tensorflow_compression.python.distributions.helpers import *
-from tensorflow_compression.python.distributions.round_adapters import *
-from tensorflow_compression.python.distributions.uniform_noise import *
-
-from tensorflow_compression.python.entropy_models.continuous_batched import *
-from tensorflow_compression.python.entropy_models.continuous_indexed import *
-from tensorflow_compression.python.entropy_models.universal import *
-
-from tensorflow_compression.python.layers.gdn import *
-from tensorflow_compression.python.layers.initializers import *
-from tensorflow_compression.python.layers.parameters import *
-from tensorflow_compression.python.layers.signal_conv import *
-from tensorflow_compression.python.layers.soft_round import *
-
-from tensorflow_compression.python.ops.gen_ops import *
-from tensorflow_compression.python.ops.math_ops import *
-from tensorflow_compression.python.ops.padding_ops import *
-from tensorflow_compression.python.ops.round_ops import *
-
-from tensorflow_compression.python.util.packed_tensors import *
+from tensorflow_compression.python.datasets import *
+from tensorflow_compression.python.distributions import *
+from tensorflow_compression.python.entropy_models import *
+from tensorflow_compression.python.layers import *
+from tensorflow_compression.python.ops import *
+from tensorflow_compression.python.util import *
 # pylint: enable=wildcard-import

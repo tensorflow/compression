@@ -5,6 +5,16 @@ package(
 licenses(["notice"])
 
 py_library(
+    name = "entropy_models",
+    srcs = ["__init__.py"],
+    deps = [
+        ":continuous_batched",
+        ":continuous_indexed",
+        ":universal",
+    ],
+)
+
+py_library(
     name = "continuous_base",
     srcs = ["continuous_base.py"],
     deps = [

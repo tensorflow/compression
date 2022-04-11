@@ -5,6 +5,18 @@ package(
 licenses(["notice"])
 
 py_library(
+    name = "layers",
+    srcs = ["__init__.py"],
+    deps = [
+        ":gdn",
+        ":initializers",
+        ":parameters",
+        ":signal_conv",
+        ":soft_round",
+    ],
+)
+
+py_library(
     name = "gdn",
     srcs = ["gdn.py"],
     deps = [":parameters"],

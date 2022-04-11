@@ -5,6 +5,17 @@ package(
 licenses(["notice"])
 
 py_library(
+    name = "distributions",
+    srcs = ["__init__.py"],
+    deps = [
+        ":deep_factorized",
+        ":helpers",
+        ":round_adapters",
+        ":uniform_noise",
+    ],
+)
+
+py_library(
     name = "deep_factorized",
     srcs = ["deep_factorized.py"],
     deps = [

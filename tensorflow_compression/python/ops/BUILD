@@ -5,6 +5,17 @@ package(
 licenses(["notice"])
 
 py_library(
+    name = "ops",
+    srcs = ["__init__.py"],
+    deps = [
+        ":gen_ops",
+        ":math_ops",
+        ":padding_ops",
+        ":round_ops",
+    ],
+)
+
+py_library(
     name = "gen_ops",
     srcs = ["gen_ops.py"],
     data = ["//tensorflow_compression/cc:libtensorflow_compression.so"],
