@@ -29,6 +29,7 @@ from tensorflow_compression.python.distributions.uniform_noise_test import *
 
 from tensorflow_compression.python.entropy_models.continuous_batched_test import *
 from tensorflow_compression.python.entropy_models.continuous_indexed_test import *
+from tensorflow_compression.python.entropy_models.power_law_test import *
 from tensorflow_compression.python.entropy_models.universal_test import *
 
 from tensorflow_compression.python.layers.gdn_test import *

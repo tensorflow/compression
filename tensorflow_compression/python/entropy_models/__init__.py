@@ -16,4 +16,5 @@
 
 from tensorflow_compression.python.entropy_models.continuous_batched import *
 from tensorflow_compression.python.entropy_models.continuous_indexed import *
+from tensorflow_compression.python.entropy_models.power_law import *
 from tensorflow_compression.python.entropy_models.universal import *

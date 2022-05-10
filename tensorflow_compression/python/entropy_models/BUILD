@@ -10,6 +10,7 @@ py_library(
     deps = [
         ":continuous_batched",
         ":continuous_indexed",
+        ":power_law",
         ":universal",
     ],
 )
@@ -64,6 +65,21 @@ py_test(
         ":continuous_indexed",
         "//tensorflow_compression/python/distributions:uniform_noise",
     ],
+)
+
+py_library(
+    name = "power_law",
+    srcs = ["power_law.py"],
+    deps = [
+        "//tensorflow_compression/python/ops:gen_ops",
+        "//tensorflow_compression/python/ops:round_ops",
+    ],
+)
+
+py_test(
+    name = "power_law_test",
+    srcs = ["power_law_test.py"],
+    deps = [":power_law"],
 )
 
 py_library(
