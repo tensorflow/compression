@@ -27,11 +27,16 @@ __all__ = [
 class PowerLawEntropyModel(tf.Module):
   """Entropy model for power-law distributed random variables.
 
-  This entropy model handles quantization of a bottleneck tensor and implements
-  a cross entropy penalty that is consistent with the Elias gamma code.
+  This entropy model handles quantization and compression of a bottleneck tensor
+  and implements a penalty that encourages compressibility under the Elias gamma
+  code.
 
   The gamma code has code lengths `1 + 2 floor(log_2(x))`, for `x` a positive
-  integer. For details on the gamma code, see:
+  integer, and is close to optimal if `x` is distributed according to a power
+  law. Being a universal code, it also guarantees that in the worst case, the
+  expected code length is no more than 3 times the entropy of the empirical
+  distribution of `x`, as long as probability decreases with increasing `x`. For
+  details on the gamma code, see:
 
   > "Universal Codeword Sets and Representations of the Integers"<br />
   > P. Elias<br />
@@ -43,13 +48,12 @@ class PowerLawEntropyModel(tf.Module):
 
   The penalty applied by this class is given by:
   ```
-  -log_2 p(x), with p(x) = alpha / 2 * (x + alpha) ** -2
+  log((abs(x) + alpha) / alpha)
   ```
-  Like the gamma code, this follows a symmetrized power law, but only
-  approximately for `alpha > 0`. Without `alpha`, the distribution would not be
-  normalizable, and the penalty would have a singularity at zero. Setting
-  `alpha` to a small positive value ensures that the penalty is non-negative,
-  and that its gradients are useful for optimization.
+  This encourages `x` to follow a symmetrized power law, but only approximately
+  for `alpha > 0`. Without `alpha`, the penalty would have a singularity at
+  zero. Setting `alpha` to a small positive value ensures that the penalty is
+  non-negative, and that its gradients are useful for optimization.
   """
 
   def __init__(self,
@@ -123,11 +127,7 @@ class PowerLawEntropyModel(tf.Module):
       entropy.
     """
     bottleneck = tf.convert_to_tensor(bottleneck, dtype=self.bottleneck_dtype)
-    log_alpha = tf.math.log(
-        tf.constant(self.alpha, dtype=self.bottleneck_dtype))
-    log_2 = tf.math.log(tf.constant(2, dtype=self.bottleneck_dtype))
-    penalty = ((1. - log_alpha / log_2) +
-               tf.math.log(abs(bottleneck) + self.alpha) * (2. / log_2))
+    penalty = tf.math.log((abs(bottleneck) + self.alpha) / self.alpha)
     return tf.reduce_sum(penalty, axis=tuple(range(-self.coding_rank, 0)))
 
   @tf.Module.with_name_scope

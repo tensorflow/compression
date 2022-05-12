@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tests of power law entropy model."""
 
+import numpy as np
 import tensorflow as tf
 from tensorflow_compression.python.entropy_models.power_law import PowerLawEntropyModel
 
@@ -56,27 +57,26 @@ class PowerLawEntropyModelTest(tf.test.TestCase):
 
   def test_penalty_is_proportional_to_code_length(self):
     em = PowerLawEntropyModel(coding_rank=1)
-    # Sample some values from a Laplacian distribution.
-    u = tf.random.uniform((100, 1), minval=-1., maxval=1.)
-    values = 100. * tf.math.log(abs(u)) * tf.sign(u)
-    # Ensure there are some large values.
-    self.assertGreater(tf.reduce_sum(tf.cast(abs(values) > 100, tf.int32)), 0)
-    strings = em.compress(tf.broadcast_to(values, (100, 100)))
+    x = tf.range(-20., 20.)[:, None]
+    x += tf.random.uniform(x.shape, -.49, .49)
+    strings = em.compress(tf.broadcast_to(x, (40, 100)))
     code_lengths = tf.cast(tf.strings.length(strings, unit="BYTE"), tf.float32)
     code_lengths *= 8 / 100
-    penalties = em.penalty(values)
-    self.assertAllInRange(penalties - code_lengths, 4, 7)
+    penalties = em.penalty(x)
+    # There are some fluctuations due to `alpha`, `floor`, and rounding, but we
+    # expect a high degree of correlation between code lengths and penalty.
+    self.assertGreater(np.corrcoef(code_lengths, penalties)[0, 1], .96)
 
-  def test_penalty_is_differentiable(self):
+  def test_penalty_is_nonnegative_and_differentiable(self):
     em = PowerLawEntropyModel(coding_rank=1)
-    # Sample some values from a Laplacian distribution.
-    u = tf.random.uniform((100, 1), minval=-1., maxval=1.)
-    values = 100. * tf.math.log(abs(u)) * tf.sign(u)
+    x = tf.range(-20., 20.)[:, None]
+    x += tf.random.uniform(x.shape, -.49, .49)
     with tf.GradientTape() as tape:
-      tape.watch(values)
-      penalties = em.penalty(values)
-    gradients = tape.gradient(penalties, values)
-    self.assertAllEqual(tf.sign(gradients), tf.sign(values))
+      tape.watch(x)
+      penalties = em.penalty(x)
+    gradients = tape.gradient(penalties, x)
+    self.assertAllGreaterEqual(penalties, 0)
+    self.assertAllEqual(tf.sign(gradients), tf.sign(x))
 
   def test_compression_works_in_tf_function(self):
     samples = tf.random.stateless_normal([100], (34, 232))
