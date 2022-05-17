@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Ops."""
+"""Operations."""
+
 from tensorflow_compression.python.ops.gen_ops import *
 from tensorflow_compression.python.ops.math_ops import *
 from tensorflow_compression.python.ops.padding_ops import *

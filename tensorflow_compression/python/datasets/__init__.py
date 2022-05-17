@@ -12,6 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Data loaders based on `tf.data.Dataset`."""
+"""Data loaders, based on `tf.data.Dataset`."""
 
 from tensorflow_compression.python.datasets.y4m_dataset import *
