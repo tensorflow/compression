@@ -115,16 +115,15 @@ class PowerLawEntropyModel(tf.Module):
 
   @tf.Module.with_name_scope
   def penalty(self, bottleneck):
-    """Computes cross-entropy penalty.
+    """Computes penalty encouraging compressibility.
 
     Args:
       bottleneck: `tf.Tensor` containing the data to be compressed. Must have at
         least `self.coding_rank` dimensions.
 
     Returns:
-      Penalty, which has the same shape as `bottleneck` without the
-      `self.coding_rank` innermost dimensions, and corresponds to a cross
-      entropy.
+      Penalty value, which has the same shape as `bottleneck` without the
+      `self.coding_rank` innermost dimensions.
     """
     bottleneck = tf.convert_to_tensor(bottleneck, dtype=self.bottleneck_dtype)
     penalty = tf.math.log((abs(bottleneck) + self.alpha) / self.alpha)

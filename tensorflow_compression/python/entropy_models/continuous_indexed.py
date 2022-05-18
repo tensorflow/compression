@@ -39,7 +39,7 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
   A typical workflow looks like this:
 
   - Train a model using an instance of this entropy model as a bottleneck,
-    passing the bottleneck tensor through it. With training=True, the model
+    passing the bottleneck tensor through it. With `training=True`, the model
     computes a differentiable upper bound on the number of bits needed to
     compress the bottleneck tensor.
   - For evaluation, get a closer estimate of the number of compressed bits

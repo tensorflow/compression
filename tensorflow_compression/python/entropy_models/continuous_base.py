@@ -110,15 +110,18 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
 
   @prior.deleter
   def prior(self):
+    """Prior distribution, used for deriving range coding tables."""
     self._prior = None
 
   @property
   def cdf(self):
+    """The CDFs used by range coding."""
     self._check_compression()
     return tf.convert_to_tensor(self._cdf)
 
   @property
   def cdf_offset(self):
+    """The CDF offsets used by range coding."""
     self._check_compression()
     return tf.convert_to_tensor(self._cdf_offset)
 

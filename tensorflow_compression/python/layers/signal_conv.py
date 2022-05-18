@@ -120,6 +120,7 @@ class _SignalConv(tf.keras.layers.Layer):
     inputs:  |0 1 2 3 4 5 6 7 8|
     outputs: |    0 . 1 . 2    |
     ```
+
     ```
     inputs:  |0 1 2 3 4 5 6 7|
     outputs: |    0 . 1 .    |
@@ -152,6 +153,7 @@ class _SignalConv(tf.keras.layers.Layer):
     inputs:  |0 1 2 3 4 5 6 7 8|
     outputs: |0 . 1 . 2 . 3 . 4|
     ```
+
     ```
     inputs:  |0 1 2 3 4 5 6 7|
     outputs: |0 . 1 . 2 . 3 .|

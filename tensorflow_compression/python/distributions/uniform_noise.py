@@ -200,6 +200,7 @@ class NoisyMixtureSameFamily(tfp.distributions.MixtureSameFamily):
 
   def __init__(self, mixture_distribution, components_distribution,
                name="NoisyMixtureSameFamily"):
+    """Initializer, taking the same arguments as `tfpd.MixtureSameFamily`."""
     super().__init__(
         mixture_distribution=mixture_distribution,
         components_distribution=UniformNoiseAdapter(components_distribution),
@@ -252,6 +253,7 @@ class NoisyNormal(UniformNoiseAdapter):
   """Gaussian distribution with additive i.i.d. uniform noise."""
 
   def __init__(self, name="NoisyNormal", **kwargs):
+    """Initializer, taking the same arguments as `tfpd.Normal`."""
     super().__init__(tfp.distributions.Normal(**kwargs), name=name)
 
 
@@ -259,6 +261,7 @@ class NoisyLogistic(UniformNoiseAdapter):
   """Logistic distribution with additive i.i.d. uniform noise."""
 
   def __init__(self, name="NoisyLogistic", **kwargs):
+    """Initializer, taking the same arguments as `tfpd.Logistic`."""
     super().__init__(tfp.distributions.Logistic(**kwargs), name=name)
 
 
@@ -266,6 +269,14 @@ class NoisyNormalMixture(NoisyMixtureSameFamily):
   """Mixture of normal distributions with additive i.i.d. uniform noise."""
 
   def __init__(self, loc, scale, weight, name="NoisyNormalMixture"):
+    """Initializer.
+
+    Args:
+      loc: Location parameters of `tfpd.Normal` component distributions.
+      scale: Scale parameters of `tfpd.Normal` component distributions.
+      weight: `probs` parameter of `tfpd.Categorical` mixture distribution.
+      name: A name for this distribution.
+    """
     super().__init__(
         mixture_distribution=tfp.distributions.Categorical(probs=weight),
         components_distribution=tfp.distributions.Normal(loc=loc, scale=scale),
@@ -277,6 +288,14 @@ class NoisyLogisticMixture(NoisyMixtureSameFamily):
   """Mixture of logistic distributions with additive i.i.d. uniform noise."""
 
   def __init__(self, loc, scale, weight, name="NoisyLogisticMixture"):
+    """Initializer.
+
+    Args:
+      loc: Location parameters of `tfpd.Logistic` component distributions.
+      scale: Scale parameters of `tfpd.Logistic` component distributions.
+      weight: `probs` parameter of `tfpd.Categorical` mixture distribution.
+      name: A name for this distribution.
+    """
     super().__init__(
         mixture_distribution=tfp.distributions.Categorical(probs=weight),
         components_distribution=tfp.distributions.Logistic(

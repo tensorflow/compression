@@ -265,10 +265,12 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
 
   @property
   def offset_heuristic(self):
+    """Whether to use heuristic to determine quantization offsets."""
     return self._offset_heuristic
 
   @property
   def quantization_offset(self):
+    """The quantization offset used in `quantize` and `compress`."""
     if self._quantization_offset is not None:
       return tf.convert_to_tensor(self._quantization_offset)
     if self.offset_heuristic and not self.compression:
