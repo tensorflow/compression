@@ -18,7 +18,17 @@ import abc
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
-import tensorflow_probability as tfp
+
+
+def source_dataset(source, batch_size, seed, dataset_size=None):
+  """Returns a `tf.data.Dataset` of samples from `source`."""
+  dataset = tf.data.Dataset.random(seed=seed)
+  if dataset_size is not None:
+    # This rounds up to multiple of batch size.
+    batches = (dataset_size - 1) // batch_size + 1
+    dataset = dataset.take(batches)
+  return dataset.map(
+      lambda seed: source.sample(batch_size, seed=tf.bitcast(seed, tf.int32)))
 
 
 class CompressionModel(tf.keras.Model, metaclass=abc.ABCMeta):
@@ -131,22 +141,15 @@ class CompressionModel(tf.keras.Model, metaclass=abc.ABCMeta):
     self.distortion = tf.keras.metrics.Mean(name="distortion")
     self.grad_rms = tf.keras.metrics.Mean(name="gradient RMS")
 
-  def fit(self, batch_size, validation_size, validation_batch_size, **kwargs):
-    train_data = tf.data.Dataset.from_tensors([])
-    train_data = train_data.repeat()
-    train_data = train_data.map(
-        lambda _: self.source.sample(batch_size),
-    )
-
-    seed = tfp.util.SeedStream(528374623, "compression_model_fit")
-    # This rounds up to multiple of batch size.
-    validation_batches = (validation_size - 1) // validation_batch_size + 1
-    validation_data = tf.data.Dataset.from_tensors([])
-    validation_data = validation_data.repeat(validation_batches)
-    validation_data = validation_data.map(
-        lambda _: self.source.sample(validation_batch_size, seed=seed),
-    )
-
+  def fit(self, batch_size, validation_size, validation_batch_size,
+          train_size=None, train_seed=None, validation_seed=82913749, **kwargs):
+    train_data = source_dataset(
+        self.source, batch_size, train_seed, dataset_size=train_size)
+    if train_size is not None:
+      train_data = train_data.repeat()
+    validation_data = source_dataset(
+        self.source, validation_batch_size, validation_seed,
+        dataset_size=validation_size)
     super().fit(
         train_data,
         validation_data=validation_data,
