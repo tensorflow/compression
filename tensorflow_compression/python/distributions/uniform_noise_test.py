@@ -75,6 +75,10 @@ class LocationScaleTest:
     with self.assertRaises(NotImplementedError):
       dist.survival_function(.5)
 
+  def test_quantizes_to_mode_decimal_part(self):
+    dist = self.dist_cls(loc=-3.75, scale=1.)
+    self.assertEqual(helpers.quantization_offset(dist), .25)
+
 
 class NoisyNormalTest(LocationScaleTest, tf.test.TestCase):
 
