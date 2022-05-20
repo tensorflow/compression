@@ -5,33 +5,42 @@ TensorFlow Compression (TFC) contains data compression tools for TensorFlow.
 You can use this library to build your own ML models with end-to-end optimized
 data compression built in. It's useful to find storage-efficient representations
 of your data (images, features, examples, etc.) while only sacrificing a small
-fraction of model performance.
+fraction of model performance. Take a look at the [lossy data compression
+tutorial](https://www.tensorflow.org/tutorials/generative/data_compression) to
+get started.
 
-Specifically, the entropy model classes in this library simplify the process of
-designing rate–distortion optimized codes. During training, they act like
-likelihood models. Once training is completed, they encode floating point
-tensors into optimized bit sequences by automating the design of probability
-tables and calling a range coder implementation behind the scenes.
+For a more in-depth introduction from a classical data compression perspective,
+consider our [paper on nonlinear transform
+coding](https://arxiv.org/abs/2007.03034), or watch @jonycgn's [talk on learned
+image compression](https://www.youtube.com/watch?v=x_q7cZviXkY). For an
+introduction to lossy data compression from a machine learning perspective, take
+a look at @yiboyang's [review paper](https://arxiv.org/abs/2202.06533).
 
-The library implements range coding (a.k.a. arithmetic coding) using a set of
-flexible TF ops written in C++. These include an optional "overflow"
-functionality that embeds an Elias gamma code into the range encoded bit
-sequence, making it possible to encode the entire set of signed integers rather
-than just a finite range.
+The library contains (see the [API
+docs](https://www.tensorflow.org/api_docs/python/tfc) for details):
 
-The main novelty of the learned approach over traditional transform coding is
-the stochastic minimization of the rate-distortion Lagrangian, and using
-nonlinear transforms implemented by neural networks. For an introduction to
-this from a data compression perspective, consider our [paper on nonlinear
-transform coding](https://arxiv.org/abs/2007.03034), or watch @jonycgn's [talk
-on learned image compression](https://www.youtube.com/watch?v=x_q7cZviXkY). For
-an introduction to lossy data compression from a machine learning perspective,
-take a look at @yiboyang's [review paper](https://arxiv.org/abs/2202.06533).
+- Range coding (a.k.a. arithmetic coding) implementations in the form of
+  flexible TF ops written in C++. These include an optional "overflow"
+  functionality that embeds an Elias gamma code into the range encoded bit
+  sequence, making it possible to encode alphabets containing the entire set of
+  signed integers rather than just a finite range.
+
+- Entropy model classes which simplify the process of designing rate–distortion
+  optimized codes. During training, they act like likelihood models. Once
+  training is completed, they encode floating point tensors into optimized bit
+  sequences by automating the design of range coding tables and calling the
+  range coder implementation behind the scenes.
+
+- Additional TensorFlow functions and Keras layers that are useful in the
+  context of learned data compression, such as methods to numerically find
+  quantiles of density functions, take expectations with respect to dithering
+  noise, convolution layers with more flexible padding options, and an
+  implementation of generalized divisive normalization (GDN).
+
 
 ## Documentation & getting help
 
-Refer to [the API
-documentation](https://tensorflow.github.io/compression/docs/api_docs/python/tfc.html)
+Refer to [the API documentation](https://www.tensorflow.org/api_docs/python/tfc)
 for a complete description of the classes and functions this package implements.
 
 Please post all questions or comments on
