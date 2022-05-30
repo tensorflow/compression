@@ -34,7 +34,8 @@ docs](https://www.tensorflow.org/api_docs/python/tfc) for details):
 - Additional TensorFlow functions and Keras layers that are useful in the
   context of learned data compression, such as methods to numerically find
   quantiles of density functions, take expectations with respect to dithering
-  noise, convolution layers with more flexible padding options, and an
+  noise, convolution layers with more flexible padding options and support for
+  reparameterizing kernels and biases in the Fourier domain, and an
   implementation of generalized divisive normalization (GDN).
 
 

@@ -214,7 +214,7 @@ class NoisyRoundAdapter(uniform_noise.UniformNoiseAdapter):
 
 
 class NoisyRoundedDeepFactorized(NoisyRoundAdapter):
-  """Rounded DeepFactorized + uniform noise."""
+  """Rounded `DeepFactorized` + uniform noise."""
 
   def __init__(self, name="NoisyRoundedDeepFactorized", **kwargs):
     prior = deep_factorized.DeepFactorized(**kwargs)
@@ -276,7 +276,7 @@ class NoisySoftRoundedNormal(NoisySoftRoundAdapter):
 
 
 class NoisySoftRoundedDeepFactorized(NoisySoftRoundAdapter):
-  """Soft rounded deep factorized distribution + uniform noise."""
+  """Soft rounded `DeepFactorized` + uniform noise."""
 
   def __init__(self,
                alpha=5.0,

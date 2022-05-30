@@ -261,7 +261,7 @@ class DeepFactorized(tfp.distributions.Distribution):
 
 
 class NoisyDeepFactorized(uniform_noise.UniformNoiseAdapter):
-  """DeepFactorized that is convolved with uniform noise."""
+  """`DeepFactorized` that is convolved with uniform noise."""
 
   def __init__(self, name="NoisyDeepFactorized", **kwargs):
     super().__init__(DeepFactorized(**kwargs), name=name)
