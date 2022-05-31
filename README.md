@@ -85,12 +85,20 @@ similar in the last line.
 
 ### Colab
 
-To try out TFC live in a [Colab](https://colab.research.google.com/), run the
-following command in a cell before executing your Python code:
+You can try out TFC live in a [Colab](https://colab.research.google.com/). The
+following command installs the latest version of TFC that is compatible with the
+installed TensorFlow version. Run it in a cell before executing your Python
+code:
 
 ```
-!pip install tensorflow-compression
+!pip install tensorflow-compression~=$(pip show tensorflow | perl -p -0777 -e 's/.*Version: (\\d\\.\\d).*/\\1.0/sg')
 ```
+
+Note: The binary packages of TFC are tied to TF with the same minor version
+(e.g., TFC 2.9.1 requires TF 2.9.x), and Colab sometimes lags behind a few days
+in deploying the latest version of TensorFlow. As a result, using `pip install
+tensorflow-compression` naively might attempt to upgrade TF, which can create
+problems.
 
 ### Docker
 
