@@ -148,6 +148,10 @@ builder.download_and_prepare()
 To train on a custom dataset, you can replace the `_get_dataset`
 call in `train.py`.
 
+## Metrics
+
+Metrics reported in Figs 4, A10, A11 are available in [data.csv](https://github.com/tensorflow/compression/blob/master/models/hific/data.csv).
+
 ## Citation
 
 If you use the work released here for your research, please cite this paper:
