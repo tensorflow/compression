@@ -15,7 +15,7 @@ cc_binary(
     ),
     copts = [
         "-pthread",
-        "-std=c++14",
+        "-std=c++17",
     ],
     linkshared = 1,
     linkstatic = 0,
