@@ -6,8 +6,11 @@ cc_binary(
     name = "libtensorflow_compression.so",
     srcs = glob(
         include = [
-            "**/*.h",
-            "**/*.cc",
+            "kernels/*.h",
+            "kernels/*.cc",
+            "lib/*.h",
+            "lib/*.cc",
+            "ops/*.cc",
         ],
         exclude = [
             "**/*_test.cc",
