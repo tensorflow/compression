@@ -53,9 +53,11 @@ other people find the question or answer more easily later.
 ## Installation
 
 ***Note: Precompiled packages are currently only provided for Linux and
-Darwin/Mac OS. To use these packages on Windows, consider using a
-[TensorFlow Docker image](https://www.tensorflow.org/install/docker) and
-installing TensorFlow Compression using pip inside the Docker container.***
+Darwin/Mac OS. To use these packages on Windows, consider installing TensorFlow
+using the [instructions for
+WSL2](https://www.tensorflow.org/install/pip#windows_1) or using a [TensorFlow
+Docker image](https://www.tensorflow.org/install/docker), and then installing
+the Linux package.***
 
 Set up an environment in which you can install precompiled binary Python
 packages using the `pip` command. Refer to the
