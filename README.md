@@ -304,12 +304,20 @@ different metrics in different colorspaces. Please see the
 [results subdirectory](https://github.com/tensorflow/compression/tree/master/results/image_compression)
 for more information.
 
-## Authors
+## Citation
 
-* Johannes Ballé (github: [jonycgn](https://github.com/jonycgn))
-* Sung Jin Hwang (github: [ssjhv](https://github.com/ssjhv))
-* Nick Johnston (github: [nmjohn](https://github.com/nmjohn))
-* David Minnen (github: [minnend](https://github.com/minnend))
-* Eirikur Agustsson (github: [relational](https://github.com/relational))
+If you use this library for research purposes, please cite:
+```
+@software{tfc_github,
+  author = {Ballé, Johannes and Hwang, Sung Jin and Agustsson, Eirikur},
+  title = {{T}ensor{F}low {C}ompression: Learned Data Compression},
+  url = {http://github.com/tensorflow/compression},
+  version = {2.9.1},
+  year = {2022},
+}
+```
+In the above BibTeX entry, names are top contributors sorted by number of
+commits. Please adjust version number and year according to the version that was
+actually used.
 
 Note that this is not an officially supported Google product.
