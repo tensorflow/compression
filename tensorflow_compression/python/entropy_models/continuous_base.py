@@ -17,8 +17,8 @@
 import abc
 from absl import logging
 import tensorflow as tf
-import tensorflow_probability as tfp
 from tensorflow_compression.python.distributions import helpers
+from tensorflow_compression.python.distributions import uniform_noise
 from tensorflow_compression.python.ops import gen_ops
 
 
@@ -69,7 +69,7 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
       bottleneck_dtype: `tf.dtypes.DType`. Data type of bottleneck tensor.
         Defaults to `tf.keras.mixed_precision.global_policy().compute_dtype`.
       laplace_tail_mass: Float. If non-zero, will augment the prior with a
-        Laplace mixture for training stability. (experimental)
+        `NoisyLaplace` mixture component for training stability. (experimental)
     """
     super().__init__()
     self._prior = None  # This will be set by subclasses, if appropriate.
@@ -137,7 +137,7 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
 
   @property
   def laplace_tail_mass(self):
-    """Whether to augment the prior with a Laplace mixture."""
+    """Whether to augment the prior with a `NoisyLaplace` mixture."""
     return self._laplace_tail_mass
 
   @property
@@ -298,7 +298,7 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
     """Evaluates prior.log_prob(bottleneck + noise)."""
     bottleneck_perturbed = tf.cast(bottleneck_perturbed, prior.dtype)
     if self.laplace_tail_mass:
-      laplace_prior = tfp.distributions.Laplace(
+      laplace_prior = uniform_noise.NoisyLaplace(
           loc=tf.constant(0, dtype=prior.dtype),
           scale=tf.constant(1, dtype=prior.dtype))
       probs = prior.prob(bottleneck_perturbed)

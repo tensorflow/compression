@@ -20,6 +20,7 @@ py_library(
     srcs = ["continuous_base.py"],
     deps = [
         "//tensorflow_compression/python/distributions:helpers",
+        "//tensorflow_compression/python/distributions:uniform_noise",
         "//tensorflow_compression/python/ops:gen_ops",
     ],
 )

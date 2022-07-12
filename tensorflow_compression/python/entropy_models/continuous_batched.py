@@ -171,8 +171,8 @@ class ContinuousBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         use. If provided (not `None`), then `offset_heuristic` is ineffective.
       decode_sanity_check: Boolean. If `True`, an raises an error if the binary
         strings passed into `decompress` are not completely decoded.
-      laplace_tail_mass: Float. If positive, will augment the prior with a
-        Laplace mixture for training stability. (experimental)
+      laplace_tail_mass: Float. If non-zero, will augment the prior with a
+        `NoisyLaplace` mixture component for training stability. (experimental)
     """
     if (prior is None) == (prior_shape is None):
       raise ValueError("Either `prior` or `prior_shape` must be provided.")

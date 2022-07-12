@@ -98,7 +98,7 @@ class UniversalBatchedEntropyModelTest(tf.test.TestCase,
         coding_rank=1,
         compression=True,
         laplace_tail_mass=1e-3)
-    x = tf.convert_to_tensor([1e3, 1e4, 1e5, 1e6, 1e7, 1e8], tf.float32)
+    x = tf.convert_to_tensor([1e3, 1e4, 1e5, 1e6], tf.float32)
     _, bits = em(x[..., None])
     self.assertAllClose(bits, tf.abs(x) / tf.math.log(2.0), rtol=0.01)
 

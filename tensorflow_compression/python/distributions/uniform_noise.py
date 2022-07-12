@@ -24,6 +24,7 @@ __all__ = [
     "NoisyMixtureSameFamily",
     "NoisyNormal",
     "NoisyLogistic",
+    "NoisyLaplace",
     "NoisyNormalMixture",
     "NoisyLogisticMixture",
 ]
@@ -263,6 +264,14 @@ class NoisyLogistic(UniformNoiseAdapter):
   def __init__(self, name="NoisyLogistic", **kwargs):
     """Initializer, taking the same arguments as `tfpd.Logistic`."""
     super().__init__(tfp.distributions.Logistic(**kwargs), name=name)
+
+
+class NoisyLaplace(UniformNoiseAdapter):
+  """Laplacian distribution with additive i.i.d. uniform noise."""
+
+  def __init__(self, name="NoisyLaplace", **kwargs):
+    """Initializer, taking the same arguments as `tfpd.Laplace`."""
+    super().__init__(tfp.distributions.Laplace(**kwargs), name=name)
 
 
 class NoisyNormalMixture(NoisyMixtureSameFamily):

@@ -53,6 +53,13 @@ class LocationScaleTest:
     x = tf.linspace(mean - 1, mean + 1, 10)
     self.assertAllClose(dist.prob(x), [0, 0, 0, 1, 1, 1, 1, 0, 0, 0])
 
+  def test_is_pmf_at_integer_grid(self):
+    # When evaluated at integers, P_i = p(c+i) should be a valid PMF.
+    dist = self.dist_cls(loc=0.1, scale=0.3)
+    x = 0.05 + tf.range(-100, 100, dtype=tf.float32)
+    pmf_probs = dist.prob(x)
+    self.assertAllClose(tf.reduce_sum(pmf_probs), 1.0)
+
   def test_sampling_works(self):
     dist = self.dist_cls(loc=0, scale=[3, 5])
     sample = dist.sample((5, 4))
@@ -88,6 +95,11 @@ class NoisyNormalTest(LocationScaleTest, tf.test.TestCase):
 class NoisyLogisticTest(LocationScaleTest, tf.test.TestCase):
 
   dist_cls = uniform_noise.NoisyLogistic
+
+
+class NoisyLaplaceTest(LocationScaleTest, tf.test.TestCase):
+
+  dist_cls = uniform_noise.NoisyLaplace
 
 
 class MixtureTest:
