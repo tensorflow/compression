@@ -311,11 +311,11 @@ for more information.
 If you use this library for research purposes, please cite:
 ```
 @software{tfc_github,
-  author = {Ballé, Johannes and Hwang, Sung Jin and Agustsson, Eirikur},
-  title = {{T}ensor{F}low {C}ompression: Learned Data Compression},
-  url = {http://github.com/tensorflow/compression},
-  version = {2.9.1},
-  year = {2022},
+  author = "Ballé, Johannes and Hwang, Sung Jin and Agustsson, Eirikur",
+  title = "{T}ensor{F}low {C}ompression: Learned Data Compression",
+  url = "http://github.com/tensorflow/compression",
+  version = "2.9.1",
+  year = "2022",
 }
 ```
 In the above BibTeX entry, names are top contributors sorted by number of
