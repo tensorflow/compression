@@ -209,9 +209,11 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
           cdf_offset, dtype=tf.int32, name="cdf_offset")
     else:
       self._cdf = tf.Variable(
-          cdf, dtype=tf.int32, trainable=False, name="cdf")
+          cdf, dtype=tf.int32, trainable=False, name="cdf",
+          validate_shape=False, shape=[None])
       self._cdf_offset = tf.Variable(
-          cdf_offset, dtype=tf.int32, trainable=False, name="cdf_offset")
+          cdf_offset, dtype=tf.int32, trainable=False, name="cdf_offset",
+          validate_shape=False, shape=[None])
 
   def _build_tables(self, prior, precision, offset=None):
     """Computes integer-valued probability tables used by the range coder.
