@@ -14,7 +14,7 @@
 # ==============================================================================
 """Swiss army tool for convolutions."""
 
-from typing import Any, Callable, Dict, Optional, Tuple, Union
+from typing import Any, Callable, Dict, NoReturn, Optional, Tuple, Union
 import tensorflow as tf
 from tensorflow_compression.python.layers import parameters
 from tensorflow_compression.python.ops import padding_ops
@@ -571,7 +571,7 @@ class _SignalConv(tf.keras.layers.Layer):
     else:
       return (fill,) + tuple(iterable) + (fill,)
 
-  def _raise_notimplemented(self):
+  def _raise_notimplemented(self) -> NoReturn:
     raise NotImplementedError(
         f"The provided combination of {type(self).__name__} arguments is not "
         f"currently implemented (filters={self.filters}, "
