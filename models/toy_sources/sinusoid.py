@@ -80,7 +80,7 @@ class Sinusoid(tfp.distributions.Distribution):
   def _sample_n(self, n, seed=None):
     ind = self.index_points
     if self.phase is None:
-      phase = tf.random.uniform((n, 1), seed=seed, dtype=self.dtype)
+      phase = tf.random.stateless_uniform((n, 1), seed=seed, dtype=self.dtype)
     else:
       phase = tf.fill((n, 1), tf.constant(self.phase, dtype=self.dtype))
     return tf.sin((2 * np.pi) * (ind + phase))

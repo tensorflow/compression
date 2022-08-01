@@ -96,7 +96,7 @@ class Sawbridge(tfp.distributions.Distribution):
 
   def _sample_n(self, n, seed=None):
     if self.drop is None:
-      uniform = tf.random.uniform(
+      uniform = tf.random.stateless_uniform(
           (self.order, n, 1), seed=seed, dtype=self.dtype)
     else:
       uniform = tf.fill(
@@ -104,7 +104,7 @@ class Sawbridge(tfp.distributions.Distribution):
     ind = self.index_points
     if self.stationary:
       if self.phase is None:
-        phase = tf.random.uniform((n, 1), seed=seed, dtype=self.dtype)
+        phase = tf.random.stateless_uniform((n, 1), seed=seed, dtype=self.dtype)
       else:
         phase = tf.constant(self.phase, dtype=self.dtype)
       ind += phase

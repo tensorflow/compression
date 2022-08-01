@@ -73,10 +73,11 @@ class Sphere(tfp.distributions.Distribution):
     return tf.TensorShape([self.order])
 
   def _sample_n(self, n, seed=None):
-    samples = tf.random.normal((n, self.order), seed=seed, dtype=self.dtype)
+    samples = tf.random.stateless_normal(
+        (n, self.order), seed=seed, dtype=self.dtype)
     radius = tf.math.sqrt(tf.reduce_sum(tf.square(samples), -1, keepdims=True))
     if self.width:
-      radius *= tf.random.uniform(
+      radius *= tf.random.stateless_uniform(
           (n, 1), minval=1. - self.width / 2., maxval=1. + self.width / 2.,
           seed=seed, dtype=self.dtype)
     return samples / radius
