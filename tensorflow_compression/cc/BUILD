@@ -21,7 +21,6 @@ cc_binary(
         "-std=c++17",
     ],
     linkshared = 1,
-    linkstatic = 0,
     visibility = ["//visibility:public"],
     deps = [
         # When building this binary together with TensorFlow, i.e., when using

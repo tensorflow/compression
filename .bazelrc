@@ -1,0 +1,2 @@
+# This flag is required for CUDA repo that @org_tensorflow depends on.
+common --experimental_repo_remote_exec
