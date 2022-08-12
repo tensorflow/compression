@@ -23,9 +23,8 @@ import tempfile
 import setuptools
 
 # Version string is intentionally set to non-numeric value, so that non-release
-# built packages are different from release packages. During builds for formal
-# releases, we should temporarily change this value to pip release version.
-__version__ = "custom-build-from-source"
+# built packages are different from release packages.
+DEFAULT_VERSION = "custom-build-from-source"
 
 
 class BinaryDistribution(setuptools.Distribution):
@@ -35,7 +34,7 @@ class BinaryDistribution(setuptools.Distribution):
     return True
 
 
-def main(srcdir):
+def main(srcdir: str, destdir: str, version: str = ""):
   tempdir = tempfile.mkdtemp()
   atexit.register(shutil.rmtree, tempdir)
 
@@ -58,7 +57,7 @@ def main(srcdir):
   os.chdir(tempdir)
   setuptools.setup(
       name="tensorflow_compression",
-      version=__version__,
+      version=version or DEFAULT_VERSION,
       description="Data compression in TensorFlow",
       url="https://tensorflow.github.io/compression/",
       author="Google LLC",
@@ -95,13 +94,12 @@ def main(srcdir):
                 "python deep-learning deep-neural-networks neural-network ml")
   )
 
-  destdir = "/tmp/tensorflow_compression"
-  print("=== Copying wheel to " + destdir)
-  if not os.path.exists(destdir): os.mkdir(destdir)
+  print("=== Copying wheel to:", destdir)
+  os.makedirs(destdir, exist_ok=True)
   for path in glob.glob(os.path.join(tempdir, "dist", "*.whl")):
-    print("Copying into " + os.path.join(destdir, os.path.basename(path)))
-    shutil.copy(path, destdir)
+    print("Copied into:", shutil.copy(path, destdir))
 
 
 if __name__ == "__main__":
-  main(sys.argv[1] if len(sys.argv) > 1 else "")
+  main(*sys.argv[1:])  # pylint: disable=no-value-for-parameter
+
