@@ -246,32 +246,45 @@ This section describes the necessary steps to build your own pip packages of
 TensorFlow Compression. This may be necessary to install it on platforms for
 which we don't provide precompiled binaries (currently only Linux and Darwin).
 
-You can use the custom-op Docker images (e.g.
-`tensorflow/tensorflow:nightly-custom-op-ubuntu16`) for building pip packages
-for Linux. Note that this is different from `tensorflow/tensorflow:devel`. To be
-compatible with the TensorFlow pip package, the GCC version must match, but
-`tensorflow/tensorflow:devel` has a different GCC version installed. For more
-information, refer to the [custom-op
-instructions](https://github.com/tensorflow/custom-op).
+To be compatible with the official TensorFlow pip package, the TFC pip package
+must be linked against a matching version of the C libraries. For this reason,
+to build the official Linux pip packages, we use [these Docker
+images](https://hub.docker.com/r/tensorflow/build) and use the same toolchain
+that TensorFlow uses.
 
-Inside a Docker container from the image, the following steps need to be taken.
+Inside the Docker container, the following steps need to be taken:
 
 1. Clone the `tensorflow/compression` repo from GitHub.
-2. Run `:build_pip_pkg` inside the cloned repo.
+2. Install Python dependencies.
+3. Run `:build_pip_pkg` inside the cloned repo.
 
 For example:
 
 ```bash
-sudo docker run -v /tmp/tensorflow_compression:/tmp/tensorflow_compression \
-    tensorflow/tensorflow:nightly-custom-op-ubuntu16 bash -c \
-    "git clone https://github.com/tensorflow/compression.git
-         /tensorflow_compression &&
+sudo docker run -i --rm -v /tmp/tensorflow_compression:/tmp/tensorflow_compression \
+    tensorflow/build:latest-python3.10 bash -c \
+    "git clone https://github.com/tensorflow/compression.git /tensorflow_compression &&
      cd /tensorflow_compression &&
-     bazel run -c opt --copt=-mavx :build_pip_pkg"
+     python -m pip install -U pip setuptools wheel &&
+     python -m pip install -r requirements.txt &&
+     bazel build -c opt --copt=-mavx --crosstool_top=@ubuntu20.04-gcc9_manylinux2014-cuda11.2-cudnn8.1-tensorrt7.2_config_cuda//crosstool:toolchain :build_pip_pkg
+     python build_pip_pkg.py bazel-bin/build_pip_pkg.runfiles/tensorflow_compression /tmp/tensorflow_compression custom_version"
 ```
 
-The wheel file is created inside `/tmp/tensorflow_compression`. Optimization
-flags can be passed via `--copt` to the `bazel run` command above.
+For Darwin, the Docker image and specifying the toolchain is not necessary. We
+just build the package like this (note that you may want to create a clean
+Python virtual environment to do this):
+
+```bash
+git clone https://github.com/tensorflow/compression.git /tensorflow_compression
+cd /tensorflow_compression
+python -m pip install -U pip setuptools wheel
+python -m pip install -r requirements.txt
+bazel build -c opt --copt=-mavx --macos_minimum_os=10.14 :build_pip_pkg
+python build_pip_pkg.py bazel-bin/build_pip_pkg.runfiles/tensorflow_compression /tmp/tensorflow_compression custom_version"
+```
+
+In both cases, the wheel file is created inside `/tmp/tensorflow_compression`.
 
 To test the created package, first install the resulting wheel file:
 
@@ -296,9 +309,6 @@ When done, you can uninstall the pip package again:
 pip uninstall tensorflow-compression
 ```
 
-To build packages for Darwin (and potentially other platforms), you can follow
-the same steps, but the Docker image should not be necessary.
-
 ## Evaluation
 
 We provide evaluation results for several image compression methods in terms of
@@ -314,7 +324,7 @@ If you use this library for research purposes, please cite:
   author = "Ballé, Johannes and Hwang, Sung Jin and Agustsson, Eirikur",
   title = "{T}ensor{F}low {C}ompression: Learned Data Compression",
   url = "http://github.com/tensorflow/compression",
-  version = "2.9.1",
+  version = "2.9.2",
   year = "2022",
 }
 ```
