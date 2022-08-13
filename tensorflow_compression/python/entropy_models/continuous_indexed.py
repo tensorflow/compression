@@ -189,8 +189,9 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         computations. Defaults to `tf.float32`.
       decode_sanity_check: Boolean. If `True`, an raises an error if the binary
         strings passed into `decompress` are not completely decoded.
-      laplace_tail_mass: Float. If non-zero, will augment the prior with a
-        `NoisyLaplace` mixture component for training stability. (experimental)
+      laplace_tail_mass: Float, or a float-valued tf.Tensor. If positive,
+        will augment the prior with a `NoisyLaplace` mixture component for
+        training stability. (experimental)
     """
     if not callable(prior_fn):
       raise TypeError("`prior_fn` must be a class or factory function.")
@@ -496,8 +497,9 @@ class LocationScaleIndexedEntropyModel(ContinuousIndexedEntropyModel):
         Defaults to `tf.keras.mixed_precision.global_policy().compute_dtype`.
       prior_dtype: `tf.dtypes.DType`. Data type of prior and probability
         computations. Defaults to `tf.float32`.
-      laplace_tail_mass: Float. If non-zero, will augment the prior with a
-        `NoisyLaplace` mixture component for training stability. (experimental)
+      laplace_tail_mass: Float, or a float-valued tf.Tensor. If positive,
+        will augment the prior with a `NoisyLaplace` mixture component for
+        training stability. (experimental)
     """
     num_scales = int(num_scales)
     super().__init__(

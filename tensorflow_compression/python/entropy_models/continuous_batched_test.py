@@ -241,6 +241,37 @@ class ContinuousBatchedEntropyModelTest(tf.test.TestCase,
     # Quantization noise should be between -.5 and .5
     self.assertAllClose(x, x_decoded, rtol=0., atol=.5)
 
+  def test_laplace_tail_mass(self):
+    noisy = uniform_noise.NoisyNormal(loc=0., scale=1.)
+    em = ContinuousBatchedEntropyModel(noisy, 1, laplace_tail_mass=0.0)
+    self.assertEqual(em.laplace_tail_mass, 0.0)
+    em = ContinuousBatchedEntropyModel(noisy, 1,
+                                       laplace_tail_mass=tf.constant(1e-3))
+    self.assertEqual(em.laplace_tail_mass, tf.constant(1e-3))
+    log_prob = em._log_prob(noisy, tf.constant(0.0))
+    self.assertEqual(log_prob.dtype, tf.float32)
+
+  def test_laplace_tail_mass_works_in_tf_function(self):
+    noisy = uniform_noise.NoisyNormal(loc=0., scale=1.)
+    samples = noisy.base.sample([100])
+
+    # Since tf.function traces each function twice, and only allows variable
+    # creation in the first call, we need to have a stateful object in which we
+    # create the entropy model only the first time the function is called, and
+    # store it for the second time.
+
+    class EntropyModel:
+
+      def log_prob(self, values):
+        if not hasattr(self, "em"):
+          self.em = ContinuousBatchedEntropyModel(
+              noisy, 1, laplace_tail_mass=tf.constant(1e-3))
+        return self.em._log_prob(noisy, values)
+
+    values_eager = EntropyModel().log_prob(samples)
+    values_function = tf.function(EntropyModel().log_prob)(samples)
+    self.assertAllEqual(values_eager, values_function)
+
 
 if __name__ == "__main__":
   tf.test.main()

@@ -68,8 +68,9 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
         Elias gamma code embedded into the range coder.
       bottleneck_dtype: `tf.dtypes.DType`. Data type of bottleneck tensor.
         Defaults to `tf.keras.mixed_precision.global_policy().compute_dtype`.
-      laplace_tail_mass: Float. If non-zero, will augment the prior with a
-        `NoisyLaplace` mixture component for training stability. (experimental)
+      laplace_tail_mass: Float, or a float-valued tf.Tensor. If positive,
+        will augment the prior with a `NoisyLaplace` mixture component for
+        training stability. (experimental)
     """
     super().__init__()
     self._prior = None  # This will be set by subclasses, if appropriate.
@@ -83,14 +84,12 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
     if bottleneck_dtype is None:
       bottleneck_dtype = tf.keras.backend.floatx()
     self._bottleneck_dtype = tf.as_dtype(bottleneck_dtype)
-    self._laplace_tail_mass = float(laplace_tail_mass)
+    self._laplace_tail_mass = laplace_tail_mass
 
     if self.coding_rank < 0:
       raise ValueError("`coding_rank` must be at least 0.")
     if not 0 < self.tail_mass < 1:
       raise ValueError("`tail_mass` must be between 0 and 1.")
-    if not 0 <= self.laplace_tail_mass < 1:
-      raise ValueError("`laplace_tail_mass` must be between 0 and 1.")
 
   def _check_compression(self):
     if not self.compression:
@@ -299,23 +298,41 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
   def _log_prob(self, prior, bottleneck_perturbed):
     """Evaluates prior.log_prob(bottleneck + noise)."""
     bottleneck_perturbed = tf.cast(bottleneck_perturbed, prior.dtype)
-    if self.laplace_tail_mass:
+    laplace_tail_mass = self.laplace_tail_mass
+
+    def mixture_log_prob_fn():
+      tf.debugging.assert_less(
+          laplace_tail_mass,
+          tf.constant(1.0, prior.dtype),
+          message="`laplace_tail_mass` must be less than 1.")
       laplace_prior = uniform_noise.NoisyLaplace(
           loc=tf.constant(0, dtype=prior.dtype),
           scale=tf.constant(1, dtype=prior.dtype))
       probs = prior.prob(bottleneck_perturbed)
-      probs = ((1 - self.laplace_tail_mass) * probs +
-               self.laplace_tail_mass *
+      probs = ((1 - laplace_tail_mass) * probs +
+               laplace_tail_mass *
                laplace_prior.prob(bottleneck_perturbed))
       probs_too_small = probs < 1e-10
       probs_bounded = tf.maximum(probs, 1e-10)
       return tf.where(
           probs_too_small,
-          tf.math.log(self.laplace_tail_mass) +
+          tf.math.log(laplace_tail_mass) +
           laplace_prior.log_prob(bottleneck_perturbed),
           tf.math.log(probs_bounded))
+
+    prior_log_prob_fn = lambda: prior.log_prob(bottleneck_perturbed)
+
+    if isinstance(laplace_tail_mass, tf.Tensor):
+      # Do all the computation in tf (graph mode compatible).
+      laplace_tail_mass = tf.cast(laplace_tail_mass, prior.dtype)
+      use_laplace_tail_mass = tf.greater(laplace_tail_mass, 0.0)
+      return tf.cond(use_laplace_tail_mass, mixture_log_prob_fn,
+                     prior_log_prob_fn)
     else:
-      return prior.log_prob(bottleneck_perturbed)
+      if laplace_tail_mass > 0:
+        return mixture_log_prob_fn()
+      else:
+        return prior_log_prob_fn()
 
   @abc.abstractmethod
   def get_config(self):
@@ -340,7 +357,7 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
         tail_mass=self.tail_mass,
         cdf_shapes=(self.cdf.shape[0], self.cdf_offset.shape[0]),
         bottleneck_dtype=self.bottleneck_dtype.name,
-        laplace_tail_mass=self.laplace_tail_mass,
+        laplace_tail_mass=float(self.laplace_tail_mass),
     )
 
   def get_weights(self):
