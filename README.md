@@ -6,8 +6,10 @@ You can use this library to build your own ML models with end-to-end optimized
 data compression built in. It's useful to find storage-efficient representations
 of your data (images, features, examples, etc.) while only sacrificing a small
 fraction of model performance. Take a look at the [lossy data compression
-tutorial](https://www.tensorflow.org/tutorials/generative/data_compression) to
-get started.
+tutorial](https://www.tensorflow.org/tutorials/generative/data_compression) or
+the [model compression
+tutorial](https://www.tensorflow.org/tutorials/optimization/compression) to get
+started.
 
 For a more in-depth introduction from a classical data compression perspective,
 consider our [paper on nonlinear transform
