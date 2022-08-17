@@ -95,7 +95,7 @@ installed TensorFlow version. Run it in a cell before executing your Python
 code:
 
 ```
-!pip install tensorflow-compression~=$(pip show tensorflow | perl -p -0777 -e 's/.*Version: (\\d\\.\\d).*/\\1.0/sg')
+!pip install tensorflow-compression~=$(pip show tensorflow | perl -p -0777 -e 's/.*Version: (\\d+\\.\\d+).*/\\1.0/sg')
 ```
 
 Note: The binary packages of TFC are tied to TF with the same minor version
