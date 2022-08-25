@@ -35,13 +35,9 @@ limitations under the License.
 #include "tensorflow/core/graph/node_builder.h"
 #include "tensorflow/core/graph/testlib.h"
 #include "tensorflow/core/kernels/ops_testutil.h"
-#include "tensorflow/core/lib/core/bits.h"
 #include "tensorflow/core/lib/core/status_test_util.h"
-#include "tensorflow/core/lib/random/simple_philox.h"
 #include "tensorflow/core/platform/stacktrace_handler.h"
 #include "tensorflow/core/platform/test.h"
-#include "tensorflow/core/public/session.h"
-#include "tensorflow/core/public/session_options.h"
 #include "tensorflow_compression/cc/lib/bit_coder.h"
 
 namespace tensorflow_compression {
@@ -198,17 +194,17 @@ TEST_F(BitCodingOpsTest, ManualEncodeWithBitcodingLibrary) {
   TF_ASSERT_OK(RunEncodeOp({data_tensor}, &code_tensor));
 
   // Use bitcoding library to encode data.
-  BitWriter enc_ = BitWriter();
-  enc_.Allocate(16);
+  BitWriter enc_ = BitWriter(16);
   enc_.WriteGamma(2);   // one zero
   enc_.WriteOneBit(0);  // negative
   enc_.WriteGamma(3);   // 3
   enc_.WriteGamma(1);   // no zeros
   enc_.WriteOneBit(1);  // positive
   enc_.WriteGamma(1);   // 1
-  enc_.ZeroPadToByte();
   Tensor expected_code_tensor(DT_STRING, {});
-  expected_code_tensor.scalar<tstring>()().assign(enc_.GetData(), 2);
+  auto encoded = enc_.GetData();
+  expected_code_tensor.scalar<tstring>()().assign(encoded.data(),
+                                                  encoded.size());
 
   // Check that code_tensor has expected value.
   test::ExpectTensorEqual<tstring>(code_tensor, expected_code_tensor);
@@ -216,8 +212,7 @@ TEST_F(BitCodingOpsTest, ManualEncodeWithBitcodingLibrary) {
 
 TEST_F(BitCodingOpsTest, ManualDecodeWithBitcodingLibrary) {
   // Use bitcoding library to manually encode [-3, 1, 0, 0] into code.
-  BitWriter enc_ = BitWriter();
-  enc_.Allocate(16);
+  BitWriter enc_ = BitWriter(16);
   enc_.WriteGamma(1);   // no zeros
   enc_.WriteOneBit(0);  // negative
   enc_.WriteGamma(3);   // 3
@@ -225,9 +220,9 @@ TEST_F(BitCodingOpsTest, ManualDecodeWithBitcodingLibrary) {
   enc_.WriteOneBit(1);  // positive
   enc_.WriteGamma(1);   // 1
   enc_.WriteGamma(3);   // two zeros
-  enc_.ZeroPadToByte();
   Tensor code_tensor(DT_STRING, {});
-  code_tensor.scalar<tstring>()().assign(enc_.GetData(), 2);
+  auto encoded = enc_.GetData();
+  code_tensor.scalar<tstring>()().assign(encoded.data(), encoded.size());
 
   Tensor shape_tensor(DT_INT32, {1});
   shape_tensor.flat<int32_t>().setValues({4});
@@ -242,7 +237,6 @@ TEST_F(BitCodingOpsTest, ManualDecodeWithBitcodingLibrary) {
   test::ExpectTensorEqual<int32_t>(data_tensor, expected_data_tensor);
 }
 
-// TODO(nicolemitchell) Strengthen these consistency checks.
 TEST_F(BitCodingOpsTest, EncodeConsistent) {
   Tensor data_tensor(DT_INT32, {4});
   data_tensor.flat<int32_t>().setValues({-6, 3, 0, 0});
@@ -259,7 +253,6 @@ TEST_F(BitCodingOpsTest, EncodeConsistent) {
 }
 
 TEST_F(BitCodingOpsTest, DecodeConsistent) {
-  // Manually encode some data into code.
   char code[] = {0b11010001, 0b01101101};  // [-6, 3, 0, 0]
 
   Tensor code_tensor(DT_STRING, {});
@@ -277,6 +270,14 @@ TEST_F(BitCodingOpsTest, DecodeConsistent) {
   // Check that decoded data has expected values.
   test::ExpectTensorEqual<int32_t>(data_tensor, expected_data_tensor);
 }
+
+// TODO(nicolemitchell,jonycgn) Add more corner cases to unit tests.
+// Examples: decode empty string (null pointer), decode strings that end
+// prematurely, decode long string of zeros that causes overflow in ReadGamma,
+// decode incorrect run length that exceeds tensor size, encode int32::min
+// tensor, encode tensor with very large values to ensure it doesn't exceed
+// allocated buffer, encode gamma values <= 0, ...
+
 }  // namespace
 }  // namespace tensorflow_compression
 

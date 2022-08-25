@@ -16,6 +16,7 @@ limitations under the License.
 
 #include <algorithm>
 #include <array>
+#include <cassert>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -28,10 +29,8 @@ limitations under the License.
 #include "tensorflow/core/framework/tensor.h"
 #include "tensorflow/core/framework/tensor_shape.h"
 #include "tensorflow/core/framework/tensor_types.h"
-#include "tensorflow/core/lib/core/errors.h"
-#include "tensorflow/core/lib/core/status.h"
 #include "tensorflow/core/platform/logging.h"
-#include "tensorflow/core/platform/macros.h"
+#include "tensorflow/core/platform/status.h"
 #include "tensorflow/core/platform/types.h"
 #include "tensorflow_compression/cc/lib/bit_coder.h"
 
@@ -39,6 +38,7 @@ namespace tensorflow_compression {
 namespace {
 namespace errors = tensorflow::errors;
 using tensorflow::DEVICE_CPU;
+using tensorflow::FromAbslStatus;
 using tensorflow::OpKernel;
 using tensorflow::OpKernelConstruction;
 using tensorflow::OpKernelContext;
@@ -69,25 +69,28 @@ class RunLengthGammaEncodeOp : public OpKernel {
     // any zeros were present in the input array, then the encoded size would be
     // strictly smaller by kMaxGammaBits and bigger by the difference in
     // encoding (the existing zero run length + 1).
-    BitWriter enc;
-    enc.Allocate(data.size() * (2 + enc.kMaxGammaBits));
+    BitWriter enc(data.size() * (2 + enc.kMaxGammaBits));
     // Save number of zeros + 1 preceding next non-zero element.
     uint32_t zero_ct = 1;
 
     // Iterate through data tensor.
-    for (size_t i = 0; i < data.size(); i++) {
+    for (int64_t i = 0; i < data.size(); i++) {
+      int32_t sample = data(i);
       // Increment zero count.
-      if (data(i) == 0) {
+      if (sample == 0) {
         zero_ct += 1;
       } else {
         // Encode run length of zeros.
         enc.WriteGamma(zero_ct);
         // Encode sign of value.
-        enc.WriteOneBit(data(i) > 0);
+        enc.WriteOneBit(sample > 0);
         // Encode magnitude of value.
-        DCHECK_NE(data(i), std::numeric_limits<int32_t>::min());
-        enc.WriteGamma(std::abs(data(i)));
-        // Reset zero count (1 because Gamma cannot encode 0).
+        if (sample == std::numeric_limits<int32_t>::min()) {
+          // We can't encode int32 minimum. Encode closest value instead.
+          sample += 1;
+        }
+        enc.WriteGamma(std::abs(sample));
+        // Reset zero count (1 because gamma cannot encode 0).
         zero_ct = 1;
       }
     }
@@ -95,10 +98,9 @@ class RunLengthGammaEncodeOp : public OpKernel {
       enc.WriteGamma(zero_ct);
     }
 
-    // Pad any remaining bits in last byte with 0.
-    enc.ZeroPadToByte();
     // Write encoded bitstring to code.
-    code->assign(enc.GetData(), enc.GetBytesWritten());
+    auto encoded = enc.GetData();
+    code->assign(encoded.data(), encoded.size());
   }
 };
 
@@ -137,32 +139,33 @@ class RunLengthGammaDecodeOp : public OpKernel {
     // Fill data tensor with zeros.
     std::memset(data.data(), 0, data.size() * sizeof(data(0)));
 
-    for (size_t i = 0; i < data.size(); i++) {
+    for (int64_t i = 0; i < data.size(); i++) {
       // Get number of zeros.
-      uint32_t num_zeros = dec.ReadGamma();
+      auto num_zeros = dec.ReadGamma();
+      OP_REQUIRES(context, num_zeros.ok(), FromAbslStatus(num_zeros.status()));
+
       // Advance the index to the next non-zero element.
-      i += num_zeros - 1;
+      i += *num_zeros - 1;
 
       // Account for case where the last element is zero.
-      if (i == data.size()) {
+      // Check if past the last element.
+      if (i >= data.size()) {
+        OP_REQUIRES(context, i == data.size(),
+                    errors::DataLoss("Decoded past end of tensor."));
         break;
       }
-      // TODO(nicolemitchell): return error status instead of crashing
-      DCHECK_LT(i, data.size());
 
       // Get sign of value.
-      uint32_t positive = dec.ReadOneBit();
+      auto positive = dec.ReadOneBit();
+      OP_REQUIRES(context, positive.ok(), FromAbslStatus(positive.status()));
 
-      // Get value.
-      uint32_t value = dec.ReadGamma();
+      // Get magnitude.
+      auto magnitude = dec.ReadGamma();
+      OP_REQUIRES(context, magnitude.ok(), FromAbslStatus(magnitude.status()));
 
       // Write value to data tensor element at index.
-      DCHECK_LE(value, std::numeric_limits<int32_t>::max());
-      data(i) = positive ? value : -static_cast<int32_t>(value);
+      data(i) = *positive ? *magnitude : -*magnitude;
     }
-
-    OP_REQUIRES(context, dec.Close().ok(),
-                tensorflow::errors::DataLoss("Decoding error."));
   }
 };
 

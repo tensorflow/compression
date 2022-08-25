@@ -20,60 +20,48 @@ limitations under the License.
 #include <string>
 #include <type_traits>
 
-#include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/span.h"
-#include "tensorflow/core/platform/logging.h"
 
 // TODO(nicolemitchell) inline commonly used methods for performance reasons.
 namespace tensorflow_compression {
 
 class BitWriter {
  public:
-  BitWriter() = default;
-  void Allocate(size_t maximum_bit_size);
+  BitWriter(size_t maximum_bit_size);
+  void WriteBits(uint32_t count, uint64_t bits);
   void WriteOneBit(uint64_t bit);
-  void WriteGamma(uint32_t value);
-  void ZeroPadToByte();
-  char* GetData();
-  size_t GetBytesWritten();
+  void WriteGamma(int32_t value);
+  absl::string_view GetData();
 
-  // Encoding an int32_t value requires max 64 bits.
-  static constexpr int32_t kMaxGammaBits = 64;
+  // WriteGamma() encodes integers to 2n - 1 bits, where n is the bit width of
+  // the integer. For int32_t (> 0), n <= 31.
+  static constexpr size_t kMaxGammaBits = 61;
+  // After each WriteBits(), the buffer contains a maximum of 7 bits. So we can
+  // safely put 57 more bits to fill the buffer.
   static constexpr size_t kMaxBitsPerCall = 57;
 
-
  private:
-  void WriteBits(uint32_t count, uint64_t bits);
-
   std::unique_ptr<char[]> data_;
-  size_t bytes_written_ = 0;
-  size_t bits_in_buffer_ = 0;
-  uint64_t buffer_ = 0;
+  char* next_byte_;
+  size_t bits_in_buffer_;
+  uint64_t buffer_;
 };
 
 class BitReader {
  public:
-  BitReader(const absl::string_view bytes);
-  void Refill();
-  uint64_t ReadOneBit();
-  uint32_t ReadGamma();
-  size_t TotalBitsConsumed() const;
-  size_t TotalBytes() const;
-  absl::Status Close();
-
-  static constexpr size_t kMaxBitsPerCall = 56;
+  BitReader(const absl::string_view data);
+  absl::StatusOr<uint64_t> ReadBits(size_t count);
+  absl::StatusOr<uint64_t> ReadOneBit();
+  absl::StatusOr<int32_t> ReadGamma();
 
  private:
-  uint64_t ReadBits(size_t nbits);
+  void Refill();
 
-  uint64_t buf_;
-  size_t bits_in_buf_;  // [0, 64)
   const char* next_byte_;
-  const char* end_minus_8_;  // for refill bounds check
-  const char* first_byte_;
-  uint64_t bits_consumed_{0};
-  bool close_called_{false};
+  const char* end_byte_;
+  size_t bits_in_buffer_;
+  uint64_t buffer_;
 };
 }  // namespace tensorflow_compression
 
