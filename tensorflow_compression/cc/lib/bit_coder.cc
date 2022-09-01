@@ -18,6 +18,7 @@ limitations under the License.
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 
 #include "absl/base/internal/endian.h"
 #include "absl/status/status.h"
@@ -26,13 +27,16 @@ namespace tensorflow_compression {
 
 BitWriter::BitWriter(size_t maximum_bit_size)
     // We write 8 bytes at a time, so we might over-write by 8 bytes.
-    : data_(std::make_unique<char[]>(maximum_bit_size / 8 + 8)),
+    // +1 byte since we need to round bits *up* to bytes.
+    : data_(std::make_unique<char[]>(maximum_bit_size / 8 + 9)),
       next_byte_(data_.get()),
       bits_in_buffer_(0),
       buffer_(0) {}
 
 void BitWriter::WriteBits(uint32_t count, uint64_t bits) {
-  assert(count <= kMaxBitsPerCall);  // Max remaining room in buffer.
+  assert(count <= kMaxBitsPerCall);
+  // This implementation relies on the unused MSBs in `bits` to be zero.
+  assert(!(bits & (std::numeric_limits<uint64_t>::max() << count)));
   buffer_ |= bits << bits_in_buffer_;
   bits_in_buffer_ += count;
   absl::little_endian::Store64(next_byte_, buffer_);
