@@ -35,8 +35,9 @@ BitWriter::BitWriter(size_t maximum_bit_size)
 
 void BitWriter::WriteBits(uint32_t count, uint64_t bits) {
   assert(count <= kMaxBitsPerCall);
-  // This implementation relies on the unused MSBs in `bits` to be zero.
-  assert(!(bits & (std::numeric_limits<uint64_t>::max() << count)));
+  // This implementation assumes unwritten MSBs in the buffer are zero.
+  // Clear the unused MSBs in bits first, then "or" it into the buffer.
+  bits &= (uint64_t{1} << count) - 1;
   buffer_ |= bits << bits_in_buffer_;
   bits_in_buffer_ += count;
   absl::little_endian::Store64(next_byte_, buffer_);
@@ -54,7 +55,7 @@ void BitWriter::WriteGamma(int32_t value) {
   WriteBits(n - 1, 0);
   // Must write most significant bit first.
   WriteBits(1, 1);
-  WriteBits(n - 1, value - (1 << (n - 1)));
+  WriteBits(n - 1, value);
 }
 
 absl::string_view BitWriter::GetData() {
