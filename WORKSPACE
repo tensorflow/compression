@@ -6,10 +6,10 @@ tensorflow_compression_workspace()
 
 http_archive(
     name = "org_tensorflow",
-    sha256 = "6eaf86ead73e23988fe192da1db68f4d3828bcdd0f3a9dc195935e339c95dbdc",
-    strip_prefix = "tensorflow-2.9.1",
+    sha256 = "b5a1bb04c84b6fe1538377e5a1f649bb5d5f0b2e3625a3c526ff3a8af88633e8",
+    strip_prefix = "tensorflow-2.10.0",
     urls = [
-        "https://github.com/tensorflow/tensorflow/archive/refs/tags/v2.9.1.tar.gz",
+        "https://github.com/tensorflow/tensorflow/archive/refs/tags/v2.10.0.tar.gz",
     ],
 )
 
@@ -25,4 +25,3 @@ tf_workspace1()
 
 load("@org_tensorflow//tensorflow:workspace0.bzl", "tf_workspace0")
 tf_workspace0()
-
