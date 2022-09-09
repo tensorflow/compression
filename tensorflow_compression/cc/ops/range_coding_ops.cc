@@ -100,7 +100,7 @@ REGISTER_OP("RangeDecode")
       ShapeHandle out;
       TF_RETURN_IF_ERROR(c->MakeShapeFromShapeTensor(1, &out));
       c->set_output(0, out);
-      return Status::OK();
+      return tensorflow::OkStatus();
     })
     .Doc(R"doc(
 Range-decodes `code` into an int32 tensor of shape `shape`.
@@ -215,7 +215,7 @@ REGISTER_OP("UnboundedIndexRangeDecode")
     .Attr("debug_level: int = 1")
     .SetShapeFn([](InferenceContext* c) {
       c->set_output(0, c->input(1));
-      return Status::OK();
+      return tensorflow::OkStatus();
     })
     .Doc(R"doc(
 Range decodes `encoded` using an indexed probability table.

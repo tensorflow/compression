@@ -54,7 +54,7 @@ Status CheckInRange(absl::string_view name, int64_t value, int64_t min,
     return errors::InvalidArgument(
         absl::Substitute("$0=$1 not in range [$2, $3)", name, value, min, max));
   }
-  return Status::OK();
+  return tensorflow::OkStatus();
 }
 
 Status ScanCDF(const int32_t* const end, const int32_t** current,
@@ -83,7 +83,7 @@ Status ScanCDF(const int32_t* const end, const int32_t** current,
     ++p;
   }
   *current = p;
-  return Status::OK();
+  return tensorflow::OkStatus();
 }
 
 Status IndexCDFVector(const TTypes<int32_t>::ConstFlat& table,
@@ -94,7 +94,7 @@ Status IndexCDFVector(const TTypes<int32_t>::ConstFlat& table,
   for (const int32_t* current = start; current != end;) {
     TF_RETURN_IF_ERROR(ScanCDF(end, &current, lookup));
   }
-  return Status::OK();
+  return tensorflow::OkStatus();
 }
 
 Status IndexCDFMatrix(const TTypes<int32_t>::ConstMatrix& table,
@@ -110,7 +110,7 @@ Status IndexCDFMatrix(const TTypes<int32_t>::ConstMatrix& table,
       return errors::InvalidArgument("CDF must end with 1 << precision.");
     }
   }
-  return Status::OK();
+  return tensorflow::OkStatus();
 }
 
 class RangeEncoderInterface final : public EntropyEncoderInterface {
@@ -129,13 +129,13 @@ class RangeEncoderInterface final : public EntropyEncoderInterface {
     } else {
       OverflowEncode(row, value);
     }
-    return Status::OK();
+    return tensorflow::OkStatus();
   }
 
   Status Finalize(std::string* sink) override {
     encoder_.Finalize(&encoded_);
     *sink = std::move(encoded_);
-    return Status::OK();
+    return tensorflow::OkStatus();
   }
 
  private:
@@ -193,14 +193,14 @@ class RangeDecoderInterface final : public EntropyDecoderInterface {
     } else {
       *output = OverflowDecode(row);
     }
-    return Status::OK();
+    return tensorflow::OkStatus();
   }
 
   Status Finalize() override {
     if (!decoder_.Finalize()) {
       return errors::DataLoss("RangeDecoder returned an error status");
     }
-    return Status::OK();
+    return tensorflow::OkStatus();
   }
 
  private:
@@ -318,7 +318,7 @@ class EntropyEncodeChannelOp : public tensorflow::OpKernel {
           "'value' shape should start with 'handle' shape: value.shape=",
           value_shape, " does not start with handle.shape=", handle_shape);
     }
-    return tensorflow::Status::OK();
+    return tensorflow::OkStatus();
   }
 
   void Compute(tensorflow::OpKernelContext* context) override {
@@ -419,7 +419,7 @@ class EntropyEncodeIndexOp : public tensorflow::OpKernel {
           index_shape, " does not start with handle.shape=", handle_shape);
     }
 
-    return tensorflow::Status::OK();
+    return tensorflow::OkStatus();
   }
 
   void Compute(tensorflow::OpKernelContext* context) override {
@@ -576,7 +576,7 @@ class EntropyDecodeChannelOp : public tensorflow::OpKernel {
         tensorflow::tensor::MakeShape(context->input(1), &suffix_shape));
     *output_shape = context->input(0).shape();
     output_shape->AppendShape(suffix_shape);
-    return tensorflow::Status::OK();
+    return tensorflow::OkStatus();
   }
 
   void Compute(tensorflow::OpKernelContext* context) override {
@@ -678,7 +678,7 @@ class EntropyDecodeIndexOp : public tensorflow::OpKernel {
           ", shape=", suffix_shape);
     }
 
-    return tensorflow::Status::OK();
+    return tensorflow::OkStatus();
   }
 
   void Compute(tensorflow::OpKernelContext* context) override {

@@ -93,10 +93,12 @@ class Y4MDatasetOp : public DatasetOpKernel {
     string DebugString() const override { return "Y4MDatasetOp::Dataset"; }
 
     Status InputDatasets(vector<const DatasetBase*>* inputs) const override {
-      return Status::OK();
+      return tensorflow::OkStatus();
     }
 
-    Status CheckExternalState() const override { return Status::OK(); }
+    Status CheckExternalState() const override {
+      return tensorflow::OkStatus();
+    }
 
    protected:
     Status AsGraphDefInternal(SerializationContext* ctx,
@@ -105,7 +107,7 @@ class Y4MDatasetOp : public DatasetOpKernel {
       Node* filenames = nullptr;
       TF_RETURN_IF_ERROR(b->AddVector(filenames_, &filenames));
       TF_RETURN_IF_ERROR(b->AddDataset(this, {filenames}, output));
-      return Status::OK();
+      return tensorflow::OkStatus();
     }
 
    private:
@@ -197,7 +199,7 @@ class Y4MDatasetOp : public DatasetOpKernel {
           // Exit if there are no more files to process.
           if (file_index_ >= dataset()->filenames_.size()) {
             *end_of_sequence = true;
-            return Status::OK();
+            return tensorflow::OkStatus();
           }
 
           // Open next file.
@@ -225,7 +227,7 @@ class Y4MDatasetOp : public DatasetOpKernel {
         TF_RETURN_IF_ERROR(
             writer->WriteScalar(full_name("file_pos"), file_pos));
 
-        return Status::OK();
+        return tensorflow::OkStatus();
       }
 
       Status RestoreInternal(
@@ -250,7 +252,7 @@ class Y4MDatasetOp : public DatasetOpKernel {
                                          chroma_format_));
           file_pos_ = file_pos;
         }
-        return Status::OK();
+        return tensorflow::OkStatus();
       }
 
      private:
@@ -278,7 +280,7 @@ class Y4MDatasetOp : public DatasetOpKernel {
               std::memcpy(&header[offset], chunk.data(), pos + 1);
             }
             header.resize(offset + pos + 1);
-            return Status::OK();
+            return tensorflow::OkStatus();
           }
           // We reached the end of the file, and the header is not complete.
           if (!status.ok()) {
@@ -390,7 +392,7 @@ class Y4MDatasetOp : public DatasetOpKernel {
               "Input file '", dataset()->filenames_[file_index],
               "' has 4:2:0 chroma format, but odd width or height.");
         }
-        return Status::OK();
+        return tensorflow::OkStatus();
       }
 
       mutex mu_;

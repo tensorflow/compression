@@ -130,7 +130,7 @@ class RangeCoderOpsTest : public OpsTestBase {
     *output = *GetOutput(0);
     inputs_.clear();
 
-    return Status::OK();
+    return tensorflow::OkStatus();
   }
 
   Status RunDecodeOp(int precision, absl::Span<const Tensor> input,
@@ -166,7 +166,7 @@ class RangeCoderOpsTest : public OpsTestBase {
     *output = *GetOutput(0);
     inputs_.clear();
 
-    return Status::OK();
+    return tensorflow::OkStatus();
   }
 
   void TestEncodeAndDecode(int precision, const Tensor& data,

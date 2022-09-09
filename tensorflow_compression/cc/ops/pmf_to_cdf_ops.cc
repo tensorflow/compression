@@ -37,7 +37,7 @@ REGISTER_OP("PmfToQuantizedCdf")
       ShapeHandle out;
       TF_RETURN_IF_ERROR(c->ReplaceDim(in, -1, last, &out));
       c->set_output(0, out);
-      return Status::OK();
+      return tensorflow::OkStatus();
     })
     .Doc(R"doc(
 Converts a PMF into a quantized CDF for range coding.
