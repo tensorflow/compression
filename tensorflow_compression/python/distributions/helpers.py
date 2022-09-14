@@ -57,32 +57,48 @@ def estimate_tails(func, target, shape, dtype):
     shape = tf.convert_to_tensor(shape, tf.int32)
     target = tf.convert_to_tensor(target, dtype)
 
-    def loop_cond(tails, m, v, count):
-      del tails, m, v  # unused
-      return tf.reduce_min(count) < 100
+    def loop_cond(tails, m, v, loss, count, best_tails, best_loss):
+      del tails, m, v, best_tails, best_loss  # unused
+      # By checking `loss`, we catch NaNs and protect against infinite loops
+      # from perfect initial guesses where there is no zero-crossing.
+      return tf.logical_and(tf.reduce_max(loss) > 1e-8,
+                            tf.reduce_min(count) < 100)
 
-    def loop_body(tails, prev_m, prev_v, count):
+    def loop_body(tails, prev_m, prev_v, loss, count, best_tails, best_loss):
+      del loss  # always recomputed
       with tf.GradientTape(watch_accessed_variables=False) as tape:
         tape.watch(tails)
         loss = abs(func(tails) - target)
+
+      # Keep track of the best (lowest loss) value so far.
+      condition = (loss < best_loss)
+      best_tails = tf.where(condition, tails, best_tails)
+      best_loss = tf.where(condition, loss, best_loss)
+
       grad = tape.gradient(loss, tails)
       m = (prev_m + grad) / 2  # Adam mean estimate.
       v = (prev_v + tf.square(grad)) / 2  # Adam variance estimate.
-      tails -= .1 * m / (tf.sqrt(v) + 1e-20)
+
+      # Reduce learning rate as count increases. This should lead to a more
+      # accurate final value.
+      k = tf.math.sqrt(tf.cast(count + 1, m.dtype))
+      tails -= 0.1 * m / (k * tf.sqrt(v) + 1e-20)
+
       # Start counting when the gradient flips sign. Since the function is
       # monotonic, m must have the same sign in all initial iterations, until
       # the optimal point is crossed. At that point the gradient flips sign.
-      count = tf.where(
-          tf.math.logical_or(count > 0, prev_m * grad < 0),
-          count + 1, count)
-      return tails, m, v, count
+      count = tf.where(tf.math.logical_or(count > 0, prev_m * grad < 0),
+                       count + 1, count)
+      return tails, m, v, loss, count, best_tails, best_loss
 
     init_tails = tf.zeros(shape, dtype=dtype)
     init_m = tf.zeros(shape, dtype=dtype)
     init_v = tf.ones(shape, dtype=dtype)
+    init_loss = init_v * dtype.max
     init_count = tf.zeros(shape, dtype=tf.int32)
-    return tf.while_loop(
-        loop_cond, loop_body, (init_tails, init_m, init_v, init_count))[0]
+    loop_vars = (init_tails, init_m, init_v, init_loss, init_count,
+                 init_tails, init_loss)
+    return tf.while_loop(loop_cond, loop_body, loop_vars)[-2]
 
 
 def quantization_offset(distribution):

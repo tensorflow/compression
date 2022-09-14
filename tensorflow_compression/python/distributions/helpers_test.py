@@ -22,6 +22,16 @@ from tensorflow_compression.python.distributions import helpers
 
 class HelpersTest(tf.test.TestCase):
 
+  def test_nan_terminates(self):
+    # Return a NaN tensor that would otherwise have a gradient wrt x.
+    func = lambda x: tf.math.tanh(x) * float("nan")
+    helpers.estimate_tails(func, target=0.5, shape=(), dtype=tf.float32)
+
+  def test_perfect_initial_guess_terminates(self):
+    # The initial guess is zero, which causes problems if the minimum is also
+    # at zero since then there's no zero-crossing to trigger the count.
+    helpers.estimate_tails(tf.math.tanh, target=0.0, shape=(), dtype=tf.float32)
+
   def test_cauchy_quantizes_to_mode_decimal_part(self):
     dist = tfp.distributions.Cauchy(loc=1.4, scale=3.)
     self.assertAllClose(helpers.quantization_offset(dist), 0.4)
