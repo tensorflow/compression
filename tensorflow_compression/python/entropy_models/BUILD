@@ -95,6 +95,7 @@ py_library(
 
 py_test(
     name = "universal_test",
+    timeout = "long",
     srcs = ["universal_test.py"],
     shard_count = 3,
     deps = [
