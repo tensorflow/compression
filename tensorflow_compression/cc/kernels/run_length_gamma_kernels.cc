@@ -67,14 +67,7 @@ class RunLengthGammaEncodeOp : public OpKernel {
                    context->allocate_output(0, TensorShape{}, &code_tensor));
     tstring* code = &code_tensor->scalar<tstring>()();
 
-    // Initialize bit encoder and ensure it allocates more than enough bits.
-    // The maximum code length is achieved when there are no zeros in the input
-    // array. The encoded size of each value is 2 + kMaxGammaBits (1 bit for
-    // no leading zeros, 1 bit for sign and kMaxGammaBits for magnitude). If
-    // any zeros were present in the input array, then the encoded size would be
-    // strictly smaller by kMaxGammaBits and bigger by the difference in
-    // encoding (the existing zero run length + 1).
-    BitWriter enc(data.size() * (2 + enc.kMaxGammaBits));
+    BitWriter enc;
     // Save number of zeros + 1 preceding next non-zero element.
     uint32_t zero_ct = 1;
 

@@ -28,10 +28,11 @@ namespace tensorflow_compression {
 
 class BitWriter {
  public:
-  BitWriter(size_t maximum_bit_size);
+  BitWriter();
   void WriteBits(uint32_t count, uint64_t bits);
   void WriteOneBit(uint64_t bit);
   void WriteGamma(int32_t value);
+  void WriteRice(int32_t value, const int parameter);
   absl::string_view GetData();
 
   // WriteGamma() encodes integers to 2n - 1 bits, where n is the bit width of
@@ -42,8 +43,8 @@ class BitWriter {
   static constexpr size_t kMaxBitsPerCall = 57;
 
  private:
-  std::unique_ptr<char[]> data_;
-  char* next_byte_;
+  std::string data_;
+  std::string::size_type next_index_;
   size_t bits_in_buffer_;
   uint64_t buffer_;
 };
@@ -54,6 +55,7 @@ class BitReader {
   absl::StatusOr<uint64_t> ReadBits(size_t count);
   absl::StatusOr<uint64_t> ReadOneBit();
   absl::StatusOr<int32_t> ReadGamma();
+  absl::StatusOr<int32_t> ReadRice(const int parameter);
 
  private:
   void Refill();

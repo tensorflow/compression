@@ -23,18 +23,35 @@ namespace shape_inference = tensorflow::shape_inference;
 using tensorflow::shape_inference::InferenceContext;
 using tensorflow::shape_inference::ShapeHandle;
 
-REGISTER_OP("RunLengthGammaEncode")
+REGISTER_OP("RunLengthEncode")
+    .Attr("run_length_code: int")
+    .Attr("magnitude_code: int")
+    .Attr("use_run_length_for_non_zeros: bool")
     .Input("data: int32")
     .Output("code: string")
     .SetShapeFn(shape_inference::ScalarShape)
     .Doc(R"doc(
-Encodes `data` using run-length and Elias gamma coding.
+Encodes `data` using run-length coding.
 
+This op implements a superset of RunLengthGammaEncode, which is equivalent to
+calling RunLengthEncode with run_length_code = -1, magnitude_code = -1, and
+use_run_length_for_non_zeros = false.
+
+run_length_code: If >= 0, use Rice code with this parameter to encode run
+  lengths, else use Golomb code.
+magnitude_code: If >= 0, use Rice code with this parameter to encode magnitudes,
+  else use Golomb code.
+use_run_length_for_non_zeros: If true, alternate between coding run lengths of
+  zeros and non-zeros. If false, only encode run lengths of zeros, and encode
+  non-zeros one by one.
 data: An int32 tensor of values to be encoded.
 code: An encoded scalar string.
 )doc");
 
-REGISTER_OP("RunLengthGammaDecode")
+REGISTER_OP("RunLengthDecode")
+    .Attr("run_length_code: int")
+    .Attr("magnitude_code: int")
+    .Attr("use_run_length_for_non_zeros: bool")
     .Input("code: string")
     .Input("shape: int32")
     .Output("data: int32")
@@ -45,12 +62,23 @@ REGISTER_OP("RunLengthGammaDecode")
       return tensorflow::OkStatus();
     })
     .Doc(R"doc(
-Decodes `data` using run-length and Elias gamma coding.
+Decodes `data` using run-length coding.
 
-This is the inverse operation to `RunLengthGammaEncode`. The shape of the tensor
+This is the inverse operation to `RunLengthEncode`. The shape of the tensor
 that was encoded must be known by the caller.
 
-code: An encoded scalar string as returned by `RunLengthGammaEncode`.
+This op implements a superset of RunLengthGammaDecode, which is equivalent to
+calling RunLengthDecode with run_length_code = -1, magnitude_code = -1, and
+use_run_length_for_non_zeros = false.
+
+run_length_code: If >= 0, use Rice code with this parameter to decode run
+  lengths, else use Golomb code.
+magnitude_code: If >= 0, use Rice code with this parameter to decode magnitudes,
+  else use Golomb code.
+use_run_length_for_non_zeros: If true, alternate between coding run lengths of
+  zeros and non-zeros. If false, only decode run lengths of zeros, and decode
+  non-zeros one by one.
+code: An encoded scalar string as returned by `RunLengthEncode`.
 shape: An int32 vector giving the shape of the encoded data.
 data: An int32 tensor of decoded values, with shape `shape`.
 )doc");

@@ -24,7 +24,7 @@ def _tensorflow_pip_impl(ctx):
   if "linux" in ctx.os.name:
     library_filename = "libtensorflow_framework.so.2"
   elif "mac" in ctx.os.name:
-    library_filename = "libtensorflow_framework.dylib"
+    library_filename = "libtensorflow_framework.2.dylib"
 
   ctx.symlink("/".join([library_path.stdout.strip(), library_filename]),
               library_filename)

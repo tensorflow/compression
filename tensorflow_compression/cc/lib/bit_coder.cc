@@ -25,11 +25,8 @@ limitations under the License.
 
 namespace tensorflow_compression {
 
-BitWriter::BitWriter(size_t maximum_bit_size)
-    // We write 8 bytes at a time, so we might over-write by 8 bytes.
-    // +1 byte since we need to round bits *up* to bytes.
-    : data_(std::make_unique<char[]>(maximum_bit_size / 8 + 9)),
-      next_byte_(data_.get()),
+BitWriter::BitWriter()
+    : next_index_(0),
       bits_in_buffer_(0),
       buffer_(0) {}
 
@@ -40,31 +37,49 @@ void BitWriter::WriteBits(uint32_t count, uint64_t bits) {
   bits &= (uint64_t{1} << count) - 1;
   buffer_ |= bits << bits_in_buffer_;
   bits_in_buffer_ += count;
-  absl::little_endian::Store64(next_byte_, buffer_);
+  // TODO(jonycgn): Investigate performance of buffer resizing.
+  data_.resize(next_index_ + 8);
+  absl::little_endian::Store64(&data_[next_index_], buffer_);
   size_t bytes_in_buffer = bits_in_buffer_ / 8;
   bits_in_buffer_ -= bytes_in_buffer * 8;
   buffer_ >>= bytes_in_buffer * 8;
-  next_byte_ += bytes_in_buffer;
+  next_index_ += bytes_in_buffer;
 }
 
 void BitWriter::WriteOneBit(uint64_t bit) { return WriteBits(1, bit); }
 
 void BitWriter::WriteGamma(int32_t value) {
   assert(value > 0);
-  auto n = absl::bit_width(static_cast<uint32_t>(value));
-  WriteBits(n - 1, 0);
-  // Must write most significant bit first.
+  auto bit_width = absl::bit_width(static_cast<uint32_t>(value));
+  // Encode most significant bit with a unary code.
+  WriteBits(bit_width - 1, 0);
   WriteBits(1, 1);
-  WriteBits(n - 1, value);
+  // Encode least significant bits with a binary code.
+  WriteBits(bit_width - 1, value);
+}
+
+void BitWriter::WriteRice(int32_t value, int parameter) {
+  assert(value >= 0);
+  assert(parameter >= 0);
+  // Encode most significant bits with a unary code.
+  uint32_t num_zeros = value >> parameter;
+  while (num_zeros > kMaxBitsPerCall) {
+    WriteBits(kMaxBitsPerCall, 0);
+    num_zeros -= kMaxBitsPerCall;
+  }
+  WriteBits(num_zeros, 0);
+  WriteBits(1, 1);
+  // Encode least significant bits with a binary code.
+  WriteBits(parameter, value);
 }
 
 absl::string_view BitWriter::GetData() {
-  size_t num_bytes = next_byte_ - data_.get();
+  size_t num_bytes = next_index_;
   if (bits_in_buffer_) {
     assert(bits_in_buffer_ < 8);
     ++num_bytes;
   }
-  return absl::string_view(data_.get(), num_bytes);
+  return absl::string_view(data_.data(), num_bytes);
 }
 
 // bytes need not be aligned nor padded!
@@ -118,20 +133,38 @@ absl::StatusOr<uint64_t> BitReader::ReadBits(size_t count) {
 absl::StatusOr<uint64_t> BitReader::ReadOneBit() { return ReadBits(1); }
 
 absl::StatusOr<int32_t> BitReader::ReadGamma() {
-  int32_t n = 1;  // Initializing n as 1 for consistency with WriteGamma.
+  // Decode most significant bit with a unary code.
+  int32_t bit_width = 1;
   while (true) {
-    auto status = ReadBits(1);
-    if (!status.ok()) return status;
-    if (*status) break;
-    ++n;
+    auto bit = ReadOneBit();
+    if (!bit.ok()) return bit;
+    if (*bit) break;
+    ++bit_width;
   }
-  if (n > 31) {
+  if (bit_width > 31) {
     return absl::DataLossError("Exceeded maximum gamma bit width.");
   }
-  int32_t value = 1 << (n - 1);
-  auto status = ReadBits(n - 1);
-  if (!status.ok()) return status;
-  return value | *status;
+  int32_t msb = 1 << (bit_width - 1);
+  // Decode least significant bits with a binary code.
+  auto lsbs = ReadBits(bit_width - 1);
+  if (!lsbs.ok()) return lsbs;
+  return msb | *lsbs;
+}
+
+absl::StatusOr<int32_t> BitReader::ReadRice(int parameter) {
+  assert(parameter >= 0);
+  // Decode most significant bits with a unary code.
+  int32_t msbs = 0;
+  while (true) {
+    auto bit = ReadOneBit();
+    if (!bit.ok()) return bit;
+    if (*bit) break;
+    ++msbs;
+  }
+  // Decode least significant bits with a binary code.
+  auto lsbs = ReadBits(parameter);
+  if (!lsbs.ok()) return lsbs;
+  return (msbs << parameter) | *lsbs;
 }
 
 }  // namespace tensorflow_compression

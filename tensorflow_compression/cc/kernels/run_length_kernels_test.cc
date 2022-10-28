@@ -35,7 +35,6 @@ limitations under the License.
 #include "tensorflow/core/graph/node_builder.h"
 #include "tensorflow/core/graph/testlib.h"
 #include "tensorflow/core/kernels/ops_testutil.h"
-#include "tensorflow/core/lib/core/status_test_util.h"
 #include "tensorflow/core/platform/stacktrace_handler.h"
 #include "tensorflow/core/platform/test.h"
 #include "tensorflow_compression/cc/lib/bit_coder.h"
@@ -59,10 +58,16 @@ using tensorflow::tstring;
 
 class BitCodingOpsTest : public OpsTestBase {
  protected:
-  Status RunEncodeOp(absl::Span<const Tensor> inputs, Tensor* output) {
-    TF_RETURN_IF_ERROR(NodeDefBuilder("encode", "RunLengthGammaEncode")
-                           .Input(tensorflow::FakeInput(DT_INT32))
-                           .Finalize(node_def()));
+  Status RunEncodeOp(absl::Span<const Tensor> inputs, Tensor* output,
+                     const int run_length_code, const int magnitude_code,
+                     const bool use_run_length_for_non_zeros) {
+    TF_RETURN_IF_ERROR(
+        NodeDefBuilder("encode", "RunLengthEncode")
+            .Attr("run_length_code", run_length_code)
+            .Attr("magnitude_code", magnitude_code)
+            .Attr("use_run_length_for_non_zeros", use_run_length_for_non_zeros)
+            .Input(tensorflow::FakeInput(DT_INT32))
+            .Finalize(node_def()));
     TF_RETURN_IF_ERROR(InitOp());
     inputs_.clear();
     std::vector<Tensor> copies(inputs.size());
@@ -76,11 +81,17 @@ class BitCodingOpsTest : public OpsTestBase {
     return tensorflow::OkStatus();
   }
 
-  Status RunDecodeOp(absl::Span<const Tensor> inputs, Tensor* output) {
-    TF_RETURN_IF_ERROR(NodeDefBuilder("decode", "RunLengthGammaDecode")
-                           .Input(tensorflow::FakeInput(DT_STRING))
-                           .Input(tensorflow::FakeInput(DT_INT32))
-                           .Finalize(node_def()));
+  Status RunDecodeOp(absl::Span<const Tensor> inputs, Tensor* output,
+                     const int run_length_code, const int magnitude_code,
+                     const bool use_run_length_for_non_zeros) {
+    TF_RETURN_IF_ERROR(
+        NodeDefBuilder("decode", "RunLengthDecode")
+            .Attr("run_length_code", run_length_code)
+            .Attr("magnitude_code", magnitude_code)
+            .Attr("use_run_length_for_non_zeros", use_run_length_for_non_zeros)
+            .Input(tensorflow::FakeInput(DT_STRING))
+            .Input(tensorflow::FakeInput(DT_INT32))
+            .Finalize(node_def()));
     TF_RETURN_IF_ERROR(InitOp());
     inputs_.clear();
     std::vector<Tensor> copies(inputs.size());
@@ -94,16 +105,21 @@ class BitCodingOpsTest : public OpsTestBase {
     return tensorflow::OkStatus();
   }
 
-  void TestEncodeAndDecode(const Tensor& data_tensor) {
+  void TestEncodeAndDecode(const Tensor& data_tensor, const int run_length_code,
+                           const int magnitude_code,
+                           const bool use_run_length_for_non_zeros) {
     Tensor code_tensor;
-    TF_ASSERT_OK(RunEncodeOp({data_tensor}, &code_tensor));
+    TF_ASSERT_OK(RunEncodeOp({data_tensor}, &code_tensor, run_length_code,
+                             magnitude_code, use_run_length_for_non_zeros));
     const TensorShape& data_shape = data_tensor.shape();
     Tensor shape_tensor{DT_INT32, {data_shape.dims()}};
     for (int i = 0; i < data_shape.dims(); ++i) {
       shape_tensor.flat<int32_t>()(i) = data_shape.dim_size(i);
     }
     Tensor decoded_tensor;
-    TF_ASSERT_OK(RunDecodeOp({code_tensor, shape_tensor}, &decoded_tensor));
+    TF_ASSERT_OK(RunDecodeOp({code_tensor, shape_tensor}, &decoded_tensor,
+                             run_length_code, magnitude_code,
+                             use_run_length_for_non_zeros));
     EXPECT_EQ(decoded_tensor.dtype(), data_tensor.dtype());
     EXPECT_EQ(decoded_tensor.shape(), data_tensor.shape());
     EXPECT_EQ(decoded_tensor.tensor_data(), data_tensor.tensor_data());
@@ -116,7 +132,10 @@ TEST_F(BitCodingOpsTest, EncodeAndDecode) {
   for (int i = 0; i < data.size(); ++i) {
     data.data()[i] = i % 2 ? i : -i;
   }
-  TestEncodeAndDecode(data_tensor);
+  TestEncodeAndDecode(data_tensor, 2, -1, false);
+  TestEncodeAndDecode(data_tensor, -1, 5, true);
+  TestEncodeAndDecode(data_tensor, -1, 4, false);
+  TestEncodeAndDecode(data_tensor, 3, -1, true);
 }
 
 TEST_F(BitCodingOpsTest, EncodeAndDecodeLeadingZeros) {
@@ -129,7 +148,10 @@ TEST_F(BitCodingOpsTest, EncodeAndDecodeLeadingZeros) {
       data.data()[i] = i % 2 ? i : -i;
     }
   }
-  TestEncodeAndDecode(data_tensor);
+  TestEncodeAndDecode(data_tensor, 2, -1, false);
+  TestEncodeAndDecode(data_tensor, -1, 5, true);
+  TestEncodeAndDecode(data_tensor, -1, 4, false);
+  TestEncodeAndDecode(data_tensor, 3, -1, true);
 }
 
 TEST_F(BitCodingOpsTest, EncodeAndDecodeTrailingZeros) {
@@ -142,7 +164,10 @@ TEST_F(BitCodingOpsTest, EncodeAndDecodeTrailingZeros) {
       data.data()[i] = i % 2 ? i : -i;
     }
   }
-  TestEncodeAndDecode(data_tensor);
+  TestEncodeAndDecode(data_tensor, 2, -1, false);
+  TestEncodeAndDecode(data_tensor, -1, 5, true);
+  TestEncodeAndDecode(data_tensor, -1, 4, false);
+  TestEncodeAndDecode(data_tensor, 3, -1, true);
 }
 
 TEST_F(BitCodingOpsTest, EncodeAndDecodeInterspersedZeros) {
@@ -151,7 +176,10 @@ TEST_F(BitCodingOpsTest, EncodeAndDecodeInterspersedZeros) {
   for (int i = 0; i < data.size(); ++i) {
     data.data()[i] = i % 2 ? i : 0;
   }
-  TestEncodeAndDecode(data_tensor);
+  TestEncodeAndDecode(data_tensor, 2, -1, false);
+  TestEncodeAndDecode(data_tensor, -1, 5, true);
+  TestEncodeAndDecode(data_tensor, -1, 4, false);
+  TestEncodeAndDecode(data_tensor, 3, -1, true);
 }
 
 TEST_F(BitCodingOpsTest, DecoderShapeFn) {
@@ -164,10 +192,13 @@ TEST_F(BitCodingOpsTest, DecoderShapeFn) {
   Node* code = test::graph::Constant(&g, code_tensor);
   Node* shape = test::graph::Constant(&g, shape_tensor);
   Node* decode;
-  TF_ASSERT_OK(NodeBuilder("decode", "RunLengthGammaDecode", g.op_registry())
-                   .Input(code)
-                   .Input(shape)
-                   .Finalize(&g, &decode));
+  TF_ASSERT_OK(NodeBuilder("decode", "RunLengthDecode", g.op_registry())
+               .Attr("run_length_code", -1)
+               .Attr("magnitude_code", -1)
+               .Attr("use_run_length_for_non_zeros", false)
+               .Input(code)
+               .Input(shape)
+               .Finalize(&g, &decode));
 
   ShapeRefiner refiner{g.versions().producer(), g.op_registry()};
   TF_ASSERT_OK(refiner.AddNode(code));
@@ -191,7 +222,7 @@ TEST_F(BitCodingOpsTest, ManualEncodeWithBitcodingLibrary) {
   data_tensor.flat<int32_t>().setValues({0, -3, 1});
 
   Tensor code_tensor;
-  TF_ASSERT_OK(RunEncodeOp({data_tensor}, &code_tensor));
+  TF_ASSERT_OK(RunEncodeOp({data_tensor}, &code_tensor, -1, -1, false));
 
   // Use bitcoding library to encode data.
   BitWriter enc_;
@@ -228,7 +259,8 @@ TEST_F(BitCodingOpsTest, ManualDecodeWithBitcodingLibrary) {
   shape_tensor.flat<int32_t>().setValues({4});
 
   Tensor data_tensor;
-  TF_ASSERT_OK(RunDecodeOp({code_tensor, shape_tensor}, &data_tensor));
+  TF_ASSERT_OK(
+      RunDecodeOp({code_tensor, shape_tensor}, &data_tensor, -1, -1, false));
 
   Tensor expected_data_tensor(DT_INT32, {4});
   expected_data_tensor.flat<int32_t>().setValues({-3, 1, 0, 0});
@@ -242,7 +274,7 @@ TEST_F(BitCodingOpsTest, EncodeConsistent) {
   data_tensor.flat<int32_t>().setValues({-6, 3, 0, 0});
 
   Tensor code_tensor;
-  TF_ASSERT_OK(RunEncodeOp({data_tensor}, &code_tensor));
+  TF_ASSERT_OK(RunEncodeOp({data_tensor}, &code_tensor, -1, -1, false));
 
   char expected_code[] = {0b11010001, 0b01101101};
 
@@ -262,7 +294,8 @@ TEST_F(BitCodingOpsTest, DecodeConsistent) {
   shape_tensor.flat<int32_t>().setValues({4});
 
   Tensor data_tensor;
-  TF_ASSERT_OK(RunDecodeOp({code_tensor, shape_tensor}, &data_tensor));
+  TF_ASSERT_OK(
+      RunDecodeOp({code_tensor, shape_tensor}, &data_tensor, -1, -1, false));
 
   Tensor expected_data_tensor(DT_INT32, {4});
   expected_data_tensor.flat<int32_t>().setValues({-6, 3, 0, 0});
