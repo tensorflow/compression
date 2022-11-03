@@ -292,7 +292,9 @@ class UniversalBatchedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         handle, decode_indexes, decode_shape, self.cdf_offset.dtype)
     sanity = gen_ops.entropy_decode_finalize(handle)
     if self.decode_sanity_check:
-      tf.debugging.assert_equal(sanity, True, message="Sanity check failed.")
+      with tf.control_dependencies([tf.debugging.assert_equal(
+          sanity, True, message="Sanity check failed.")]):
+        symbols = tf.identity(symbols)
     symbols += tf.gather(self.cdf_offset, indexes)
     outputs = tf.cast(symbols, self.bottleneck_dtype)
     return outputs + offset
@@ -589,7 +591,9 @@ class UniversalIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         handle, flat_indexes, decode_shape, self.cdf_offset.dtype)
     sanity = gen_ops.entropy_decode_finalize(handle)
     if self.decode_sanity_check:
-      tf.debugging.assert_equal(sanity, True, message="Sanity check failed.")
+      with tf.control_dependencies([tf.debugging.assert_equal(
+          sanity, True, message="Sanity check failed.")]):
+        symbols = tf.identity(symbols)
     symbols += tf.gather(self.cdf_offset, flat_indexes)
     offset = self._offset_from_indexes(indexes)
     return tf.cast(symbols, self.bottleneck_dtype) + offset

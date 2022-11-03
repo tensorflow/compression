@@ -410,7 +410,9 @@ class ContinuousIndexedEntropyModel(continuous_base.ContinuousEntropyModelBase):
         handle, flat_indexes, decode_shape, self.cdf_offset.dtype)
     sanity = gen_ops.entropy_decode_finalize(handle)
     if self.decode_sanity_check:
-      tf.debugging.assert_equal(sanity, True, message="Sanity check failed.")
+      with tf.control_dependencies([tf.debugging.assert_equal(
+          sanity, True, message="Sanity check failed.")]):
+        symbols = tf.identity(symbols)
     symbols += tf.gather(self.cdf_offset, flat_indexes)
     return tf.cast(symbols, self.bottleneck_dtype)
 

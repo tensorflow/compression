@@ -301,17 +301,16 @@ class ContinuousEntropyModelBase(tf.Module, metaclass=abc.ABCMeta):
     laplace_tail_mass = self.laplace_tail_mass
 
     def mixture_log_prob_fn():
-      tf.debugging.assert_less(
-          laplace_tail_mass,
-          tf.constant(1.0, prior.dtype),
-          message="`laplace_tail_mass` must be less than 1.")
-      laplace_prior = uniform_noise.NoisyLaplace(
-          loc=tf.constant(0, dtype=prior.dtype),
-          scale=tf.constant(1, dtype=prior.dtype))
-      probs = prior.prob(bottleneck_perturbed)
-      probs = ((1 - laplace_tail_mass) * probs +
-               laplace_tail_mass *
-               laplace_prior.prob(bottleneck_perturbed))
+      with tf.control_dependencies([tf.debugging.assert_less(
+          laplace_tail_mass, tf.constant(1.0, prior.dtype),
+          message="`laplace_tail_mass` must be less than 1.")]):
+        laplace_prior = uniform_noise.NoisyLaplace(
+            loc=tf.constant(0, dtype=prior.dtype),
+            scale=tf.constant(1, dtype=prior.dtype))
+        probs = prior.prob(bottleneck_perturbed)
+        probs = ((1 - laplace_tail_mass) * probs +
+                 laplace_tail_mass *
+                 laplace_prior.prob(bottleneck_perturbed))
       probs_too_small = probs < 1e-10
       probs_bounded = tf.maximum(probs, 1e-10)
       return tf.where(
