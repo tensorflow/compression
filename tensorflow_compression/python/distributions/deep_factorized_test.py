@@ -23,6 +23,12 @@ from tensorflow_compression.python.distributions import helpers
 
 class DeepFactorizedTest(tf.test.TestCase, parameterized.TestCase):
 
+  def setUp(self):
+    super().setUp()
+    # Disable TensorFloat-32 format on A100 platform, as precision is too low
+    # for current test assertions.
+    tf.config.experimental.enable_tensor_float_32_execution(False)
+
   def test_can_instantiate_scalar(self):
     df = deep_factorized.DeepFactorized()
     self.assertEqual(df.batch_shape, ())
@@ -65,6 +71,12 @@ class DeepFactorizedTest(tf.test.TestCase, parameterized.TestCase):
 
 
 class NoisyDeepFactorizedTest(tf.test.TestCase):
+
+  def setUp(self):
+    super().setUp()
+    # Disable TensorFloat-32 format on A100 platform, as precision is too low
+    # for current test assertions.
+    tf.config.experimental.enable_tensor_float_32_execution(False)
 
   def test_can_instantiate_and_run_scalar(self):
     df = deep_factorized.NoisyDeepFactorized(num_filters=(2, 3, 4))

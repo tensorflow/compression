@@ -23,6 +23,12 @@ from tensorflow_compression.python.layers import parameters
 
 class GDNTest(tf.test.TestCase, parameterized.TestCase):
 
+  def setUp(self):
+    super().setUp()
+    # Disable TensorFloat-32 format on A100 platform, as precision is too low
+    # for current test assertions.
+    tf.config.experimental.enable_tensor_float_32_execution(False)
+
   def test_invalid_data_format_raises_error(self):
     with self.assertRaises(ValueError):
       gdn.GDN(data_format="NHWC")
