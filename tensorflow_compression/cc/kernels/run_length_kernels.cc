@@ -107,11 +107,16 @@ class RunLengthEncodeOp : public OpKernel {
     const int32_t* const end = data.data() + data.size();
     const int32_t* p = data.data();
 
+    // If we encode both zeros and non-zeros with run-length encoding
+    // (use_run_length_for_non_zeros == true), only the first zero run length
+    // can possibly be zero. We can subtract 1 from all subsequent run lengths.
+    int32_t run_length_offset = 0;
+
     while (p < end) {
       // Find next non-zero.
       const int32_t* q = std::find_if_not(p, end,
                                           [](int32_t x) { return x == 0; });
-      WriteRunLength(enc, q - p);
+      WriteRunLength(enc, q - p - run_length_offset);
       p = q;
 
       if (!(p < end)) break;
@@ -119,10 +124,11 @@ class RunLengthEncodeOp : public OpKernel {
       if (use_run_length_for_non_zeros_) {
         // Find next zero.
         q = std::find_if(p, end, [](int32_t x) { return x == 0; });
-        WriteRunLength(enc, q - p);
+        WriteRunLength(enc, q - p - 1);
         while (p < q) {
           WriteNonZero(enc, *p++);
         }
+        run_length_offset = 1;
       } else {
         WriteNonZero(enc, *p++);
       }
@@ -211,12 +217,17 @@ class RunLengthDecodeOp : public OpKernel {
     int32_t* const end = data.data() + data.size();
     int32_t* p = data.data();
 
+    // If we encode both zeros and non-zeros with run-length encoding
+    // (use_run_length_for_non_zeros == true), only the first zero run length
+    // can possibly be zero. We can subtract 1 from all subsequent run lengths.
+    int32_t run_length_offset = 0;
+
     while (p < end) {
       // Skip to the next non-zero element.
       auto run_length = ReadRunLength(context, dec);
       OP_REQUIRES_OK_ABSL(context, run_length.status());
 
-      p += *run_length;
+      p += *run_length + run_length_offset;
 
       if (!(p < end)) {
         // Should not be past the last element.
@@ -228,7 +239,7 @@ class RunLengthDecodeOp : public OpKernel {
       if (use_run_length_for_non_zeros_) {
         run_length = ReadRunLength(context, dec);
         OP_REQUIRES_OK_ABSL(context, run_length.status());
-        const int32_t* const next_zero = p + *run_length;
+        const int32_t* const next_zero = p + *run_length + 1;
         OP_REQUIRES(context, next_zero <= end,
                     errors::DataLoss("Decoded past end of tensor."));
         while (p < next_zero) {
@@ -236,6 +247,7 @@ class RunLengthDecodeOp : public OpKernel {
           OP_REQUIRES_OK_ABSL(context, nonzero.status());
           *p++ = *nonzero;
         }
+        run_length_offset = 1;
       } else {
         auto nonzero = ReadNonZero(context, dec);
         OP_REQUIRES_OK_ABSL(context, nonzero.status());
