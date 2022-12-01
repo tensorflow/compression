@@ -63,6 +63,12 @@ py_test(
     deps = [":round_ops"],
 )
 
+py_test(
+    name = "quantization_ops_test",
+    srcs = ["quantization_ops_test.py"],
+    deps = [":gen_ops"],
+)
+
 filegroup(
     name = "py_src",
     srcs = glob(["*.py"]),

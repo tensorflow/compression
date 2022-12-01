@@ -34,5 +34,6 @@ __all__ = [
     "pmf_to_quantized_cdf",
     "run_length_gamma_decode",
     "run_length_gamma_encode",
+    "stochastic_round",
 ]
 # pylint:enable=undefined-all-variable
