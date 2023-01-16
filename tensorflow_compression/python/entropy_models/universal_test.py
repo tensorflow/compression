@@ -371,7 +371,7 @@ class UniversalIndexedEntropyModelTest(tf.test.TestCase,
     u = x - x_hat
     self.assertAllLessEqual(tf.abs(u), 0.5)
     # Check distribution has right statistics.
-    _, p = scipy.stats.kstest(u, "uniform", (-0.5, 1.0))
+    _, p = scipy.stats.kstest(tf.reshape(u, [-1]), "uniform", (-0.5, 1.0))
     self.assertGreater(p, 1e-6)
 
   def test_expected_grads_or_not_gives_same_bits(self):
