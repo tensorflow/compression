@@ -19,9 +19,8 @@ limitations under the License.
 #include <cstdint>
 #include <string>
 
-#include "absl/types/span.h"
-#include "tensorflow/core/framework/tensor.h"
 #include "tensorflow/core/framework/tensor_types.h"
+#include "tensorflow/core/framework/op_kernel.h"
 #include "tensorflow/core/lib/core/status.h"
 
 namespace tensorflow_compression {
@@ -29,15 +28,21 @@ namespace tensorflow_compression {
 class EntropyEncoderInterface {
  public:
   virtual ~EntropyEncoderInterface() = default;
-  virtual tensorflow::Status Encode(int32_t index, int32_t value) = 0;
-  virtual tensorflow::Status Finalize(std::string* sink) = 0;
+  virtual tensorflow::Status Encode(
+      tensorflow::OpKernelContext* context,
+      tensorflow::TTypes<int32_t>::ConstMatrix index,
+      tensorflow::TTypes<int32_t>::ConstMatrix value) = 0;
+  virtual tensorflow::Status Finalize(tensorflow::OpKernelContext*) = 0;
 };
 
 class EntropyDecoderInterface {
  public:
   virtual ~EntropyDecoderInterface() = default;
-  virtual tensorflow::Status Decode(int32_t index, int32_t* output) = 0;
-  virtual tensorflow::Status Finalize() = 0;
+  virtual tensorflow::Status Decode(
+      tensorflow::OpKernelContext* context,
+      tensorflow::TTypes<int32_t>::ConstMatrix index,
+      tensorflow::TTypes<int32_t>::Matrix output) = 0;
+  virtual tensorflow::Status Finalize(tensorflow::OpKernelContext*) = 0;
 };
 
 }  // namespace tensorflow_compression

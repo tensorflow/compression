@@ -15,6 +15,8 @@ limitations under the License.
 
 #include "tensorflow_compression/cc/kernels/range_coder_kernels.h"
 
+#include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -35,12 +37,18 @@ limitations under the License.
 #include "tensorflow/core/framework/variant_tensor_data.h"
 #include "tensorflow/core/lib/core/errors.h"
 #include "tensorflow/core/lib/core/threadpool.h"
+#include "tensorflow/core/platform/errors.h"
+#include "tensorflow/core/platform/mutex.h"
+#include "tensorflow/core/platform/status.h"
+#include "tensorflow/core/platform/statusor.h"
+#include "tensorflow/tsl/platform/errors.h"
 #include "tensorflow_compression/cc/lib/range_coder.h"
 
 namespace tensorflow_compression {
 namespace {
 
 using ::tensorflow::Status;
+using ::tensorflow::StatusOr;
 using ::tensorflow::Tensor;
 using ::tensorflow::TensorShape;
 using ::tensorflow::tstring;
@@ -48,6 +56,48 @@ using ::tensorflow::TTypes;
 using ::tensorflow::Variant;
 namespace errors = ::tensorflow::errors;
 
+// -----------------------------------------------------------------------------
+// Datatype holder in DT_VARIANT tensors.
+// -----------------------------------------------------------------------------
+struct EntropyEncoderVariant {
+  std::shared_ptr<EntropyEncoderInterface> encoder;
+
+  // These functions are tensorflow::Variant requirements.
+  std::string TypeName() const { return "(anonymous)::EntropyEncoderVariant"; }
+  void Encode(tensorflow::VariantTensorData* data) const;
+  bool Decode(const tensorflow::VariantTensorData& data);
+};
+
+void EntropyEncoderVariant::Encode(tensorflow::VariantTensorData* data) const {
+  LOG(ERROR) << "Encode() not implemented.";
+}
+
+bool EntropyEncoderVariant::Decode(const tensorflow::VariantTensorData& data) {
+  LOG(ERROR) << "Decode() not implemented.";
+  return false;
+}
+
+struct EntropyDecoderVariant {
+  std::shared_ptr<EntropyDecoderInterface> decoder;
+
+  // These functions are tensorflow::Variant requirements.
+  std::string TypeName() const { return "(anonymous)::EntropyDecoderVariant"; }
+  void Encode(tensorflow::VariantTensorData* data) const;
+  bool Decode(const tensorflow::VariantTensorData& data);
+};
+
+void EntropyDecoderVariant::Encode(tensorflow::VariantTensorData* data) const {
+  LOG(ERROR) << "Encode() not implemented.";
+}
+
+bool EntropyDecoderVariant::Decode(const tensorflow::VariantTensorData& data) {
+  LOG(ERROR) << "Decode() not implemented.";
+  return false;
+}
+
+// -----------------------------------------------------------------------------
+// Utility functions for range coding.
+// -----------------------------------------------------------------------------
 Status CheckInRange(absl::string_view name, int64_t value, int64_t min,
                     int64_t max) {
   if (value < min || max <= value) {
@@ -61,7 +111,7 @@ Status ScanCDF(const int32_t* const end, const int32_t** current,
                std::vector<absl::Span<const int32_t>>* lookup) {
   const int32_t* p = *current;
   if (end < p + 3) {
-    // CDF must have at least values: precision, 0, 1 << precision.
+    // CDF must have at least three values: precision, 0, 1 << precision.
     return errors::InvalidArgument("CDF ended prematurely.");
   }
   const int32_t* precision = p;
@@ -113,34 +163,135 @@ Status IndexCDFMatrix(const TTypes<int32_t>::ConstMatrix& table,
   return tensorflow::OkStatus();
 }
 
-class RangeEncoderInterface final : public EntropyEncoderInterface {
+class RangeEncoderInterface : public EntropyEncoderInterface {
  public:
-  RangeEncoderInterface(absl::Span<const absl::Span<const int32_t>> lookup,
-                        Tensor hold)
-      : lookup_(lookup.begin(), lookup.end()), hold_(std::move(hold)) {}
+  static tensorflow::StatusOr<std::shared_ptr<RangeEncoderInterface>> Make(
+      tensorflow::OpKernelContext* context, const TensorShape& handle_shape) {
+    std::shared_ptr<RangeEncoderInterface> p(new RangeEncoderInterface);
 
-  Status Encode(int32_t index, int32_t value) override {
-    TF_RETURN_IF_ERROR(CheckInRange("index", index, 0, lookup_.size()));
-    absl::Span<const int32_t> row = lookup_[index];
-    // Negative precision value enables overflow functionality.
-    if (row[0] > 0) {
-      TF_RETURN_IF_ERROR(CheckInRange("value", value, 0, row.size() - 2));
-      encoder_.Encode(row[value + 1], row[value + 2], row[0], &encoded_);
+    const int64_t n = handle_shape.num_elements();
+    p->encoder_.resize(n);
+    p->encoded_.resize(n);
+
+    const Tensor& lookup = context->input(1);
+    p->lookup_tensor_ = lookup;
+
+    if (lookup.dims() == 1) {
+      TF_RETURN_IF_ERROR(IndexCDFVector(lookup.flat<int32_t>(), &p->lookup_));
+    } else if (lookup.dims() == 2) {
+      TF_RETURN_IF_ERROR(IndexCDFMatrix(lookup.matrix<int32_t>(), &p->lookup_));
     } else {
-      OverflowEncode(row, value);
+      TF_RETURN_IF_ERROR(errors::InvalidArgument(
+          "`lookup` must be rank 1 or 2: ", lookup.shape()));
+    }
+
+    return p;
+  }
+
+  Status Encode(tensorflow::OpKernelContext* context,
+                TTypes<int32_t>::ConstMatrix index,
+                TTypes<int32_t>::ConstMatrix value) override {
+    // Sanity checks.
+    CHECK_EQ(encoder_.size(), encoded_.size());
+
+    CHECK_EQ(encoder_.size(), value.dimension(0));
+    // We may also want to check if lookup_.size() == value_tensor->dim_size(-1)
+    // when index tensor was not provided.
+
+    tensorflow::mutex mu;
+    tensorflow::Status status ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu);
+
+#define REQUIRE_IN_RANGE(name, value, min, max)     \
+  if (auto s = CheckInRange(name, value, min, max); \
+      ABSL_PREDICT_FALSE(!s.ok())) {                \
+    tensorflow::mutex_lock lock(mu);                \
+    status = s;                                     \
+    return;                                         \
+  }
+
+    const int64_t cost_per_unit = 50 * value.dimension(1);
+    tensorflow::thread::ThreadPool* workers =
+        context->device()->tensorflow_cpu_worker_threads()->workers;
+
+    if (index.size() != 0) {
+      workers->ParallelFor(
+          encoder_.size(), cost_per_unit,
+          [this, value, index, &mu, &status](int64_t start, int64_t limit) {
+            const int64_t lookup_size = lookup_.size();
+            const int64_t num_elements = value.dimension(1);
+            const int32_t* p_value = &value(start, 0);
+            const int32_t* p_index = &index(start, 0);
+            for (int64_t i = start; i < limit; ++i) {
+              RangeEncoder& encoder = encoder_[i];
+              std::string* sink = &encoded_[i];
+              for (int64_t j = 0; j < num_elements; ++j) {
+                const int32_t ind = *p_index++;
+                const int32_t val = *p_value++;
+
+                REQUIRE_IN_RANGE("index", ind, 0, lookup_size);
+                absl::Span<const int32_t> row = lookup_[ind];
+                // Negative precision value enables overflow functionality.
+                if (row[0] > 0) {
+                  REQUIRE_IN_RANGE("value", val, 0, row.size() - 2);
+                  encoder.Encode(row[val + 1], row[val + 2], row[0], sink);
+                } else {
+                  OverflowEncode(encoder, sink, row, val);
+                }
+              }
+            }
+          });
+    } else {
+      workers->ParallelFor(
+          encoder_.size(), cost_per_unit,
+          [this, value, &mu, &status](int64_t start, int64_t limit) {
+            const int64_t lookup_size = lookup_.size();
+            const int64_t num_elements = value.dimension(1);
+            const int32_t* p_value = &value(start, 0);
+            for (int64_t i = start; i < limit; ++i) {
+              RangeEncoder& encoder = encoder_[i];
+              std::string* sink = &encoded_[i];
+              for (int64_t ind = 0, j = 0; j < num_elements; ++ind, ++j) {
+                const int32_t val = *p_value++;
+
+                ind = (ind < lookup_size) ? ind : 0;
+                absl::Span<const int32_t> row = lookup_[ind];
+                // Negative precision value enables overflow functionality.
+                if (row[0] > 0) {
+                  REQUIRE_IN_RANGE("value", val, 0, row.size() - 2);
+                  encoder.Encode(row[val + 1], row[val + 2], row[0], sink);
+                } else {
+                  OverflowEncode(encoder, sink, row, val);
+                }
+              }
+            }
+          });
+    }
+#undef REQUIRE_IN_RANGE
+
+    return status;
+  }
+
+  Status Finalize(tensorflow::OpKernelContext* context) override {
+    Tensor* tensor;
+    TF_RETURN_IF_ERROR(
+        context->allocate_output(0, context->input(0).shape(), &tensor));
+
+    auto output = tensor->flat<tstring>();
+    CHECK_EQ(encoder_.size(), output.size());
+
+    for (int64_t i = 0; i < output.size(); ++i) {
+      encoder_[i].Finalize(&encoded_[i]);
+      output(i) = std::move(encoded_[i]);
     }
     return tensorflow::OkStatus();
   }
 
-  Status Finalize(std::string* sink) override {
-    encoder_.Finalize(&encoded_);
-    *sink = std::move(encoded_);
-    return tensorflow::OkStatus();
-  }
-
  private:
-  void OverflowEncode(const absl::Span<const int32_t> row, int32_t value) {
+  static void OverflowEncode(RangeEncoder& encoder, std::string* sink,
+                             const absl::Span<const int32_t> row,
+                             int32_t value) {
     const int32_t max_value = row.size() - 3;
+    DCHECK_GE(max_value, 0);
     const int32_t sign = value < 0;
     int32_t gamma;
     if (sign) {
@@ -150,348 +301,271 @@ class RangeEncoderInterface final : public EntropyEncoderInterface {
       gamma = value - max_value + 1;
       value = max_value;
     }
-    encoder_.Encode(row[value + 1], row[value + 2], -row[0], &encoded_);
+    encoder.Encode(row[value + 1], row[value + 2], -row[0], sink);
     // Last interval in CDF table is escape symbol.
     if (value != max_value) {
       return;
     }
     // Encode overflow value using Elias gamma code and binary uniform CDF.
     int32_t n = 1;
+    // TODO(ssjhv): Clamp gamma.
     while (gamma >= (1 << n)) {
-      encoder_.Encode(0, 1, 1, &encoded_);
+      encoder.Encode(0, 1, 1, sink);
       ++n;
     }
     while (--n >= 0) {
       const int32_t bit = (gamma >> n) & 1;
-      encoder_.Encode(bit, bit + 1, 1, &encoded_);
+      encoder.Encode(bit, bit + 1, 1, sink);
     }
     // Encode sign.
-    encoder_.Encode(sign, sign + 1, 1, &encoded_);
+    encoder.Encode(sign, sign + 1, 1, sink);
   }
+
+  RangeEncoderInterface() = default;
 
   std::vector<absl::Span<const int32_t>> lookup_;
-  RangeEncoder encoder_;
-  std::string encoded_;
-  Tensor hold_;
+  std::vector<RangeEncoder> encoder_;
+  std::vector<std::string> encoded_;
+  Tensor lookup_tensor_;  // Ref-count purpose.
 };
 
-class RangeDecoderInterface final : public EntropyDecoderInterface {
+class RangeDecoderInterface : public EntropyDecoderInterface {
  public:
-  RangeDecoderInterface(absl::string_view encoded,
-                        absl::Span<const absl::Span<const int32_t>> lookup,
-                        Tensor hold)
-      : lookup_(lookup.begin(), lookup.end()),
-        decoder_(encoded),
-        hold_(std::move(hold)) {}
+  static StatusOr<std::shared_ptr<RangeDecoderInterface>> Make(
+      tensorflow::OpKernelContext* context) {
+    std::shared_ptr<RangeDecoderInterface> p(new RangeDecoderInterface);
 
-  Status Decode(int32_t index, int32_t* output) override {
-    TF_RETURN_IF_ERROR(CheckInRange("index", index, 0, lookup_.size()));
-    absl::Span<const int32_t> row = lookup_[index];
-    // Negative precision value enables overflow functionality.
-    if (row[0] > 0) {
-      *output = decoder_.Decode(row.subspan(1), row[0]);
-    } else {
-      *output = OverflowDecode(row);
+    const Tensor& encoded_tensor = context->input(0);
+    p->encoded_tensor_ = encoded_tensor;
+
+    auto encoded = encoded_tensor.flat<tstring>();
+    for (int64_t i = 0; i < encoded.size(); ++i) {
+      p->decoder_.emplace_back(encoded(i));
     }
-    return tensorflow::OkStatus();
+
+    const Tensor& lookup = context->input(1);
+    p->lookup_tensor_ = lookup;
+    if (lookup.dims() == 1) {
+      TF_RETURN_IF_ERROR(IndexCDFVector(lookup.flat<int32_t>(), &p->lookup_));
+    } else if (lookup.dims() == 2) {
+      TF_RETURN_IF_ERROR(IndexCDFMatrix(lookup.matrix<int32_t>(), &p->lookup_));
+    } else {
+      return errors::InvalidArgument("`lookup` must be rank 1 or 2: ",
+                                     lookup.shape());
+    }
+
+    return p;
   }
 
-  Status Finalize() override {
-    if (!decoder_.Finalize()) {
-      return errors::DataLoss("RangeDecoder returned an error status");
+  Status Decode(tensorflow::OpKernelContext* context,
+                TTypes<int32_t>::ConstMatrix index,
+                TTypes<int32_t>::Matrix output) override {
+    // Sanity check.
+    CHECK_EQ(decoder_.size(), output.dimension(0));
+
+    tensorflow::mutex mu;
+    tensorflow::Status status ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu);
+
+#define REQUIRE_IN_RANGE(name, value, min, max)     \
+  if (auto s = CheckInRange(name, value, min, max); \
+      ABSL_PREDICT_FALSE(!s.ok())) {                \
+    tensorflow::mutex_lock lock(mu);                \
+    status = s;                                     \
+    return;                                         \
+  }
+
+    const int64_t cost_per_unit = 80 * output.dimension(1);
+    tensorflow::thread::ThreadPool* workers =
+        context->device()->tensorflow_cpu_worker_threads()->workers;
+
+    if (index.size() != 0) {
+      workers->ParallelFor(
+          decoder_.size(), cost_per_unit,
+          [this, index, &output, &mu, &status](int64_t start, int64_t limit) {
+            const int64_t lookup_size = lookup_.size();
+            const int64_t num_elements = output.dimension(1);
+            const int32_t* p_index = &index(start, 0);
+            int32_t* p_output = &output(start, 0);
+            for (int64_t i = start; i < limit; ++i) {
+              RangeDecoder& decoder = decoder_[i];
+              for (int64_t j = 0; j < num_elements; ++j) {
+                const int32_t ind = *p_index++;
+                REQUIRE_IN_RANGE("index", ind, 0, lookup_size);
+                absl::Span<const int32_t> row = lookup_[ind];
+                // Negative precision value enables overflow functionality.
+                if (row[0] > 0) {
+                  *p_output++ = decoder.Decode(row.subspan(1), row[0]);
+                } else {
+                  *p_output++ = OverflowDecode(decoder, row);
+                }
+              }
+            }
+          });
+    } else {
+      workers->ParallelFor(
+          decoder_.size(), cost_per_unit,
+          [this, &output](int64_t start, int64_t limit) {
+            const int64_t lookup_size = lookup_.size();
+            const int64_t num_elements = output.dimension(1);
+            int32_t* p_output = &output(start, 0);
+            for (int64_t i = start; i < limit; ++i) {
+              RangeDecoder& decoder = decoder_[i];
+              for (int64_t ind = 0, j = 0; j < num_elements; ++ind, ++j) {
+                if (lookup_size <= ind) ind = 0;
+                absl::Span<const int32_t> row = lookup_[ind];
+                // Negative precision value enables overflow functionality.
+                if (row[0] > 0) {
+                  *p_output++ = decoder.Decode(row.subspan(1), row[0]);
+                } else {
+                  *p_output++ = OverflowDecode(decoder, row);
+                }
+              }
+            }
+          });
+    }
+
+#undef REQUIRE_IN_RANGE
+    return status;
+  }
+
+  Status Finalize(tensorflow::OpKernelContext* context) override {
+    Tensor* output_tensor;
+    TF_RETURN_IF_ERROR(
+        context->allocate_output(0, encoded_tensor_.shape(), &output_tensor));
+    auto output = output_tensor->flat<bool>();
+    output.setConstant(true);
+
+    CHECK_EQ(output.size(), decoder_.size());
+    for (int64_t i = 0; i < output.size(); ++i) {
+      if (bool success = decoder_[i].Finalize(); !success) {
+        output(i) = false;
+        VLOG(0) << "RangeDecoder #" << i << " final status was an error";
+      }
     }
     return tensorflow::OkStatus();
   }
 
  private:
-  int32_t OverflowDecode(const absl::Span<const int32_t> row) {
+  static int32_t OverflowDecode(RangeDecoder& decoder,
+                                const absl::Span<const int32_t> row) {
     constexpr int32_t binary_uniform_cdf[] = {0, 1, 2};
     const int32_t max_value = row.size() - 3;
-    int32_t value = decoder_.Decode(row.subspan(1), -row[0]);
+    DCHECK_GE(max_value, 0);
+    int32_t value = decoder.Decode(row.subspan(1), -row[0]);
     // Last interval in CDF table is escape symbol.
     if (value != max_value) {
       return value;
     }
     // Decode overflow using Elias gamma code and binary uniform CDF.
     int32_t n = 0;
-    while (decoder_.DecodeLinearly(binary_uniform_cdf, 1) == 0) {
+    while (decoder.DecodeLinearly(binary_uniform_cdf, 1) == 0) {
       ++n;
     }
     value = 1 << n;
     while (--n >= 0) {
-      value |= decoder_.DecodeLinearly(binary_uniform_cdf, 1) << n;
+      value |= decoder.DecodeLinearly(binary_uniform_cdf, 1) << n;
     }
     // Decode sign.
-    const int32_t sign = decoder_.DecodeLinearly(binary_uniform_cdf, 1);
+    const int32_t sign = decoder.DecodeLinearly(binary_uniform_cdf, 1);
     return sign ? -value : value + max_value - 1;
   }
 
+  RangeDecoderInterface() = default;
+
   std::vector<absl::Span<const int32_t>> lookup_;
-  RangeDecoder decoder_;
-  Tensor hold_;
+  std::vector<RangeDecoder> decoder_;
+  Tensor encoded_tensor_;  // Ref-count purpose.
+  Tensor lookup_tensor_;   // Ref-count purpose.
 };
 
-struct EntropyEncoderVariant {
-  std::shared_ptr<EntropyEncoderInterface> encoder;
-
-  // These functions are tensorflow::Variant requirements.
-  std::string TypeName() const { return "(anonymous)::EntropyEncoderVariant"; }
-  void Encode(tensorflow::VariantTensorData* data) const;
-  bool Decode(const tensorflow::VariantTensorData& data);
-};
-
-void EntropyEncoderVariant::Encode(tensorflow::VariantTensorData* data) const {
-  LOG(ERROR) << "Encode() not implemented.";
-}
-
-bool EntropyEncoderVariant::Decode(const tensorflow::VariantTensorData& data) {
-  LOG(ERROR) << "Decode() not implemented.";
-  return false;
-}
-
-struct EntropyDecoderVariant {
-  std::shared_ptr<EntropyDecoderInterface> decoder;
-  Tensor holder;
-
-  // These functions are tensorflow::Variant requirements.
-  std::string TypeName() const { return "(anonymous)::EntropyDecoderVariant"; }
-  void Encode(tensorflow::VariantTensorData* data) const;
-  bool Decode(const tensorflow::VariantTensorData& data);
-};
-
-void EntropyDecoderVariant::Encode(tensorflow::VariantTensorData* data) const {
-  LOG(ERROR) << "Encode() not implemented.";
-}
-
-bool EntropyDecoderVariant::Decode(const tensorflow::VariantTensorData& data) {
-  LOG(ERROR) << "Decode() not implemented.";
-  return false;
-}
-
-// RangeEncoder ops -----------------------------------------------------------
+// -----------------------------------------------------------------------------
+// RangeEncoder ops
+// -----------------------------------------------------------------------------
+template <typename Interface>
 class CreateRangeEncoderOp : public tensorflow::OpKernel {
  public:
   using OpKernel::OpKernel;
+
   void Compute(tensorflow::OpKernelContext* context) override {
     TensorShape handle_shape;
     OP_REQUIRES_OK(context, tensorflow::tensor::MakeShape(context->input(0),
                                                           &handle_shape));
 
+    EntropyEncoderVariant wrap;
+    OP_REQUIRES_VALUE(wrap.encoder, context,
+                      Interface::Make(context, handle_shape));
+
     Tensor* output_tensor;
     OP_REQUIRES_OK(context,
                    context->allocate_output(0, handle_shape, &output_tensor));
-
-    const Tensor& lookup = context->input(1);
-    OP_REQUIRES(context, lookup.dims() == 1 || lookup.dims() == 2,
-                errors::InvalidArgument("`lookup` must be rank 1 or 2."));
-
-    std::vector<absl::Span<const int32_t>> table;
-    if (lookup.dims() == 1) {
-      OP_REQUIRES_OK(context, IndexCDFVector(lookup.flat<int32_t>(), &table));
-    } else {
-      DCHECK_EQ(lookup.dims(), 2);
-      OP_REQUIRES_OK(context, IndexCDFMatrix(lookup.matrix<int32_t>(), &table));
-    }
-
-    auto output = output_tensor->flat<Variant>();
-    for (int64_t i = 0; i < output.size(); ++i) {
-      EntropyEncoderVariant wrap;
-      wrap.encoder = std::make_shared<RangeEncoderInterface>(table, lookup);
-      output(i) = std::move(wrap);
-    }
+    output_tensor->flat<Variant>()(0) = std::move(wrap);
   }
 };
 
 REGISTER_KERNEL_BUILDER(
     Name("CreateRangeEncoder").Device(tensorflow::DEVICE_CPU),
-    CreateRangeEncoderOp);
+    CreateRangeEncoderOp<RangeEncoderInterface>);
 
-class EntropyEncodeChannelOp : public tensorflow::OpKernel {
+class EntropyEncodeOp : public tensorflow::OpKernel {
  public:
   using OpKernel::OpKernel;
 
-  tensorflow::Status CheckShapes(tensorflow::OpKernelContext* context) const {
-    const TensorShape& handle_shape = context->input(0).shape();
-    const TensorShape& value_shape = context->input(1).shape();
-    if (!tensorflow::TensorShapeUtils::StartsWith(value_shape, handle_shape)) {
-      return errors::InvalidArgument(
-          "'value' shape should start with 'handle' shape: value.shape=",
-          value_shape, " does not start with handle.shape=", handle_shape);
-    }
-    return tensorflow::OkStatus();
-  }
-
   void Compute(tensorflow::OpKernelContext* context) override {
-    OP_REQUIRES_OK(context, CheckShapes(context));
-
     // This is an unnecessary shallow copy but helps avoiding a const_cast.
-    Tensor handle_tensor = context->input(0);
-    auto handle = handle_tensor.flat<Variant>();
+    Tensor handle = context->input(0);
+    const TensorShape& handle_shape = handle.shape();
+    OP_REQUIRES(context, handle_shape.num_elements() != 0,
+                errors::InvalidArgument("`handle` is empty: handle.shape=",
+                                        handle_shape));
 
-    const int prefix_dims = handle_tensor.dims();
+    auto* wrap = handle.flat<Variant>()(0).get<EntropyEncoderVariant>();
+    OP_REQUIRES(context, wrap != nullptr && wrap->encoder != nullptr,
+                errors::InvalidArgument("'handle' is not an encoder"));
+
+    Tensor const* value_tensor = nullptr;
+    OP_REQUIRES_OK(context, context->input("value", &value_tensor));
+
+    OP_REQUIRES(
+        context,
+        tensorflow::TensorShapeUtils::StartsWith(value_tensor->shape(),
+                                                 handle_shape),
+        errors::InvalidArgument(
+            "'value' shape should start with 'handle' shape: value.shape=",
+            value_tensor->shape(),
+            " does not start with handle.shape=", handle_shape));
+
+    const int prefix_dims = handle_shape.dims();
     auto value =
-        context->input(1).flat_inner_outer_dims<int32_t, 2>(prefix_dims - 1);
-    CHECK_EQ(handle.dimension(0), value.dimension(0));
+        value_tensor->flat_inner_outer_dims<int32_t, 2>(prefix_dims - 1);
 
-    const TensorShape& value_shape = context->input(1).shape();
-    const int64_t index_stride =
-        value_shape.dims() == prefix_dims
-            ? 1
-            : value_shape.dim_size(value_shape.dims() - 1);
-    CHECK_EQ(value.dimension(1) % index_stride, 0);
+    if (context->num_inputs() > 2) {
+      // EntropyEncodeIndex op.
+      Tensor const* index_tensor = nullptr;
+      OP_REQUIRES_OK(context, context->input("index", &index_tensor));
+      OP_REQUIRES(context, index_tensor->shape() == value_tensor->shape(),
+                  errors::InvalidArgument(
+                      "'index' shape should match 'value' shape: index.shape=",
+                      index_tensor->shape(),
+                      " != value.shape=", value_tensor->shape()));
 
-    const int64_t cost_per_unit = 50 * value.dimension(1);
-
-    tensorflow::thread::ThreadPool* workers =
-        context->device()->tensorflow_cpu_worker_threads()->workers;
-    tensorflow::mutex mu;
-    workers->ParallelFor(handle.size(), cost_per_unit,
-                         [&handle, &mu, context, value, index_stride](
-                             int64_t start, int64_t limit) {
-                           PerShard(handle, value, index_stride, context, &mu,
-                                    start, limit);
-                         });
-
-    context->set_output(0, handle_tensor);
-  }
-
- private:
-  static void PerShard(TTypes<Variant>::Flat handle,
-                       TTypes<int32_t>::ConstMatrix value,
-                       const int64_t index_stride,
-                       tensorflow::OpKernelContext* context,
-                       tensorflow::mutex* mu, int64_t start, int64_t limit) {
-#define REQUIRES(cond, status)        \
-  if (!ABSL_PREDICT_TRUE(cond)) {     \
-    tensorflow::mutex_lock lock(*mu); \
-    context->SetStatus(status);       \
-    return;                           \
-  }
-#define REQUIRES_OK(status) \
-  {                         \
-    auto s = (status);      \
-    REQUIRES(s.ok(), s);    \
-  }
-
-    const int64_t num_elements = value.dimension(1);
-    auto* p_value = &value(start, 0);
-    int64_t index = 0;
-
-    for (int64_t i = start; i < limit; ++i) {
-      auto* wrap = handle(i).get<EntropyEncoderVariant>();
-      REQUIRES(wrap != nullptr && wrap->encoder != nullptr,
-               errors::InvalidArgument("'handle' is not an encoder"));
-      auto* encoder = wrap->encoder.get();
-
-      for (int64_t j = 0; j < num_elements; ++j) {
-        REQUIRES_OK(encoder->Encode(index++, *(p_value++)));
-        if (index == index_stride) index = 0;
-      }
+      auto index =
+          index_tensor->flat_inner_outer_dims<int32_t, 2>(prefix_dims - 1);
+      OP_REQUIRES_OK(context, wrap->encoder->Encode(context, index, value));
+    } else {
+      // EntropyEncodeChannel op.
+      TTypes<int32_t>::ConstMatrix index(nullptr, 0, 0);
+      OP_REQUIRES_OK(context, wrap->encoder->Encode(context, index, value));
     }
 
-#undef REQUIRES
-#undef REQUIRES_OK
+    context->set_output(0, handle);
   }
 };
 
+REGISTER_KERNEL_BUILDER(
+    Name("EntropyEncodeIndex").Device(tensorflow::DEVICE_CPU), EntropyEncodeOp);
 REGISTER_KERNEL_BUILDER(
     Name("EntropyEncodeChannel").Device(tensorflow::DEVICE_CPU),
-    EntropyEncodeChannelOp);
-
-class EntropyEncodeIndexOp : public tensorflow::OpKernel {
- public:
-  using OpKernel::OpKernel;
-
-  tensorflow::Status CheckShapes(tensorflow::OpKernelContext* context) const {
-    const TensorShape& handle_shape = context->input(0).shape();
-    const TensorShape& index_shape = context->input(1).shape();
-    const TensorShape& value_shape = context->input(2).shape();
-
-    if (value_shape != index_shape) {
-      return errors::InvalidArgument(
-          "'value' shape should match 'index' shape: value.shape=", value_shape,
-          " != index.shape=", index_shape);
-    }
-
-    if (!tensorflow::TensorShapeUtils::StartsWith(index_shape, handle_shape)) {
-      return errors::InvalidArgument(
-          "'index' shape should start with 'handle' shape: index.shape=",
-          index_shape, " does not start with handle.shape=", handle_shape);
-    }
-
-    return tensorflow::OkStatus();
-  }
-
-  void Compute(tensorflow::OpKernelContext* context) override {
-    OP_REQUIRES_OK(context, CheckShapes(context));
-
-    // This is an unnecessary shallow copy but helps avoiding a const_cast.
-    Tensor handle_tensor = context->input(0);
-    auto handle = handle_tensor.flat<Variant>();
-
-    const int prefix_dims = handle_tensor.dims();
-    auto index =
-        context->input(1).flat_inner_outer_dims<int32_t, 2>(prefix_dims - 1);
-    auto value =
-        context->input(2).flat_inner_outer_dims<int32_t, 2>(prefix_dims - 1);
-
-    CHECK_EQ(handle.dimension(0), value.dimension(0));
-
-    const int64_t cost_per_unit = 50 * value.dimension(1);
-
-    tensorflow::thread::ThreadPool* workers =
-        context->device()->tensorflow_cpu_worker_threads()->workers;
-    tensorflow::mutex mu;
-    workers->ParallelFor(
-        handle.size(), cost_per_unit,
-        [&handle, &mu, context, value, index](int64_t start, int64_t limit) {
-          PerShard(handle, index, value, context, &mu, start, limit);
-        });
-
-    context->set_output(0, handle_tensor);
-  }
-
- private:
-  static void PerShard(TTypes<Variant>::Flat handle,
-                       TTypes<int32_t>::ConstMatrix index,
-                       TTypes<int32_t>::ConstMatrix value,
-                       tensorflow::OpKernelContext* context,
-                       tensorflow::mutex* mu, int64_t start, int64_t limit) {
-#define REQUIRES(cond, status)        \
-  if (!ABSL_PREDICT_TRUE(cond)) {     \
-    tensorflow::mutex_lock lock(*mu); \
-    context->SetStatus(status);       \
-    return;                           \
-  }
-#define REQUIRES_OK(status) \
-  {                         \
-    auto s = (status);      \
-    REQUIRES(s.ok(), s);    \
-  }
-
-    const int64_t num_elements = value.dimension(1);
-    const int32_t* p_value = &value(start, 0);
-    const int32_t* p_index = &index(start, 0);
-
-    for (int64_t i = start; i < limit; ++i) {
-      auto* wrap = handle(i).get<EntropyEncoderVariant>();
-      REQUIRES(wrap != nullptr && wrap->encoder != nullptr,
-               errors::InvalidArgument("'handle' is not an encoder"));
-      auto* encoder = wrap->encoder.get();
-
-      for (int64_t j = 0; j < num_elements; ++j) {
-        REQUIRES_OK(encoder->Encode(*(p_index++), *(p_value++)));
-      }
-    }
-
-#undef REQUIRES
-#undef REQUIRES_OK
-  }
-};
-
-REGISTER_KERNEL_BUILDER(
-    Name("EntropyEncodeIndex").Device(tensorflow::DEVICE_CPU),
-    EntropyEncodeIndexOp);
+    EntropyEncodeOp);
 
 class EntropyEncodeFinalizeOp : public tensorflow::OpKernel {
  public:
@@ -500,24 +574,16 @@ class EntropyEncodeFinalizeOp : public tensorflow::OpKernel {
   void Compute(tensorflow::OpKernelContext* context) override {
     // This is an unnecessary shallow copy but helps avoiding a const_cast.
     Tensor handle_tensor = context->input(0);
-    auto handle = handle_tensor.flat<Variant>();
+    OP_REQUIRES(
+        context, handle_tensor.shape().num_elements() != 0,
+        errors::InvalidArgument("`handle` is empty: ", handle_tensor.shape()));
 
-    Tensor* output_tensor;
-    OP_REQUIRES_OK(context, context->allocate_output(0, handle_tensor.shape(),
-                                                     &output_tensor));
-    auto output = output_tensor->flat<tstring>();
+    auto* wrap = handle_tensor.flat<Variant>()(0).get<EntropyEncoderVariant>();
+    OP_REQUIRES(context, wrap != nullptr && wrap->encoder != nullptr,
+                errors::InvalidArgument("'handle' is not an encoder"));
 
-    Status status;
-    std::string encoded;
-    for (int64_t i = 0; i < output.size(); ++i) {
-      auto* wrap = handle(i).get<EntropyEncoderVariant>();
-      OP_REQUIRES(context, wrap != nullptr && wrap->encoder != nullptr,
-                  errors::InvalidArgument("'handle' is not an encoder"));
-      status.Update(wrap->encoder->Finalize(&encoded));
-      output(i) = encoded;
-      handle(i).clear();
-    }
-    OP_REQUIRES_OK(context, status);
+    // Finalize() should take care of the output.
+    OP_REQUIRES_OK(context, wrap->encoder->Finalize(context));
   }
 };
 
@@ -525,236 +591,91 @@ REGISTER_KERNEL_BUILDER(
     Name("EntropyEncodeFinalize").Device(tensorflow::DEVICE_CPU),
     EntropyEncodeFinalizeOp);
 
-// RangeDecoder ops -----------------------------------------------------------
+// -----------------------------------------------------------------------------
+// RangeDecoder ops
+// -----------------------------------------------------------------------------
+template <typename Interface>
 class CreateRangeDecoderOp : public tensorflow::OpKernel {
  public:
   using OpKernel::OpKernel;
 
   void Compute(tensorflow::OpKernelContext* context) override {
-    const Tensor& encoded_tensor = context->input(0);
-    auto encoded = encoded_tensor.flat<tstring>();
+    TensorShape handle_shape = context->input(0).shape();
+    OP_REQUIRES(context, handle_shape.num_elements() != 0,
+                errors::InvalidArgument("`encoded` is empty: ", handle_shape));
 
-    Tensor* output_tensor;
-    OP_REQUIRES_OK(context, context->allocate_output(0, encoded_tensor.shape(),
-                                                     &output_tensor));
+    EntropyDecoderVariant wrap;
+    OP_REQUIRES_VALUE(wrap.decoder, context,
+                      Interface::Make(context));
 
-    const Tensor& lookup = context->input(1);
-    OP_REQUIRES(context, lookup.dims() == 1 || lookup.dims() == 2,
-                errors::InvalidArgument("`lookup` must be rank 1 or 2."));
-
-    std::vector<absl::Span<const int32_t>> table;
-    if (lookup.dims() == 1) {
-      OP_REQUIRES_OK(context, IndexCDFVector(lookup.flat<int32_t>(), &table));
-    } else {
-      DCHECK_EQ(lookup.dims(), 2);
-      OP_REQUIRES_OK(context, IndexCDFMatrix(lookup.matrix<int32_t>(), &table));
-    }
-
-    auto output = output_tensor->flat<Variant>();
-    for (int64_t i = 0; i < output.size(); ++i) {
-      EntropyDecoderVariant wrap;
-      wrap.decoder =
-          std::make_shared<RangeDecoderInterface>(encoded(i), table, lookup);
-      wrap.holder = encoded_tensor;
-      output(i) = std::move(wrap);
-    }
+    Tensor* output;
+    OP_REQUIRES_OK(context, context->allocate_output(0, handle_shape, &output));
+    output->flat<Variant>()(0) = std::move(wrap);
   }
 };
 
 REGISTER_KERNEL_BUILDER(
     Name("CreateRangeDecoder").Device(tensorflow::DEVICE_CPU),
-    CreateRangeDecoderOp);
+    CreateRangeDecoderOp<RangeDecoderInterface>);
 
-class EntropyDecodeChannelOp : public tensorflow::OpKernel {
+class EntropyDecodeOp : public tensorflow::OpKernel {
  public:
   using OpKernel::OpKernel;
 
-  tensorflow::Status CheckShapes(tensorflow::OpKernelContext* context,
-                                 TensorShape* output_shape) const {
-    TensorShape suffix_shape;
-    TF_RETURN_IF_ERROR(
-        tensorflow::tensor::MakeShape(context->input(1), &suffix_shape));
-    *output_shape = context->input(0).shape();
-    output_shape->AppendShape(suffix_shape);
-    return tensorflow::OkStatus();
-  }
-
   void Compute(tensorflow::OpKernelContext* context) override {
-    TensorShape output_shape;
-    OP_REQUIRES_OK(context, CheckShapes(context, &output_shape));
-
     // This is an unnecessary shallow copy but helps avoiding a const_cast.
-    Tensor handle_tensor = context->input(0);
-    auto handle = handle_tensor.flat<Variant>();
+    Tensor handle = context->input(0);
+    OP_REQUIRES(context, handle.shape().num_elements() != 0,
+                errors::InvalidArgument("`handle` is empty: ", handle.shape()));
+    context->set_output(0, handle);
 
-    const int prefix_dims = handle_tensor.dims();
+    auto* wrap = handle.flat<Variant>()(0).get<EntropyDecoderVariant>();
+    OP_REQUIRES(context, wrap != nullptr && wrap->decoder != nullptr,
+                errors::InvalidArgument("'handle' is not a decoder"));
+
+    Tensor const* suffix_shape_tensor = nullptr;
+    OP_REQUIRES_OK(context, context->input("shape", &suffix_shape_tensor));
+
+    TensorShape suffix_shape;
+    OP_REQUIRES_OK(context, tensorflow::tensor::MakeShape(*suffix_shape_tensor,
+                                                          &suffix_shape));
+
+    TensorShape output_shape = handle.shape();
+    output_shape.AppendShape(suffix_shape);
 
     Tensor* output_tensor;
     OP_REQUIRES_OK(context,
                    context->allocate_output(1, output_shape, &output_tensor));
     auto output =
-        output_tensor->flat_inner_outer_dims<int32_t, 2>(prefix_dims - 1);
+        output_tensor->flat_inner_outer_dims<int32_t, 2>(handle.dims() - 1);
 
-    const int64_t index_stride =
-        output_shape.dims() == prefix_dims
-            ? 1
-            : output_shape.dim_size(output_shape.dims() - 1);
-    CHECK_EQ(output.dimension(1) % index_stride, 0);
+    if (context->num_inputs() > 2) {
+      // EntropyDecodeIndex op.
+      Tensor const* index_tensor = nullptr;
+      OP_REQUIRES_OK(context, context->input("index", &index_tensor));
+      OP_REQUIRES(context, index_tensor->shape() == output_shape,
+                  errors::InvalidArgument("'index' shape should match 'handle' "
+                                          "shape + 'shape': index.shape=",
+                                          index_tensor->shape(),
+                                          ", handle.shape=", handle.shape(),
+                                          ", shape=", suffix_shape));
 
-    const int64_t cost_per_unit = 80 * output.dimension(1);
-    tensorflow::thread::ThreadPool* workers =
-        context->device()->tensorflow_cpu_worker_threads()->workers;
-    tensorflow::mutex mu;
-    workers->ParallelFor(handle.size(), cost_per_unit,
-                         [&handle, &mu, context, index_stride, &output](
-                             int64_t start, int64_t limit) {
-                           PerShard(handle, index_stride, output, context, &mu,
-                                    start, limit);
-                         });
-
-    context->set_output(0, handle_tensor);
-  }
-
- private:
-  static void PerShard(TTypes<Variant>::Flat handle, const int64_t index_stride,
-                       TTypes<int32_t>::Matrix output,
-                       tensorflow::OpKernelContext* context,
-                       tensorflow::mutex* mu, int64_t start, int64_t limit) {
-#define REQUIRES(cond, status)        \
-  if (!ABSL_PREDICT_TRUE(cond)) {     \
-    tensorflow::mutex_lock lock(*mu); \
-    context->SetStatus(status);       \
-    return;                           \
-  }
-#define REQUIRES_OK(status) \
-  {                         \
-    auto s = (status);      \
-    REQUIRES(s.ok(), s);    \
-  }
-
-    const int64_t num_elements = output.dimension(1);
-    auto* p_output = &output(start, 0);
-    int64_t index = 0;
-
-    for (int64_t i = start; i < limit; ++i) {
-      auto* wrap = handle(i).get<EntropyDecoderVariant>();
-      REQUIRES(wrap != nullptr && wrap->decoder != nullptr,
-               errors::InvalidArgument("'handle' is not a decoder"));
-      auto* decoder = wrap->decoder.get();
-
-      for (int64_t j = 0; j < num_elements; ++j) {
-        REQUIRES_OK(decoder->Decode(index++, p_output++));
-        if (index == index_stride) index = 0;
-      }
+      auto index =
+          index_tensor->flat_inner_outer_dims<int32_t, 2>(handle.dims() - 1);
+      OP_REQUIRES_OK(context, wrap->decoder->Decode(context, index, output));
+    } else {
+      // EntropyDecodeChannel op.
+      TTypes<int32_t>::ConstMatrix index(nullptr, 0, 0);
+      OP_REQUIRES_OK(context, wrap->decoder->Decode(context, index, output));
     }
   }
-
-#undef REQUIRES
-#undef REQUIRES_OK
 };
 
+REGISTER_KERNEL_BUILDER(
+    Name("EntropyDecodeIndex").Device(tensorflow::DEVICE_CPU), EntropyDecodeOp);
 REGISTER_KERNEL_BUILDER(
     Name("EntropyDecodeChannel").Device(tensorflow::DEVICE_CPU),
-    EntropyDecodeChannelOp);
-
-class EntropyDecodeIndexOp : public tensorflow::OpKernel {
- public:
-  using OpKernel::OpKernel;
-
-  tensorflow::Status CheckShapes(tensorflow::OpKernelContext* context,
-                                 TensorShape* output_shape) const {
-    TensorShape suffix_shape;
-    TF_RETURN_IF_ERROR(
-        tensorflow::tensor::MakeShape(context->input(2), &suffix_shape));
-
-    *output_shape = context->input(0).shape();
-    output_shape->AppendShape(suffix_shape);
-
-    TensorShape index_shape = context->input(1).shape();
-    if (index_shape != *output_shape) {
-      return errors::InvalidArgument(
-          "'index' shape should match 'handle' shape + 'shape': index.shape=",
-          index_shape, ", handle.shape=", context->input(0).shape(),
-          ", shape=", suffix_shape);
-    }
-
-    return tensorflow::OkStatus();
-  }
-
-  void Compute(tensorflow::OpKernelContext* context) override {
-    TensorShape output_shape;
-    OP_REQUIRES_OK(context, CheckShapes(context, &output_shape));
-
-    // This is an unnecessary shallow copy but helps avoiding a const_cast.
-    Tensor handle_tensor = context->input(0);
-    auto handle = handle_tensor.flat<Variant>();
-
-    const int prefix_dims = handle_tensor.dims();
-    auto index =
-        context->input(1).flat_inner_outer_dims<int32_t, 2>(prefix_dims - 1);
-
-    CHECK_EQ(handle.dimension(0), index.dimension(0));
-
-    Tensor* output_tensor;
-    OP_REQUIRES_OK(context,
-                   context->allocate_output(1, output_shape, &output_tensor));
-    auto output =
-        output_tensor->flat_inner_outer_dims<int32_t, 2>(prefix_dims - 1);
-
-    const int64_t cost_per_unit = 80 * index.dimension(1);
-    tensorflow::thread::ThreadPool* workers =
-        context->device()->tensorflow_cpu_worker_threads()->workers;
-    tensorflow::mutex mu;
-    workers->ParallelFor(
-        handle.size(), cost_per_unit,
-        [&handle, &mu, context, index, &output](int64_t start, int64_t limit) {
-          PerShard(handle, index, output, context, &mu, start, limit);
-        });
-
-    context->set_output(0, handle_tensor);
-  }
-
- private:
-  static void PerShard(TTypes<Variant>::Flat handle,
-                       TTypes<int32_t>::ConstMatrix index,
-                       TTypes<int32_t>::Matrix output,
-                       tensorflow::OpKernelContext* context,
-                       tensorflow::mutex* mu, int64_t start, int64_t limit) {
-#define REQUIRES(cond, status)        \
-  if (!ABSL_PREDICT_TRUE(cond)) {     \
-    tensorflow::mutex_lock lock(*mu); \
-    context->SetStatus(status);       \
-    return;                           \
-  }
-#define REQUIRES_OK(status) \
-  {                         \
-    auto s = (status);      \
-    REQUIRES(s.ok(), s);    \
-  }
-
-    const int64_t num_elements = output.dimension(1);
-    const int32_t* p_index = &index(start, 0);
-    int32_t* p_output = &output(start, 0);
-
-    for (int64_t i = start; i < limit; ++i) {
-      auto* wrap = handle(i).get<EntropyDecoderVariant>();
-      REQUIRES(wrap != nullptr && wrap->decoder != nullptr,
-               errors::InvalidArgument("'handle' is not a decoder"));
-      auto* decoder = wrap->decoder.get();
-
-      for (int64_t j = 0; j < num_elements; ++j) {
-        REQUIRES_OK(decoder->Decode(*(p_index++), p_output++));
-      }
-    }
-  }
-
-#undef REQUIRES
-#undef REQUIRES_OK
-};
-
-REGISTER_KERNEL_BUILDER(
-    Name("EntropyDecodeIndex").Device(tensorflow::DEVICE_CPU),
-    EntropyDecodeIndexOp);
+    EntropyDecodeOp);
 
 class EntropyDecodeFinalizeOp : public tensorflow::OpKernel {
  public:
@@ -762,25 +683,15 @@ class EntropyDecodeFinalizeOp : public tensorflow::OpKernel {
 
   void Compute(tensorflow::OpKernelContext* context) override {
     // This is an unnecessary shallow copy but helps avoiding a const_cast.
-    Tensor handle_tensor = context->input(0);
-    auto handle = handle_tensor.flat<Variant>();
+    Tensor handle = context->input(0);
+    OP_REQUIRES(context, handle.shape().num_elements() != 0,
+                errors::InvalidArgument("`handle` is empty: ", handle.shape()));
 
-    Tensor* output_tensor;
-    OP_REQUIRES_OK(context, context->allocate_output(0, handle_tensor.shape(),
-                                                     &output_tensor));
-    auto output = output_tensor->flat<bool>();
+    auto* wrap = handle.flat<Variant>()(0).get<EntropyDecoderVariant>();
+    OP_REQUIRES(context, wrap != nullptr && wrap->decoder != nullptr,
+                errors::InvalidArgument("'handle' is not a decoder"));
 
-    for (int64_t i = 0; i < handle.size(); ++i) {
-      auto* wrap = handle(i).get<EntropyDecoderVariant>();
-      OP_REQUIRES(context, wrap != nullptr && wrap->decoder != nullptr,
-                  errors::InvalidArgument("'handle' is not a decoder"));
-      auto status = wrap->decoder->Finalize();
-      output(i) = status.ok();
-      if (!status.ok()) {
-        VLOG(0) << status.error_message();
-      }
-      handle(i).clear();
-    }
+    OP_REQUIRES_OK(context, wrap->decoder->Finalize(context));
   }
 };
 
