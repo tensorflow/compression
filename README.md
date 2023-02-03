@@ -269,8 +269,7 @@ sudo docker run -i --rm -v /tmp/tensorflow_compression:/tmp/tensorflow_compressi
      cd /tensorflow_compression &&
      python -m pip install -U pip setuptools wheel &&
      python -m pip install -r requirements.txt &&
-     bazel build -c opt --copt=-mavx --crosstool_top=@ubuntu20.04-gcc9_manylinux2014-cuda11.2-cudnn8.1-tensorrt7.2_config_cuda//crosstool:toolchain :build_pip_pkg
-     python build_pip_pkg.py bazel-bin/build_pip_pkg.runfiles/tensorflow_compression /tmp/tensorflow_compression custom_version"
+     bazel run -c opt --copt=-mavx --crosstool_top=@ubuntu20.04-gcc9_manylinux2014-cuda11.2-cudnn8.1-tensorrt7.2_config_cuda//crosstool:toolchain :build_pip_pkg -- . /tmp/tensorflow_compression <custom-version>"
 ```
 
 For Darwin, the Docker image and specifying the toolchain is not necessary. We
@@ -282,8 +281,7 @@ git clone https://github.com/tensorflow/compression.git /tensorflow_compression
 cd /tensorflow_compression
 python -m pip install -U pip setuptools wheel
 python -m pip install -r requirements.txt
-bazel build -c opt --copt=-mavx --macos_minimum_os=10.14 :build_pip_pkg
-python build_pip_pkg.py bazel-bin/build_pip_pkg.runfiles/tensorflow_compression /tmp/tensorflow_compression custom_version"
+bazel run -c opt --copt=-mavx --macos_minimum_os=10.14 :build_pip_pkg -- . /tmp/tensorflow_compression <custom-version>"
 ```
 
 In both cases, the wheel file is created inside `/tmp/tensorflow_compression`.

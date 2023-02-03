@@ -22,9 +22,8 @@ import sys
 import tempfile
 import setuptools
 
-# Version string is intentionally set to non-numeric value, so that non-release
-# built packages are different from release packages.
-DEFAULT_VERSION = "custom-build-from-source"
+# Version string should follow PEP440 rules.
+DEFAULT_VERSION = "0.dev0+build-from-source"
 
 
 class BinaryDistribution(setuptools.Distribution):
@@ -101,5 +100,5 @@ def main(srcdir: str, destdir: str, version: str = ""):
 
 
 if __name__ == "__main__":
-  main(*sys.argv[1:])  # pylint: disable=no-value-for-parameter
+  main(*sys.argv[1:])  # pylint: disable=too-many-function-args
 
