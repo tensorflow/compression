@@ -480,7 +480,7 @@ class _SignalConv(tf.keras.layers.Layer):
     self._check_not_built()
     # This is necessary to make Keras deserialization via __init__ work.
     if isinstance(value, dict):
-      value = tf.keras.utils.deserialize_keras_object(value)
+      value = tf.keras.utils.legacy.deserialize_keras_object(value)
     if isinstance(value, str):
       if value not in ("variable", "rdft"):
         raise ValueError(f"Unsupported value for kernel_parameter: '{value}'.")
@@ -498,7 +498,7 @@ class _SignalConv(tf.keras.layers.Layer):
     self._check_not_built()
     # This is necessary to make Keras deserialization via __init__ work.
     if isinstance(value, dict):
-      value = tf.keras.utils.deserialize_keras_object(value)
+      value = tf.keras.utils.legacy.deserialize_keras_object(value)
     if isinstance(value, str):
       if value != "variable":
         raise ValueError(f"Unsupported value for bias_parameter: '{value}'.")
@@ -991,7 +991,7 @@ class _SignalConv(tf.keras.layers.Layer):
       if isinstance(parameter, str):
         return parameter
       try:
-        return tf.keras.utils.serialize_keras_object(parameter)
+        return tf.keras.utils.legacy.serialize_keras_object(parameter)
       except (ValueError, TypeError):  # Should throw TypeError, but doesn't...
         if isinstance(parameter, tf.Variable):
           return "variable"

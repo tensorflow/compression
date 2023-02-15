@@ -218,7 +218,7 @@ class GDN(tf.keras.layers.Layer):
     self._check_not_built()
     # This is necessary to make Keras deserialization via __init__ work.
     if isinstance(value, dict):
-      value = tf.keras.utils.deserialize_keras_object(value)
+      value = tf.keras.utils.legacy.deserialize_keras_object(value)
     if value is not None and not callable(value):
       # It's a constant, so keep it in compute_dtype.
       value = tf.convert_to_tensor(value, dtype=self.compute_dtype)
@@ -233,7 +233,7 @@ class GDN(tf.keras.layers.Layer):
     self._check_not_built()
     # This is necessary to make Keras deserialization via __init__ work.
     if isinstance(value, dict):
-      value = tf.keras.utils.deserialize_keras_object(value)
+      value = tf.keras.utils.legacy.deserialize_keras_object(value)
     if value is not None and not callable(value):
       # It's a constant, so keep it in compute_dtype.
       value = tf.convert_to_tensor(value, dtype=self.compute_dtype)
@@ -248,7 +248,7 @@ class GDN(tf.keras.layers.Layer):
     self._check_not_built()
     # This is necessary to make Keras deserialization via __init__ work.
     if isinstance(value, dict):
-      value = tf.keras.utils.deserialize_keras_object(value)
+      value = tf.keras.utils.legacy.deserialize_keras_object(value)
     if value is not None and not callable(value):
       # It's a constant, so keep it in compute_dtype.
       value = tf.convert_to_tensor(value, dtype=self.compute_dtype)
@@ -263,7 +263,7 @@ class GDN(tf.keras.layers.Layer):
     self._check_not_built()
     # This is necessary to make Keras deserialization via __init__ work.
     if isinstance(value, dict):
-      value = tf.keras.utils.deserialize_keras_object(value)
+      value = tf.keras.utils.legacy.deserialize_keras_object(value)
     if value is not None and not callable(value):
       # It's a constant, so keep it in compute_dtype.
       value = tf.convert_to_tensor(value, dtype=self.compute_dtype)
@@ -431,7 +431,7 @@ class GDN(tf.keras.layers.Layer):
       if parameter is None:
         return None
       try:
-        return tf.keras.utils.serialize_keras_object(parameter)
+        return tf.keras.utils.legacy.serialize_keras_object(parameter)
       except (ValueError, TypeError):  # Should throw TypeError, but doesn't...
         try:
           return float(parameter)
@@ -449,18 +449,22 @@ class GDN(tf.keras.layers.Layer):
         rectify=self.rectify,
         data_format=self.data_format,
         alpha_parameter=alpha_parameter,
-        beta_parameter=tf.keras.utils.serialize_keras_object(
-            self.beta_parameter),
-        gamma_parameter=tf.keras.utils.serialize_keras_object(
-            self.gamma_parameter),
+        beta_parameter=tf.keras.utils.legacy.serialize_keras_object(
+            self.beta_parameter
+        ),
+        gamma_parameter=tf.keras.utils.legacy.serialize_keras_object(
+            self.gamma_parameter
+        ),
         epsilon_parameter=epsilon_parameter,
         alpha_initializer=tf.keras.initializers.serialize(
-            self.alpha_initializer),
-        beta_initializer=tf.keras.initializers.serialize(
-            self.beta_initializer),
+            self.alpha_initializer
+        ),
+        beta_initializer=tf.keras.initializers.serialize(self.beta_initializer),
         gamma_initializer=tf.keras.initializers.serialize(
-            self.gamma_initializer),
+            self.gamma_initializer
+        ),
         epsilon_initializer=tf.keras.initializers.serialize(
-            self.epsilon_initializer),
+            self.epsilon_initializer
+        ),
     )
     return config

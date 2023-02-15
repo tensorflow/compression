@@ -31,9 +31,9 @@ class ParameterTest:
     parameter = self.cls(initial_value, **self.kwargs)
     name_before = parameter.name
     value_before = parameter()
-    json = tf.keras.utils.serialize_keras_object(parameter)
+    json = tf.keras.utils.legacy.serialize_keras_object(parameter)
     weights = parameter.get_weights()
-    parameter = tf.keras.utils.deserialize_keras_object(json)
+    parameter = tf.keras.utils.legacy.deserialize_keras_object(json)
     self.assertIsInstance(parameter, self.cls)
     self.assertEqual(name_before, parameter.name)
     parameter.set_weights(weights)
