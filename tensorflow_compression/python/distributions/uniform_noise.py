@@ -44,7 +44,11 @@ def _logsum_expbig_minus_expsmall(big, small):
     `tf.Tensor` containing the result.
   """
   with tf.name_scope("logsum_expbig_minus_expsmall"):
-    return tf.math.log1p(-tf.exp(small - big)) + big
+    # Have to special case `inf` and `-inf` since otherwise we get a NaN
+    # out of the exp (if both small and big are -inf).
+    return tf.where(
+        tf.math.is_inf(big), big, tf.math.log1p(-tf.exp(small - big)) + big
+    )
 
 
 class UniformNoiseAdapter(tfp.distributions.Distribution):

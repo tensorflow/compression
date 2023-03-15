@@ -161,6 +161,15 @@ class MixtureTest:
     with self.assertRaises(NotImplementedError):
       dist.survival_function(.5)
 
+  def test_stable(self):
+    # An extreme distribution that has probability 1 at 0 and probability 0
+    # otherwise.
+    dist = self.dist_cls(loc=[0, 0], scale=[0, 0], weight=[0.5, 0.5])
+    with self.subTest("AtTheMode"):
+      self.assertAllClose(dist.prob([0]), [1.0])
+    with self.subTest("NotAtTheMode"):
+      self.assertAllClose(dist.prob([1]), [0.0])
+
 
 class NoisyNormalMixtureTest(MixtureTest, tf.test.TestCase):
 
