@@ -50,7 +50,7 @@ using tensorflow::tstring;
   {                                                                    \
     auto s = (status);                                                 \
     OP_REQUIRES(context, s.ok(), tensorflow::Status(                   \
-        static_cast<tensorflow::error::Code>(s.code()), s.message())); \
+        static_cast<tensorflow::errors::Code>(s.code()), s.message())); \
   }
 
 class RunLengthGammaEncodeOp : public OpKernel {

@@ -46,11 +46,13 @@ using tensorflow::TensorShape;
 using tensorflow::TensorShapeUtils;
 using tensorflow::tstring;
 
-#define OP_REQUIRES_OK_ABSL(context, status) \
-  {                                                                    \
-    auto s = (status);                                                 \
-    OP_REQUIRES(context, s.ok(), tensorflow::Status(                   \
-        static_cast<tensorflow::error::Code>(s.code()), s.message())); \
+#define OP_REQUIRES_OK_ABSL(context, status)                                \
+  {                                                                         \
+    auto s = (status);                                                      \
+    OP_REQUIRES(                                                            \
+        context, s.ok(),                                                    \
+        tensorflow::Status(static_cast<tensorflow::errors::Code>(s.code()), \
+                           s.message()));                                   \
   }
 
 // TODO(jonycgn): Try to avoid in-loop branches based on attributes.
