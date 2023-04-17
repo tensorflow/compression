@@ -329,7 +329,7 @@ TEST_F(RangeCoderOpsTest, InvalidCdfShape) {
   {
     const Status status = RunEncodeOp(10, {data, cdf}, &unused);
     EXPECT_FALSE(status.ok());
-    EXPECT_NE(status.error_message().find("`cdf` should have one more axis"),
+    EXPECT_NE(status.ToString().find("`cdf` should have one more axis"),
               std::string::npos);
   }
 
@@ -339,7 +339,7 @@ TEST_F(RangeCoderOpsTest, InvalidCdfShape) {
   {
     const Status status = RunDecodeOp(10, {empty, shape, cdf}, &unused);
     EXPECT_FALSE(status.ok());
-    EXPECT_NE(status.error_message().find("`cdf` should have one more axis"),
+    EXPECT_NE(status.ToString().find("`cdf` should have one more axis"),
               std::string::npos);
   }
 
@@ -347,16 +347,14 @@ TEST_F(RangeCoderOpsTest, InvalidCdfShape) {
   {
     const Status status = RunEncodeOp(10, {data, cdf}, &unused);
     EXPECT_FALSE(status.ok());
-    EXPECT_NE(
-        status.error_message().find("last dimension of `cdf` should be > 1"),
-        std::string::npos);
+    EXPECT_NE(status.ToString().find("last dimension of `cdf` should be > 1"),
+              std::string::npos);
   }
   {
     const Status status = RunDecodeOp(10, {empty, shape, cdf}, &unused);
     EXPECT_FALSE(status.ok());
-    EXPECT_NE(
-        status.error_message().find("last dimension of `cdf` should be > 1"),
-        std::string::npos);
+    EXPECT_NE(status.ToString().find("last dimension of `cdf` should be > 1"),
+              std::string::npos);
   }
 }
 
@@ -405,7 +403,7 @@ TEST_F(RangeCoderOpsTest, InvalidBroadcast) {
   {
     const Status status = RunEncodeOp(10, {data, cdf}, &unused);
     EXPECT_FALSE(status.ok());
-    EXPECT_NE(status.error_message().find("Cannot broadcast shape"),
+    EXPECT_NE(status.ToString().find("Cannot broadcast shape"),
               std::string::npos);
   }
 
@@ -417,7 +415,7 @@ TEST_F(RangeCoderOpsTest, InvalidBroadcast) {
   {
     const Status status = RunDecodeOp(10, {empty, shape, cdf}, &unused);
     EXPECT_FALSE(status.ok());
-    EXPECT_NE(status.error_message().find("Cannot broadcast shape"),
+    EXPECT_NE(status.ToString().find("Cannot broadcast shape"),
               std::string::npos);
   }
 
@@ -427,8 +425,7 @@ TEST_F(RangeCoderOpsTest, InvalidBroadcast) {
   {
     const Status status = RunEncodeOp(10, {data, cdf}, &unused);
     EXPECT_FALSE(status.ok());
-    EXPECT_NE(status.error_message().find("Irregular broadcast"),
-              std::string::npos);
+    EXPECT_NE(status.ToString().find("Irregular broadcast"), std::string::npos);
   }
 
   shape = Tensor{DT_INT32, {static_cast<int64_t>(shape_vector.size())}};
@@ -438,17 +435,16 @@ TEST_F(RangeCoderOpsTest, InvalidBroadcast) {
   {
     const Status status = RunDecodeOp(10, {empty, shape, cdf}, &unused);
     EXPECT_FALSE(status.ok());
-    EXPECT_NE(status.error_message().find("Irregular broadcast"),
-              std::string::npos);
+    EXPECT_NE(status.ToString().find("Irregular broadcast"), std::string::npos);
   }
 }
 
-#define EXPECT_STATUS_SUBSTR(status_expr, message)                       \
-  {                                                                      \
-    auto status = (status_expr);                                         \
-    EXPECT_FALSE(status.ok());                                           \
-    EXPECT_NE(status.error_message().find((message)), std::string::npos) \
-        << status.error_message();                                       \
+#define EXPECT_STATUS_SUBSTR(status_expr, message)                  \
+  {                                                                 \
+    auto status = (status_expr);                                    \
+    EXPECT_FALSE(status.ok());                                      \
+    EXPECT_NE(status.ToString().find((message)), std::string::npos) \
+        << status.ToString();                                       \
   }
 
 TEST_F(RangeCoderOpsTest, EncoderDebug) {

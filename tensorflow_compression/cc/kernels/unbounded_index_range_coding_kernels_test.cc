@@ -312,8 +312,8 @@ TEST_F(UnboundedIndexRangeCoderOpsTest, EncoderDebug) {
     auto status =                                                     \
         RunEncodeOpDebug(5, 2, {data, index, cdf, cdf_size, offset}); \
     EXPECT_FALSE(status.ok());                                        \
-    EXPECT_NE(status.error_message().find((message)), string::npos)   \
-        << status.error_message();                                    \
+    EXPECT_NE(status.ToString().find((message)), string::npos)        \
+        << status.ToString();                                         \
   }
 
   index.scalar<int32_t>()() = -1;
