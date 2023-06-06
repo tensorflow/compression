@@ -653,7 +653,7 @@ class _SignalConv(tf.keras.layers.Layer):
           strides=strides, padding="VALID", data_format=data_format)
       # Perform remaining downsampling.
       slices = tuple(slice(None, None, s // gcf) for s in self.strides_down)
-      if any(s.step > 1 for s in slices):
+      if any(s.step > 1 for s in slices):  # pytype: disable=unsupported-operands
         outputs = outputs[self._padded_tuple(slices, slice(None))]
     else:
       self._raise_notimplemented()
