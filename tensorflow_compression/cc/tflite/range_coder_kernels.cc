@@ -91,12 +91,18 @@ TfLiteStatus CheckOutputTypes(TfLiteContext* context, TfLiteNode* node) {
   return CheckOutputTypesImpl<t...>(context, node, 0);
 }
 
+struct TfLiteIntArrayDeleter {
+  void operator()(TfLiteIntArray* p) {
+    if (p) TfLiteIntArrayFree(p);
+  }
+};
+
 // REQUIRES: tensor->type == kTfLiteInt32
 // REQUIRES: NumDimensions(tensor) == 1
-std::unique_ptr<TfLiteIntArray, tflite::TfLiteIntArrayDeleter> MakeShape(
+std::unique_ptr<TfLiteIntArray, TfLiteIntArrayDeleter> MakeShape(
     const TfLiteTensor* tensor) {
   const int dims = SizeOfDimension(tensor, 0);
-  std::unique_ptr<TfLiteIntArray, tflite::TfLiteIntArrayDeleter> shape(
+  std::unique_ptr<TfLiteIntArray, TfLiteIntArrayDeleter> shape(
       TfLiteIntArrayCreate(dims));
   std::copy_n(GetTensorData<int32_t>(tensor), dims, shape->data);
   return shape;
