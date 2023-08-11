@@ -349,6 +349,8 @@ class Y4MDatasetOp : public DatasetOpKernel {
             case 'C':
               if (absl::ConsumePrefix(&header, "420jpeg")) {
                 chroma_format = ChromaFormat::I420;
+              } else if (absl::ConsumePrefix(&header, "420")) {
+                chroma_format = ChromaFormat::I420;
               } else if (absl::ConsumePrefix(&header, "444")) {
                 chroma_format = ChromaFormat::I444;
               } else {
