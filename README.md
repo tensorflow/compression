@@ -324,7 +324,7 @@ If you use this library for research purposes, please cite:
   author = "Ballé, Johannes and Hwang, Sung Jin and Agustsson, Eirikur",
   title = "{T}ensor{F}low {C}ompression: Learned Data Compression",
   url = "http://github.com/tensorflow/compression",
-  version = "2.13.0",
+  version = "2.14.0",
   year = "2023",
 }
 ```
