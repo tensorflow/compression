@@ -7,7 +7,7 @@ tensorflow_compression_workspace()
 http_archive(
     name = "org_tensorflow",
     sha256 = "ce357fd0728f0d1b0831d1653f475591662ec5bca736a94ff789e6b1944df19f",
-    strip_prefix = "tensorflow-2.13.0",
+    strip_prefix = "tensorflow-2.14.0",
     urls = [
         "https://github.com/tensorflow/tensorflow/archive/refs/tags/v2.14.0.tar.gz",
     ],
