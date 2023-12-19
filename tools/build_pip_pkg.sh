@@ -15,30 +15,36 @@
 # ==============================================================================
 
 # This script must run at the workspace root directory.
-# In addition, `tensorflow_compression/cc:libtensorflow_compression.so` should
-# have been built using bazel.
 
 set -ex  # Fail if any command fails, echo commands.
 
-OUTPUT_DIR="${1-/tmp}"
-WHEEL_VERSION="${2-0.dev0}"
+# Script configuration --------------------------------------------------------
+OUTPUT_DIR="${1-/tmp/tensorflow_compression}"
+WHEEL_VERSION=${2-0.dev0}
 
-PKGDIR="$(mktemp -d)"
-trap 'rm -r -- "${PKGDIR}"' EXIT
+# Optionally exported environment variables.
+: ${BAZEL_OPT:=}
+# -----------------------------------------------------------------------------
 
-cp LICENSE README.md MANIFEST.in requirements.txt build_pip_pkg.py "${PKGDIR}"
+python -m pip install -U pip setuptools wheel
+python -m pip install -r requirements.txt
+bazel build ${BAZEL_OPT} -c opt --copt=-mavx tensorflow_compression/cc:libtensorflow_compression.so
 
-mkdir -p "${PKGDIR}/tensorflow_compression/cc"
+SRCDIR="$(mktemp -d)"
+trap 'rm -r -- "${SRCDIR}"' EXIT
+
+cp LICENSE README.md MANIFEST.in requirements.txt "${SRCDIR}"
+
+mkdir -p "${SRCDIR}/tensorflow_compression/cc"
 cp "$(bazel info -c opt bazel-genfiles)/tensorflow_compression/cc/libtensorflow_compression.so" \
-  "${PKGDIR}/tensorflow_compression/cc"
+  "${SRCDIR}/tensorflow_compression/cc"
 
 
-copy_file()
-{
-  FILENAME="${1#./}"
-  DEST="${PKGDIR%/}/$(dirname "${FILENAME}")"
-  mkdir -p "${DEST}"
-  cp "${FILENAME}" "${DEST}"
+copy_file() {
+  local FILENAME="${1#./}"
+  local DST="${SRCDIR%/}/$(dirname "${FILENAME}")"
+  mkdir -p "${DST}"
+  cp "${FILENAME}" "${DST}"
 }
 
 copy_file "tensorflow_compression/__init__.py"
@@ -48,6 +54,4 @@ copy_file "tensorflow_compression/all_tests.py"
 find tensorflow_compression/python -name "*.py" \
   | while read filename; do copy_file "${filename}"; done
 
-pushd "${PKGDIR}"
-python build_pip_pkg.py . "${OUTPUT_DIR}" "${WHEEL_VERSION}"
-popd
+python tools/build_pip_pkg.py "${SRCDIR}" "${OUTPUT_DIR}" "${WHEEL_VERSION}"

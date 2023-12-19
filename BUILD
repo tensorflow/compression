@@ -45,7 +45,7 @@ py_binary(
 
 py_binary(
     name = "build_pip_pkg",
-    srcs = ["build_pip_pkg.py"],
+    srcs = ["tools/build_pip_pkg.py"],
     data = [
         "LICENSE",
         "README.md",
