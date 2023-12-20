@@ -220,7 +220,7 @@ class ContinuousIndexedEntropyModelTest(tf.test.TestCase,
       self.assertEqual(bits.shape, (2,))
       self.assertAllGreaterEqual(bits, 0.)
     finally:
-      tf.keras.mixed_precision.set_global_policy(None)
+      tf.keras.mixed_precision.set_global_policy(tf.keras.backend.floatx())
 
 
 class LocationScaleIndexedEntropyModelTest(tf.test.TestCase):

@@ -115,7 +115,7 @@ class PowerLawEntropyModelTest(tf.test.TestCase):
       self.assertEqual(penalty.dtype, tf.float16)
       self.assertEqual(penalty.shape, (2,))
     finally:
-      tf.keras.mixed_precision.set_global_policy(None)
+      tf.keras.mixed_precision.set_global_policy(tf.keras.backend.floatx())
 
 
 if __name__ == "__main__":

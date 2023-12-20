@@ -207,7 +207,7 @@ class GDNTest(tf.test.TestCase, parameterized.TestCase):
         self.assertEqual(variable.dtype, tf.float32)
       self.assertEqual(y.dtype, tf.float16)
     finally:
-      tf.keras.mixed_precision.set_global_policy(None)
+      tf.keras.mixed_precision.set_global_policy(tf.keras.backend.floatx())
 
 
 if __name__ == "__main__":

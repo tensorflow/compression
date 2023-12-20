@@ -215,7 +215,7 @@ class ContinuousBatchedEntropyModelTest(tf.test.TestCase,
       self.assertEqual(bits.shape, (2,))
       self.assertAllGreaterEqual(bits, 0.)
     finally:
-      tf.keras.mixed_precision.set_global_policy(None)
+      tf.keras.mixed_precision.set_global_policy(tf.keras.backend.floatx())
 
   def test_small_cdfs_for_dirac_prior_without_quantization_offset(self):
     prior = uniform_noise.NoisyNormal(loc=100. * tf.range(16.), scale=1e-10)
