@@ -38,9 +38,9 @@ calling RunLengthEncode with run_length_code = -1, magnitude_code = -1, and
 use_run_length_for_non_zeros = false.
 
 run_length_code: If >= 0, use Rice code with this parameter to encode run
-  lengths, else use Golomb code.
+  lengths, else use Elias gamma code.
 magnitude_code: If >= 0, use Rice code with this parameter to encode magnitudes,
-  else use Golomb code.
+  else use Elias gamma code.
 use_run_length_for_non_zeros: If true, alternate between coding run lengths of
   zeros and non-zeros. If false, only encode run lengths of zeros, and encode
   non-zeros one by one.
@@ -72,9 +72,9 @@ calling RunLengthDecode with run_length_code = -1, magnitude_code = -1, and
 use_run_length_for_non_zeros = false.
 
 run_length_code: If >= 0, use Rice code with this parameter to decode run
-  lengths, else use Golomb code.
+  lengths, else use Elias gamma code.
 magnitude_code: If >= 0, use Rice code with this parameter to decode magnitudes,
-  else use Golomb code.
+  else use Elias gamma code.
 use_run_length_for_non_zeros: If true, alternate between coding run lengths of
   zeros and non-zeros. If false, only decode run lengths of zeros, and decode
   non-zeros one by one.
