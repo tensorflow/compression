@@ -36,29 +36,3 @@ py_library(
         "//tensorflow_compression/python/util:packed_tensors",
     ],
 )
-
-py_binary(
-    name = "build_api_docs",
-    srcs = ["tools/build_api_docs.py"],
-    deps = [":tensorflow_compression"],
-)
-
-py_binary(
-    name = "build_pip_pkg",
-    srcs = ["tools/build_pip_pkg.py"],
-    data = [
-        "LICENSE",
-        "README.md",
-        "MANIFEST.in",
-        "requirements.txt",
-        "tensorflow_compression/all_tests.py",
-        ":tensorflow_compression",
-        # The following targets are for Python unit tests.
-        "//tensorflow_compression/python/datasets:py_src",
-        "//tensorflow_compression/python/distributions:py_src",
-        "//tensorflow_compression/python/entropy_models:py_src",
-        "//tensorflow_compression/python/layers:py_src",
-        "//tensorflow_compression/python/ops:py_src",
-        "//tensorflow_compression/python/util:py_src",
-    ],
-)

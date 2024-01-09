@@ -75,7 +75,7 @@ releases](https://github.com/tensorflow/compression/releases).
 To install TFC via `pip`, run the following command:
 
 ```bash
-pip install tensorflow-compression
+python -m pip install tensorflow-compression
 ```
 
 To test that the installation works correctly, you can run the unit tests with:
@@ -95,7 +95,7 @@ installed TensorFlow version. Run it in a cell before executing your Python
 code:
 
 ```
-!pip install tensorflow-compression~=$(pip show tensorflow | perl -p -0777 -e 's/.*Version: (\d+\.\d+).*/\1.0/sg')
+%pip install tensorflow-compression~=$(pip show tensorflow | perl -p -0777 -e 's/.*Version: (\d+\.\d+).*/\1.0/sg')
 ```
 
 Note: The binary packages of TFC are tied to TF with the same minor version
@@ -114,7 +114,7 @@ host. For instance, you can use a command line like this:
 
 ```bash
 docker run tensorflow/tensorflow:latest bash -c \
-    "pip install tensorflow-compression &&
+    "python -m pip install tensorflow-compression &&
      python -m tensorflow_compression.all_tests"
 ```
 
@@ -132,7 +132,7 @@ installs TensorFlow and TensorFlow Compression:
 ```bash
 conda create --name ENV_NAME python cudatoolkit cudnn
 conda activate ENV_NAME
-pip install tensorflow-compression
+python -m pip install tensorflow-compression
 ```
 
 Depending on the requirements of the `tensorflow` pip package, you may need to
@@ -257,22 +257,19 @@ that TensorFlow uses.
 Inside the Docker container, the following steps need to be taken:
 
 1. Clone the `tensorflow/compression` repo from GitHub.
-2. Install Python dependencies.
-3. Run `:build_pip_pkg` inside the cloned repo.
+2. Run `tools/build_pip_pkg.sh` inside the cloned repo.
 
 For example:
 
 ```bash
-sudo docker run -i --rm -v /tmp/tensorflow_compression:/tmp/tensorflow_compression \
-    tensorflow/build:latest-python3.10 bash -c \
-    "git clone https://github.com/tensorflow/compression.git /tensorflow_compression &&
-     cd /tensorflow_compression &&
-     python -m pip install -U pip setuptools wheel &&
-     python -m pip install -r requirements.txt &&
-     bazel build -c opt --copt=-mavx --crosstool_top=@ubuntu20.04-gcc9_manylinux2014-cuda11.2-cudnn8.1-tensorrt7.2_config_cuda//crosstool:toolchain :build_pip_pkg &&
-     pushd bazel-bin/build_pip_pkg.runfiles/tensorflow_compression &&
-     python build_pip_pkg.py . /tmp/tensorflow_compression <custom-version> &&
-     popd"
+git clone https://github.com/tensorflow/compression.git /tensorflow_compression
+docker run -i --rm \
+    -v /tmp/tensorflow_compression:/tmp/tensorflow_compression\
+    -v /tensorflow_compression:/tensorflow_compression \
+    -w /tensorflow_compression \
+    -e "BAZEL_OPT=--config=manylinux_2_17_x86_64" \
+    tensorflow/build:latest-python3.10 \
+    bash tools/build_pip_pkg.sh /tmp/tensorflow_compression <custom-version>
 ```
 
 For Darwin, the Docker image and specifying the toolchain is not necessary. We
@@ -282,12 +279,9 @@ Python virtual environment to do this):
 ```bash
 git clone https://github.com/tensorflow/compression.git /tensorflow_compression
 cd /tensorflow_compression
-python -m pip install -U pip setuptools wheel
-python -m pip install -r requirements.txt
-bazel build -c opt --copt=-mavx --macos_minimum_os=10.14 :build_pip_pkg
-pushd bazel-bin/build_pip_pkg.runfiles/tensorflow_compression
-python build_pip_pkg.py . /tmp/tensorflow_compression <custom-version>"
-popd
+BAZEL_OPT="--macos_minimum_os=10.14" bash \
+  tools/build_pip_pkg.sh \
+  /tmp/tensorflow_compression <custom-version>
 ```
 
 In both cases, the wheel file is created inside `/tmp/tensorflow_compression`.
@@ -295,7 +289,7 @@ In both cases, the wheel file is created inside `/tmp/tensorflow_compression`.
 To test the created package, first install the resulting wheel file:
 
 ```bash
-pip install /tmp/tensorflow_compression/tensorflow_compression-*.whl
+python -m pip install /tmp/tensorflow_compression/tensorflow_compression-*.whl
 ```
 
 Then run the unit tests (Do not run the tests in the workspace directory where
@@ -312,7 +306,7 @@ popd
 When done, you can uninstall the pip package again:
 
 ```bash
-pip uninstall tensorflow-compression
+python -m pip uninstall tensorflow-compression
 ```
 
 ## Evaluation

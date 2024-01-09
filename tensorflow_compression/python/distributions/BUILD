@@ -81,8 +81,3 @@ py_test(
         ":round_adapters",
     ],
 )
-
-filegroup(
-    name = "py_src",
-    srcs = glob(["*.py"]),
-)

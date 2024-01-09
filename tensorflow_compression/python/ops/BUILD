@@ -68,8 +68,3 @@ py_test(
     srcs = ["quantization_ops_test.py"],
     deps = [":gen_ops"],
 )
-
-filegroup(
-    name = "py_src",
-    srcs = glob(["*.py"]),
-)

@@ -22,8 +22,3 @@ py_test(
     srcs = ["packed_tensors_test.py"],
     deps = [":packed_tensors"],
 )
-
-filegroup(
-    name = "py_src",
-    srcs = glob(["*.py"]),
-)

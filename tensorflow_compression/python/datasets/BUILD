@@ -23,8 +23,3 @@ py_test(
     srcs = ["y4m_dataset_test.py"],
     deps = [":y4m_dataset"],
 )
-
-filegroup(
-    name = "py_src",
-    srcs = glob(["*.py"]),
-)

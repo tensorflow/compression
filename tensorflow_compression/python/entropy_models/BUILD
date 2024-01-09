@@ -104,8 +104,3 @@ py_test(
         "//tensorflow_compression/python/distributions:uniform_noise",
     ],
 )
-
-filegroup(
-    name = "py_src",
-    srcs = glob(["*.py"]),
-)

@@ -89,8 +89,3 @@ py_test(
         "//tensorflow_compression/python/ops:round_ops",
     ],
 )
-
-filegroup(
-    name = "py_src",
-    srcs = glob(["*.py"]),
-)
