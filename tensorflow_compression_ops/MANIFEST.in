@@ -1,0 +1,3 @@
+global-include LICENSE
+global-include *.md
+recursive-include tensorflow_compression_ops/cc/ *.so
