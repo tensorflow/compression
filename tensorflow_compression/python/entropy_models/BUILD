@@ -10,6 +10,7 @@ py_library(
     deps = [
         ":continuous_batched",
         ":continuous_indexed",
+        ":laplace",
         ":power_law",
         ":universal",
     ],
@@ -66,6 +67,21 @@ py_test(
         ":continuous_indexed",
         "//tensorflow_compression/python/distributions:uniform_noise",
     ],
+)
+
+py_library(
+    name = "laplace",
+    srcs = ["laplace.py"],
+    deps = [
+        "//tensorflow_compression/python/ops:gen_ops",
+        "//tensorflow_compression/python/ops:round_ops",
+    ],
+)
+
+py_test(
+    name = "laplace_test",
+    srcs = ["laplace_test.py"],
+    deps = [":laplace"],
 )
 
 py_library(
