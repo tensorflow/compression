@@ -324,8 +324,8 @@ If you use this library for research purposes, please cite:
   author = "Ballé, Johannes and Hwang, Sung Jin and Agustsson, Eirikur",
   title = "{T}ensor{F}low {C}ompression: Learned Data Compression",
   url = "http://github.com/tensorflow/compression",
-  version = "2.14.0",
-  year = "2023",
+  version = "2.14.1",
+  year = "2024",
 }
 ```
 In the above BibTeX entry, names are top contributors sorted by number of
