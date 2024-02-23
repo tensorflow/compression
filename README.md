@@ -40,6 +40,26 @@ docs](https://www.tensorflow.org/api_docs/python/tfc) for details):
   reparameterizing kernels and biases in the Fourier domain, and an
   implementation of generalized divisive normalization (GDN).
 
+**Important update:** As of February 1, 2024, TensorFlow Compression is in
+maintenance mode. This means concretely:
+
+- The full feature set of TFC is frozen. No new features will be developed, but
+  the repository will receive maintenance fixes.
+
+- Going forward, new TFC packages will only work with TensorFlow 2.14. This is
+  due to an incompatibility introduced in the Keras version shipped with TF
+  2.15, which would require a rewrite of our layer and entropy model classes.
+
+- To ensure existing models can still be run with TF 2.15 and later, we are
+  releasing a new package
+  [tensorflow-compression-ops](https://github.com/tensorflow/compression/tree/master/tensorflow_compression_ops),
+  which only contains the C++ ops. These will be updated as long as possible for
+  newer TF versions.
+
+- Binary packages are provided for both options on pypi.org:
+  [TFC](https://pypi.org/project/tensorflow-compression/) and
+  [TFC ops](https://pypi.org/project/tensorflow-compression-ops/).
+
 
 ## Documentation & getting help
 
