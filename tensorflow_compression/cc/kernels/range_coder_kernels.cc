@@ -165,7 +165,7 @@ Status IndexCDFMatrix(const TTypes<int32_t>::ConstMatrix& table,
 
 class RangeEncoderInterface : public EntropyEncoderInterface {
  public:
-  static tensorflow::StatusOr<std::shared_ptr<RangeEncoderInterface>> Make(
+  static absl::StatusOr<std::shared_ptr<RangeEncoderInterface>> Make(
       tensorflow::OpKernelContext* context, const TensorShape& handle_shape) {
     std::shared_ptr<RangeEncoderInterface> p(new RangeEncoderInterface);
 
@@ -331,7 +331,7 @@ class RangeEncoderInterface : public EntropyEncoderInterface {
 
 class RangeDecoderInterface : public EntropyDecoderInterface {
  public:
-  static StatusOr<std::shared_ptr<RangeDecoderInterface>> Make(
+  static absl::StatusOr<std::shared_ptr<RangeDecoderInterface>> Make(
       tensorflow::OpKernelContext* context) {
     std::shared_ptr<RangeDecoderInterface> p(new RangeDecoderInterface);
 
