@@ -166,7 +166,7 @@ REGISTER_OP("EntropyDecodeChannel")
       TF_RETURN_IF_ERROR(c->MakeShapeFromShapeTensor(1, &suffix_shape));
       TF_RETURN_IF_ERROR(c->Concatenate(shape, suffix_shape, &shape));
       c->set_output(1, shape);
-      return tensorflow::OkStatus();
+      return absl::OkStatus();
     })
     .Doc(R"doc(
 Decodes the encoded stream inside `handle`.
@@ -208,7 +208,7 @@ REGISTER_OP("EntropyDecodeIndex")
       TF_RETURN_IF_ERROR(c->MakeShapeFromShapeTensor(2, &suffix_shape));
       TF_RETURN_IF_ERROR(c->Concatenate(shape, suffix_shape, &shape));
       c->set_output(1, shape);
-      return tensorflow::OkStatus();
+      return absl::OkStatus();
     })
     .Doc(R"doc(
 Decodes the encoded stream inside `handle`.

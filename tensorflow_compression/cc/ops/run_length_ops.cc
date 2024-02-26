@@ -59,7 +59,7 @@ REGISTER_OP("RunLengthDecode")
       ShapeHandle out;
       TF_RETURN_IF_ERROR(c->MakeShapeFromShapeTensor(1, &out));
       c->set_output(0, out);
-      return tensorflow::OkStatus();
+      return absl::OkStatus();
     })
     .Doc(R"doc(
 Decodes `data` using run-length coding.
