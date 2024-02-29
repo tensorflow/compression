@@ -59,7 +59,7 @@ tensorflow::Status CheckIndex(int64_t upper_bound, const Tensor& index) {
                                      upper_bound, "): value=", flat(i));
     }
   }
-  return tensorflow::OkStatus();
+  return absl::OkStatus();
 }
 
 tensorflow::Status CheckCdfSize(int64_t upper_bound, const Tensor& cdf_size) {
@@ -70,7 +70,7 @@ tensorflow::Status CheckCdfSize(int64_t upper_bound, const Tensor& cdf_size) {
                                      upper_bound, "]: value=", flat(i));
     }
   }
-  return tensorflow::OkStatus();
+  return absl::OkStatus();
 }
 
 tensorflow::Status CheckCdf(int precision, const Tensor& cdf,
@@ -96,7 +96,7 @@ tensorflow::Status CheckCdf(int precision, const Tensor& cdf,
       }
     }
   }
-  return tensorflow::OkStatus();
+  return absl::OkStatus();
 }
 
 // Assumes that CheckArgumentShapes().ok().
@@ -107,7 +107,7 @@ tensorflow::Status CheckArgumentValues(int precision, const Tensor& index,
   TF_RETURN_IF_ERROR(CheckIndex(cdf.dim_size(0), index));
   TF_RETURN_IF_ERROR(CheckCdfSize(cdf.dim_size(1), cdf_size));
   TF_RETURN_IF_ERROR(CheckCdf(precision, cdf, cdf_size));
-  return tensorflow::OkStatus();
+  return absl::OkStatus();
 }
 
 tensorflow::Status CheckArgumentShapes(const Tensor& index, const Tensor& cdf,
@@ -131,7 +131,7 @@ tensorflow::Status CheckArgumentShapes(const Tensor& index, const Tensor& cdf,
         "should match the number of rows in 'cdf': offset.shape=",
         offset.shape(), ", cdf.shape=", cdf.shape());
   }
-  return tensorflow::OkStatus();
+  return absl::OkStatus();
 }
 
 class UnboundedIndexRangeEncodeOp : public OpKernel {
@@ -365,7 +365,7 @@ class UnboundedIndexRangeDecodeOp : public OpKernel {
       output(i) = value;
     }
 
-    return tensorflow::OkStatus();
+    return absl::OkStatus();
   }
 
   int precision_;

@@ -144,7 +144,7 @@ Status CheckCdfShape(const TensorShape& data_shape,
         "The last dimension of `cdf` should be > 1: ", cdf_shape.DebugString());
   }
 
-  return tensorflow::OkStatus();
+  return absl::OkStatus();
 }
 
 tensorflow::Status CheckCdfValues(int precision,
@@ -169,7 +169,7 @@ tensorflow::Status CheckCdfValues(int precision,
       }
     }
   }
-  return tensorflow::OkStatus();
+  return absl::OkStatus();
 }
 
 class RangeEncodeOp : public OpKernel {
@@ -265,7 +265,7 @@ class RangeEncodeOp : public OpKernel {
     }
 
     encoder.Finalize(output);
-    return tensorflow::OkStatus();
+    return absl::OkStatus();
   }
 
   int precision_;
@@ -369,7 +369,7 @@ class RangeDecodeOp : public OpKernel {
 
       *data = decoder.Decode({cdf_slice, chip_size}, precision_);
     }
-    return tensorflow::OkStatus();
+    return absl::OkStatus();
   }
 
   int precision_;

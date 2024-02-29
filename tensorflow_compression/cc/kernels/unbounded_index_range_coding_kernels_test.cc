@@ -167,7 +167,7 @@ class UnboundedIndexRangeCoderOpsTest : public OpsTestBase {
     *output = *GetOutput(0);
     inputs_.clear();
 
-    return tensorflow::OkStatus();
+    return absl::OkStatus();
   }
 
   Status RunDecodeOpDebug(int precision, int overflow_width,
@@ -205,7 +205,7 @@ class UnboundedIndexRangeCoderOpsTest : public OpsTestBase {
     *output = *GetOutput(0);
     inputs_.clear();
 
-    return tensorflow::OkStatus();
+    return absl::OkStatus();
   }
 
   void TestEncodeAndDecode(int precision, int overflow_width,

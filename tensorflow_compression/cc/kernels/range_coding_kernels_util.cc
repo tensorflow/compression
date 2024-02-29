@@ -87,7 +87,7 @@ Status MergeAxes(const TensorShape& broadcast_shape,
   }
   merged_storage_shape.push_back(storage_stride);
 
-  return tensorflow::OkStatus();
+  return absl::OkStatus();
 }
 
 }  // namespace tensorflow_compression

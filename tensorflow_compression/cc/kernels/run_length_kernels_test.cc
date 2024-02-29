@@ -78,7 +78,7 @@ class BitCodingOpsTest : public OpsTestBase {
     TF_RETURN_IF_ERROR(RunOpKernel());
     *output = *GetOutput(0);
     inputs_.clear();
-    return tensorflow::OkStatus();
+    return absl::OkStatus();
   }
 
   Status RunDecodeOp(absl::Span<const Tensor> inputs, Tensor* output,
@@ -102,7 +102,7 @@ class BitCodingOpsTest : public OpsTestBase {
     TF_RETURN_IF_ERROR(RunOpKernel());
     *output = *GetOutput(0);
     inputs_.clear();
-    return tensorflow::OkStatus();
+    return absl::OkStatus();
   }
 
   void TestEncodeAndDecode(const Tensor& data_tensor, const int run_length_code,
