@@ -104,7 +104,7 @@ Status CheckInRange(absl::string_view name, int64_t value, int64_t min,
     return errors::InvalidArgument(
         absl::Substitute("$0=$1 not in range [$2, $3)", name, value, min, max));
   }
-  return tensorflow::OkStatus();
+  return absl::OkStatus();
 }
 
 Status ScanCDF(const int32_t* const end, const int32_t** current,
@@ -133,7 +133,7 @@ Status ScanCDF(const int32_t* const end, const int32_t** current,
     ++p;
   }
   *current = p;
-  return tensorflow::OkStatus();
+  return absl::OkStatus();
 }
 
 Status IndexCDFVector(const TTypes<int32_t>::ConstFlat& table,
@@ -144,7 +144,7 @@ Status IndexCDFVector(const TTypes<int32_t>::ConstFlat& table,
   for (const int32_t* current = start; current != end;) {
     TF_RETURN_IF_ERROR(ScanCDF(end, &current, lookup));
   }
-  return tensorflow::OkStatus();
+  return absl::OkStatus();
 }
 
 Status IndexCDFMatrix(const TTypes<int32_t>::ConstMatrix& table,
@@ -160,7 +160,7 @@ Status IndexCDFMatrix(const TTypes<int32_t>::ConstMatrix& table,
       return errors::InvalidArgument("CDF must end with 1 << precision.");
     }
   }
-  return tensorflow::OkStatus();
+  return absl::OkStatus();
 }
 
 class RangeEncoderInterface : public EntropyEncoderInterface {
@@ -283,7 +283,7 @@ class RangeEncoderInterface : public EntropyEncoderInterface {
       encoder_[i].Finalize(&encoded_[i]);
       output(i) = std::move(encoded_[i]);
     }
-    return tensorflow::OkStatus();
+    return absl::OkStatus();
   }
 
  private:
@@ -442,7 +442,7 @@ class RangeDecoderInterface : public EntropyDecoderInterface {
         VLOG(0) << "RangeDecoder #" << i << " final status was an error";
       }
     }
-    return tensorflow::OkStatus();
+    return absl::OkStatus();
   }
 
  private:
