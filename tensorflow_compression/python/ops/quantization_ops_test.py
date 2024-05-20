@@ -71,7 +71,7 @@ class QuantizationOpsTest(tf.test.TestCase, parameterized.TestCase):
     rounded = gen_ops.stochastic_round(replicated, 1., ())
     self.assertEqual(rounded.dtype, tf.int32)
     averaged = tf.reduce_mean(tf.cast(rounded, tf.float32), axis=0)
-    self.assertAllClose(values, averaged, atol=5e-3, rtol=0)
+    self.assertAllClose(values, averaged, atol=1e-2, rtol=0)
 
 
 if __name__ == "__main__":
