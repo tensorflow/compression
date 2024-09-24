@@ -25,7 +25,7 @@ __all__ = [
 ]
 
 
-# TODO(jonycgn): Consider wrapping in tf.function.
+# TODO(jonarchist): Consider wrapping in tf.function.
 def estimate_tails(func, target, shape, dtype):
   """Estimates approximate tail quantiles.
 

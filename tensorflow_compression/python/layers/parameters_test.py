@@ -57,7 +57,7 @@ class RDFTParameterTest(ParameterTest, tf.test.TestCase,
   kwargs = dict(name="rdft_kernel")
   shape = (3, 3, 1, 2)
 
-  # TODO(jonycgn): Find out why 3D RFFT gradients are not implemented in TF.
+  # TODO(jonarchist): Find out why 3D RFFT gradients are not implemented in TF.
   @parameterized.parameters((7, 3, 2), (5, 3, 1, 2))
   def test_gradients_propagate(self, *shape):
     initial_value = tf.random.uniform(shape, dtype=tf.float32)

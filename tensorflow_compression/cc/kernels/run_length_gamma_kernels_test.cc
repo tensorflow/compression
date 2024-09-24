@@ -271,7 +271,7 @@ TEST_F(BitCodingOpsTest, DecodeConsistent) {
   test::ExpectTensorEqual<int32_t>(data_tensor, expected_data_tensor);
 }
 
-// TODO(nicolemitchell,jonycgn) Add more corner cases to unit tests.
+// TODO(nicolemitchell,jonarchist) Add more corner cases to unit tests.
 // Examples: decode empty string (null pointer), decode strings that end
 // prematurely, decode long string of zeros that causes overflow in ReadGamma,
 // decode incorrect run length that exceeds tensor size, encode int32::min

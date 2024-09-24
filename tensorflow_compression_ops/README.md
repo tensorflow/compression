@@ -206,7 +206,7 @@ If you use this library for research purposes, please cite:
 
 ```
 @software{tfc_github,
-  author = "Ballé, Johannes and Hwang, Sung Jin and Agustsson, Eirikur",
+  author = "Ballé, Jona and Hwang, Sung Jin and Agustsson, Eirikur",
   title = "{T}ensor{F}low {C}ompression: Learned Data Compression",
   url = "http://github.com/tensorflow/compression",
   version = "2.14.1",

@@ -162,7 +162,7 @@ class BMSHJ2018Model(tf.keras.Model):
     side_entropy_model = tfc.ContinuousBatchedEntropyModel(
         self.hyperprior, coding_rank=3, compression=False)
 
-    x = tf.cast(x, self.compute_dtype)  # TODO(jonycgn): Why is this necessary?
+    x = tf.cast(x, self.compute_dtype)  # TODO(jonarchist): Why is this necessary?
     y = self.analysis_transform(x)
     z = self.hyper_analysis_transform(abs(y))
     z_hat, side_bits = side_entropy_model(z, training=training)

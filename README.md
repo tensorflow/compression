@@ -13,8 +13,8 @@ started.
 
 For a more in-depth introduction from a classical data compression perspective,
 consider our [paper on nonlinear transform
-coding](https://arxiv.org/abs/2007.03034), or watch @jonycgn's [talk on learned
-image compression](https://www.youtube.com/watch?v=x_q7cZviXkY). For an
+coding](https://arxiv.org/abs/2007.03034), or watch @jonarchists's [talk on
+learned image compression](https://www.youtube.com/watch?v=x_q7cZviXkY). For an
 introduction to lossy data compression from a machine learning perspective, take
 a look at @yiboyang's [review paper](https://arxiv.org/abs/2202.06533).
 
@@ -341,7 +341,7 @@ for more information.
 If you use this library for research purposes, please cite:
 ```
 @software{tfc_github,
-  author = "Ballé, Johannes and Hwang, Sung Jin and Agustsson, Eirikur",
+  author = "Ballé, Jona and Hwang, Sung Jin and Agustsson, Eirikur",
   title = "{T}ensor{F}low {C}ompression: Learned Data Compression",
   url = "http://github.com/tensorflow/compression",
   version = "2.14.1",

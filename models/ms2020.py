@@ -199,7 +199,7 @@ class MS2020Model(tf.keras.Model):
 
   def call(self, x, training):
     """Computes rate and distortion losses."""
-    x = tf.cast(x, self.compute_dtype)  # TODO(jonycgn): Why is this necessary?
+    x = tf.cast(x, self.compute_dtype)  # TODO(jonarchist): Why is this necessary?
     # Build the encoder (analysis) half of the hierarchical autoencoder.
     y = self.analysis_transform(x)
     y_shape = tf.shape(y)[1:-1]

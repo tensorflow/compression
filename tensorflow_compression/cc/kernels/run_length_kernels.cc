@@ -55,7 +55,7 @@ using tensorflow::tstring;
                            s.message()));                                   \
   }
 
-// TODO(jonycgn): Try to avoid in-loop branches based on attributes.
+// TODO(jonarchist): Try to avoid in-loop branches based on attributes.
 
 class RunLengthEncodeOp : public OpKernel {
  public:

@@ -107,7 +107,7 @@ class BLS2017Model(tf.keras.Model):
     """Computes rate and distortion losses."""
     entropy_model = tfc.ContinuousBatchedEntropyModel(
         self.prior, coding_rank=3, compression=False)
-    x = tf.cast(x, self.compute_dtype)  # TODO(jonycgn): Why is this necessary?
+    x = tf.cast(x, self.compute_dtype)  # TODO(jonarchist): Why is this necessary?
     y = self.analysis_transform(x)
     y_hat, bits = entropy_model(y, training=training)
     x_hat = self.synthesis_transform(y_hat)

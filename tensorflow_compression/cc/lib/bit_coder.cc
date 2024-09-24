@@ -37,7 +37,7 @@ void BitWriter::WriteBits(uint32_t count, uint64_t bits) {
   bits &= (uint64_t{1} << count) - 1;
   buffer_ |= bits << bits_in_buffer_;
   bits_in_buffer_ += count;
-  // TODO(jonycgn): Investigate performance of buffer resizing.
+  // TODO(jonarchist): Investigate performance of buffer resizing.
   data_.resize(next_index_ + 8);
   absl::little_endian::Store64(&data_[next_index_], buffer_);
   size_t bytes_in_buffer = bits_in_buffer_ / 8;
