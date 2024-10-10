@@ -199,7 +199,7 @@ class RangeEncoderInterface : public EntropyEncoderInterface {
     // when index tensor was not provided.
 
     tensorflow::mutex mu;
-    tensorflow::Status status ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu);
+    absl::Status status ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu);
 
 #define REQUIRE_IN_RANGE(name, value, min, max)     \
   if (auto s = CheckInRange(name, value, min, max); \
@@ -364,7 +364,7 @@ class RangeDecoderInterface : public EntropyDecoderInterface {
     CHECK_EQ(decoder_.size(), output.dimension(0));
 
     tensorflow::mutex mu;
-    tensorflow::Status status ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu);
+    absl::Status status ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu);
 
 #define REQUIRE_IN_RANGE(name, value, min, max)     \
   if (auto s = CheckInRange(name, value, min, max); \

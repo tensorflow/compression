@@ -147,8 +147,8 @@ Status CheckCdfShape(const TensorShape& data_shape,
   return absl::OkStatus();
 }
 
-tensorflow::Status CheckCdfValues(int precision,
-                                  const tensorflow::Tensor& cdf_tensor) {
+absl::Status CheckCdfValues(int precision,
+                            const tensorflow::Tensor& cdf_tensor) {
   const auto cdf = cdf_tensor.flat_inner_dims<int32_t, 2>();
   const auto size = cdf.dimension(1);
   if (size <= 2) {
@@ -230,11 +230,11 @@ class RangeEncodeOp : public OpKernel {
 
  private:
   template <int N>
-  tensorflow::Status RangeEncodeImpl(TTypes<int16_t>::ConstFlat data,
-                                     absl::Span<const int64_t> data_shape,
-                                     TTypes<int32_t>::ConstMatrix cdf,
-                                     absl::Span<const int64_t> cdf_shape,
-                                     std::string* output) const {
+  absl::Status RangeEncodeImpl(TTypes<int16_t>::ConstFlat data,
+                               absl::Span<const int64_t> data_shape,
+                               TTypes<int32_t>::ConstMatrix cdf,
+                               absl::Span<const int64_t> cdf_shape,
+                               std::string* output) const {
     const int64_t data_size = data.size();
     const int64_t cdf_size = cdf.size();
     const int64_t chip_size = cdf.dimension(1);
@@ -343,11 +343,11 @@ class RangeDecodeOp : public OpKernel {
 
  private:
   template <int N>
-  tensorflow::Status RangeDecodeImpl(TTypes<int16_t>::Flat output,
-                                     absl::Span<const int64_t> output_shape,
-                                     TTypes<int32_t>::ConstMatrix cdf,
-                                     absl::Span<const int64_t> cdf_shape,
-                                     const tstring& encoded) const {
+  absl::Status RangeDecodeImpl(TTypes<int16_t>::Flat output,
+                               absl::Span<const int64_t> output_shape,
+                               TTypes<int32_t>::ConstMatrix cdf,
+                               absl::Span<const int64_t> cdf_shape,
+                               const tstring& encoded) const {
     BroadcastRange<int16_t, int32_t, N> view{output.data(), output_shape,
                                          cdf.data(), cdf_shape};
 

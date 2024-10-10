@@ -51,7 +51,7 @@ using tensorflow::TensorShapeUtils;
 using tensorflow::tstring;
 using tensorflow::TTypes;
 
-tensorflow::Status CheckIndex(int64_t upper_bound, const Tensor& index) {
+absl::Status CheckIndex(int64_t upper_bound, const Tensor& index) {
   auto flat = index.flat<int32_t>();
   for (int64_t i = 0; i < flat.size(); ++i) {
     if (flat(i) < 0 || upper_bound <= flat(i)) {
@@ -62,7 +62,7 @@ tensorflow::Status CheckIndex(int64_t upper_bound, const Tensor& index) {
   return absl::OkStatus();
 }
 
-tensorflow::Status CheckCdfSize(int64_t upper_bound, const Tensor& cdf_size) {
+absl::Status CheckCdfSize(int64_t upper_bound, const Tensor& cdf_size) {
   auto flat = cdf_size.vec<int32_t>();
   for (int64_t i = 0; i < flat.size(); ++i) {
     if (flat(i) < 3 || upper_bound < flat(i)) {
@@ -73,8 +73,8 @@ tensorflow::Status CheckCdfSize(int64_t upper_bound, const Tensor& cdf_size) {
   return absl::OkStatus();
 }
 
-tensorflow::Status CheckCdf(int precision, const Tensor& cdf,
-                            const Tensor& cdf_size) {
+absl::Status CheckCdf(int precision, const Tensor& cdf,
+                      const Tensor& cdf_size) {
   auto matrix = cdf.matrix<int32_t>();
   auto size = cdf_size.vec<int32_t>();
   CHECK_EQ(matrix.dimension(0), size.size());
@@ -100,19 +100,17 @@ tensorflow::Status CheckCdf(int precision, const Tensor& cdf,
 }
 
 // Assumes that CheckArgumentShapes().ok().
-tensorflow::Status CheckArgumentValues(int precision, const Tensor& index,
-                                       const Tensor& cdf,
-                                       const Tensor& cdf_size,
-                                       const Tensor& offset) {
+absl::Status CheckArgumentValues(int precision, const Tensor& index,
+                                 const Tensor& cdf, const Tensor& cdf_size,
+                                 const Tensor& offset) {
   TF_RETURN_IF_ERROR(CheckIndex(cdf.dim_size(0), index));
   TF_RETURN_IF_ERROR(CheckCdfSize(cdf.dim_size(1), cdf_size));
   TF_RETURN_IF_ERROR(CheckCdf(precision, cdf, cdf_size));
   return absl::OkStatus();
 }
 
-tensorflow::Status CheckArgumentShapes(const Tensor& index, const Tensor& cdf,
-                                       const Tensor& cdf_size,
-                                       const Tensor& offset) {
+absl::Status CheckArgumentShapes(const Tensor& index, const Tensor& cdf,
+                                 const Tensor& cdf_size, const Tensor& offset) {
   if (!TensorShapeUtils::IsMatrix(cdf.shape()) || cdf.dim_size(1) < 3) {
     return errors::InvalidArgument(
         "'cdf' should be 2-D and cdf.dim_size(1) >= 3: ", cdf.shape());
@@ -306,12 +304,12 @@ class UnboundedIndexRangeDecodeOp : public OpKernel {
   }
 
  private:
-  tensorflow::Status RangeDecodeImpl(TTypes<int32_t>::Flat output,
-                                     TTypes<int32_t>::ConstFlat index,
-                                     TTypes<int32_t>::ConstMatrix cdf,
-                                     TTypes<int32_t>::ConstVec cdf_size,
-                                     TTypes<int32_t>::ConstVec offset,
-                                     TTypes<tstring>::ConstFlat encoded) const {
+  absl::Status RangeDecodeImpl(TTypes<int32_t>::Flat output,
+                               TTypes<int32_t>::ConstFlat index,
+                               TTypes<int32_t>::ConstMatrix cdf,
+                               TTypes<int32_t>::ConstVec cdf_size,
+                               TTypes<int32_t>::ConstVec offset,
+                               TTypes<tstring>::ConstFlat encoded) const {
     RangeDecoder decoder(encoded(0));
 
     DCHECK_GE(cdf.dimension(1), 2);
