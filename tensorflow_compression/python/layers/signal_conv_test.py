@@ -376,7 +376,7 @@ class ConvolutionsTest(tf.test.TestCase):
         raise
     else:
       try:
-        with self.assertRaisesRegexp(NotImplementedError, "SignalConv"):
+        with self.assertRaisesRegex(NotImplementedError, "SignalConv"):
           method(**args)
       except:
         msg = []
