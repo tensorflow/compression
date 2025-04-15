@@ -37,7 +37,7 @@ cc_library(
     srcs = ["lib/bit_coder.cc"],
     hdrs = ["lib/bit_coder.h"],
     deps = [
-        "@com_google_absl//absl/base:endian",
+        "@com_google_absl//absl/base:config",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
