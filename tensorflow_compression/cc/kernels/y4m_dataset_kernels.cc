@@ -13,63 +13,64 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
+#include <cstddef>
 #include <cstdint>
+#include <cstring>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include "absl/strings/str_join.h"
+#include "absl/log/check.h"
+#include "absl/status/status.h"
+#include "absl/strings/numbers.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
+#include "absl/strings/strip.h"
 #include "tensorflow/core/framework/dataset.h"
-#include "tensorflow/core/framework/partial_tensor_shape.h"
+#include "tensorflow/core/framework/op_kernel.h"
+#include "tensorflow/core/framework/op_requires.h"
 #include "tensorflow/core/framework/tensor.h"
-#include "tensorflow/core/platform/errors.h"
-#include "tensorflow/core/platform/logging.h"
+#include "tensorflow/core/framework/tensor_shape.h"
+#include "tensorflow/core/framework/types.h"
+#include "tensorflow/tsl/platform/mutex.h"
+#include "tensorflow/tsl/platform/thread_annotations.h"
+#include "tensorflow/tsl/platform/tstring.h"
 
 namespace tensorflow_compression {
 namespace {
-namespace errors = tensorflow::errors;
-using absl::string_view;
-using std::string;
-using std::vector;
-using tensorflow::DataTypeVector;
+namespace errors = tsl::errors;
 using tensorflow::DT_UINT8;
-using tensorflow::mutex;
-using tensorflow::mutex_lock;
-using tensorflow::Node;
-using tensorflow::OpKernelContext;
-using tensorflow::PartialTensorShape;
-using tensorflow::RandomAccessFile;
-using tensorflow::Status;
 using tensorflow::Tensor;
-using tensorflow::data::DatasetBase;
-using tensorflow::data::DatasetIterator;
-using tensorflow::data::DatasetOpKernel;
-using tensorflow::data::IteratorContext;
-using tensorflow::data::SerializationContext;
 
-class Y4MDatasetOp : public DatasetOpKernel {
+class Y4MDatasetOp : public tensorflow::data::DatasetOpKernel {
  public:
   explicit Y4MDatasetOp(tensorflow::OpKernelConstruction* ctx)
       : DatasetOpKernel(ctx) {}
 
  protected:
-  void MakeDataset(OpKernelContext* ctx, DatasetBase** output) override {
+  void MakeDataset(tensorflow::OpKernelContext* ctx,
+                   tensorflow::data::DatasetBase** output) override {
     const Tensor* filenames_tensor;
     OP_REQUIRES_OK(ctx, ctx->input("filenames", &filenames_tensor));
-    OP_REQUIRES(
-        ctx, filenames_tensor->dims() <= 1,
-        errors::InvalidArgument("`filenames` must be a scalar or a vector."));
+    OP_REQUIRES(ctx, filenames_tensor->dims() <= 1,
+                absl::InvalidArgumentError(
+                    "`filenames` must be a scalar or a vector."));
 
-    vector<string> filenames;
+    std::vector<std::string> filenames;
     filenames.reserve(filenames_tensor->NumElements());
     for (int i = 0; i < filenames_tensor->NumElements(); ++i) {
-      filenames.emplace_back(filenames_tensor->flat<tensorflow::tstring>()(i));
+      filenames.emplace_back(filenames_tensor->flat<tsl::tstring>()(i));
     }
 
     *output = new Dataset(ctx, std::move(filenames));
   }
 
  private:
-  class Dataset : public DatasetBase {
+  class Dataset : public tensorflow::data::DatasetBase {
    public:
-    explicit Dataset(OpKernelContext* ctx, vector<string> filenames)
+    explicit Dataset(tensorflow::OpKernelContext* ctx,
+                     std::vector<std::string> filenames)
         : DatasetBase(tensorflow::data::DatasetContext(ctx)),
           filenames_(std::move(filenames)) {}
 
@@ -79,53 +80,59 @@ class Y4MDatasetOp : public DatasetOpKernel {
           new Iterator({this, absl::StrCat(prefix, "::Y4M")}));
     }
 
-    const DataTypeVector& output_dtypes() const override {
-      static DataTypeVector* dtypes = new DataTypeVector({DT_UINT8, DT_UINT8});
+    const tensorflow::DataTypeVector& output_dtypes() const override {
+      static tensorflow::DataTypeVector* dtypes =
+          new tensorflow::DataTypeVector({DT_UINT8, DT_UINT8});
       return *dtypes;
     }
 
-    const vector<PartialTensorShape>& output_shapes() const override {
-      static vector<PartialTensorShape>* shapes =
-          new vector<PartialTensorShape>{{-1, -1, 1}, {-1, -1, 2}};
+    const std::vector<tensorflow::PartialTensorShape>& output_shapes()
+        const override {
+      static std::vector<tensorflow::PartialTensorShape>* shapes =
+          new std::vector<tensorflow::PartialTensorShape>{{-1, -1, 1},
+                                                          {-1, -1, 2}};
       return *shapes;
     }
 
-    string DebugString() const override { return "Y4MDatasetOp::Dataset"; }
+    std::string DebugString() const override { return "Y4MDatasetOp::Dataset"; }
 
-    Status InputDatasets(vector<const DatasetBase*>* inputs) const override {
+    absl::Status InputDatasets(
+        std::vector<const DatasetBase*>* inputs) const override {
       return absl::OkStatus();
     }
 
-    Status CheckExternalState() const override { return absl::OkStatus(); }
+    absl::Status CheckExternalState() const override {
+      return absl::OkStatus();
+    }
 
    protected:
-    Status AsGraphDefInternal(SerializationContext* ctx,
-                              DatasetGraphDefBuilder* b,
-                              Node** output) const override {
-      Node* filenames = nullptr;
+    absl::Status AsGraphDefInternal(tensorflow::data::SerializationContext* ctx,
+                                    DatasetGraphDefBuilder* b,
+                                    tensorflow::Node** output) const override {
+      tensorflow::Node* filenames = nullptr;
       TF_RETURN_IF_ERROR(b->AddVector(filenames_, &filenames));
       TF_RETURN_IF_ERROR(b->AddDataset(this, {filenames}, output));
       return absl::OkStatus();
     }
 
    private:
-    class Iterator : public DatasetIterator<Dataset> {
+    class Iterator : public tensorflow::data::DatasetIterator<Dataset> {
      public:
       explicit Iterator(const Params& params)
           : DatasetIterator<Dataset>(params) {}
 
-      Status GetNextInternal(IteratorContext* ctx,
-                             vector<Tensor>* out_tensors,
-                             bool* end_of_sequence) override {
-        mutex_lock l(mu_);
+      absl::Status GetNextInternal(tensorflow::data::IteratorContext* ctx,
+                                   std::vector<Tensor>* out_tensors,
+                                   bool* end_of_sequence) override {
+        tsl::mutex_lock l(mu_);
 
         do {
           if (file_) {
-            const string_view frame_header = "FRAME\n";
+            const absl::string_view frame_header = "FRAME\n";
             size_t frame_size = width_ * height_ * 3;
             int64_t cbcr_width = width_;
             int64_t cbcr_height = height_;
-            string_view frame_buffer;
+            absl::string_view frame_buffer;
 
             if (chroma_format_ == ChromaFormat::I420) {
               frame_size /= 2;
@@ -138,8 +145,8 @@ class Y4MDatasetOp : public DatasetOpKernel {
             buffer_.resize(frame_header.size() + frame_size);
 
             // Try to read the next frame.
-            Status status = file_->Read(file_pos_, buffer_.size(),
-                                        &frame_buffer, &buffer_[0]);
+            absl::Status status = file_->Read(file_pos_, buffer_.size(),
+                                              &frame_buffer, &buffer_[0]);
 
             // Yield frame on successful read of a complete frame.
             if (status.ok()) {
@@ -148,7 +155,8 @@ class Y4MDatasetOp : public DatasetOpKernel {
               if (!absl::ConsumePrefix(&frame_buffer, frame_header)) {
                 return errors::InvalidArgument(
                     "Input file '", dataset()->filenames_[file_index_],
-                    "' has a FRAME marker at byte ", file_pos_, " which is "
+                    "' has a FRAME marker at byte ", file_pos_,
+                    " which is "
                     "either invalid or has unsupported frame parameters.");
               }
 
@@ -161,8 +169,8 @@ class Y4MDatasetOp : public DatasetOpKernel {
               std::memcpy(flat_y.data(), frame_buffer.data(), flat_y.size());
               frame_buffer.remove_prefix(flat_y.size());
               for (int i = 0; i < cbcr_size; i++) {
-                flat_cbcr.data()[2*i] = frame_buffer[i];
-                flat_cbcr.data()[2*i+1] = frame_buffer[cbcr_size+i];
+                flat_cbcr.data()[2 * i] = frame_buffer[i];
+                flat_cbcr.data()[2 * i + 1] = frame_buffer[cbcr_size + i];
               }
               out_tensors->push_back(std::move(y_tensor));
               out_tensors->push_back(std::move(cbcr_tensor));
@@ -174,7 +182,7 @@ class Y4MDatasetOp : public DatasetOpKernel {
 
             // Catch any other errors than out of range, which needs special
             // treatment.
-            if (!errors::IsOutOfRange(status)) {
+            if (!absl::IsOutOfRange(status)) {
               return status;
             }
 
@@ -213,10 +221,10 @@ class Y4MDatasetOp : public DatasetOpKernel {
       }
 
      protected:
-      Status SaveInternal(
-          SerializationContext* ctx,
+      absl::Status SaveInternal(
+          tensorflow::data::SerializationContext* ctx,
           tensorflow::data::IteratorStateWriter* writer) override {
-        mutex_lock l(mu_);
+        tsl::mutex_lock l(mu_);
 
         TF_RETURN_IF_ERROR(
             writer->WriteScalar(full_name("file_index"), file_index_));
@@ -228,10 +236,10 @@ class Y4MDatasetOp : public DatasetOpKernel {
         return absl::OkStatus();
       }
 
-      Status RestoreInternal(
-          IteratorContext* ctx,
+      absl::Status RestoreInternal(
+          tensorflow::data::IteratorContext* ctx,
           tensorflow::data::IteratorStateReader* reader) override {
-        mutex_lock l(mu_);
+        tsl::mutex_lock l(mu_);
         int64_t file_index;
         int64_t file_pos;
 
@@ -256,8 +264,8 @@ class Y4MDatasetOp : public DatasetOpKernel {
      private:
       enum class ChromaFormat { undefined, I420, I444 };
 
-      Status ReadHeader(const RandomAccessFile& file, const size_t file_index,
-                        string& header) {
+      absl::Status ReadHeader(const tsl::RandomAccessFile& file,
+                              const size_t file_index, std::string& header) {
         // 256 bytes should be more than enough in most cases. If not, keep
         // reading chunks until header is complete.
         const size_t chunk_size = 256;
@@ -265,11 +273,11 @@ class Y4MDatasetOp : public DatasetOpKernel {
         do {
           const uint64_t offset = header.size();
           header.resize(offset + chunk_size);
-          string_view chunk;
-          Status status = file.Read(
-              offset, chunk_size, &chunk, &header[offset]);
+          absl::string_view chunk;
+          absl::Status status =
+              file.Read(offset, chunk_size, &chunk, &header[offset]);
           // End of file error is fine, as long as the header is complete.
-          if (!(status.ok() || errors::IsOutOfRange(status))) {
+          if (!(status.ok() || absl::IsOutOfRange(status))) {
             return status;
           }
           const size_t pos = chunk.find('\n');
@@ -292,10 +300,10 @@ class Y4MDatasetOp : public DatasetOpKernel {
         } while (true);
       }
 
-      Status ParseHeader(string_view header, const size_t file_index,
-                         int64_t& width, int64_t& height,
-                         ChromaFormat& chroma_format) {
-        const string_view digits = "0123456789";
+      absl::Status ParseHeader(absl::string_view header,
+                               const size_t file_index, int64_t& width,
+                               int64_t& height, ChromaFormat& chroma_format) {
+        const absl::string_view digits = "0123456789";
 
         width = 0;
         height = 0;
@@ -306,9 +314,9 @@ class Y4MDatasetOp : public DatasetOpKernel {
         header.remove_suffix(1);
 
         if (!absl::ConsumePrefix(&header, "YUV4MPEG2")) {
-          return errors::InvalidArgument(
-              "Input file '", dataset()->filenames_[file_index],
-              "' does not have a YUV4MPEG2 marker.");
+          return errors::InvalidArgument("Input file '",
+                                         dataset()->filenames_[file_index],
+                                         "' does not have a YUV4MPEG2 marker.");
         }
 
         while (!header.empty()) {
@@ -373,19 +381,19 @@ class Y4MDatasetOp : public DatasetOpKernel {
         }
 
         if (!width) {
-          return errors::InvalidArgument(
-              "Input file '", dataset()->filenames_[file_index],
-              "' has no width specifier.");
+          return errors::InvalidArgument("Input file '",
+                                         dataset()->filenames_[file_index],
+                                         "' has no width specifier.");
         }
         if (!height) {
-          return errors::InvalidArgument(
-              "Input file '", dataset()->filenames_[file_index],
-              "' has no height specifier.");
+          return errors::InvalidArgument("Input file '",
+                                         dataset()->filenames_[file_index],
+                                         "' has no height specifier.");
         }
         if (chroma_format == ChromaFormat::undefined) {
-          return errors::InvalidArgument(
-              "Input file '", dataset()->filenames_[file_index],
-              "' has no chroma format specifier.");
+          return errors::InvalidArgument("Input file '",
+                                         dataset()->filenames_[file_index],
+                                         "' has no chroma format specifier.");
         }
         if (chroma_format == ChromaFormat::I420 && (width & 1 || height & 1)) {
           return errors::InvalidArgument(
@@ -395,17 +403,17 @@ class Y4MDatasetOp : public DatasetOpKernel {
         return absl::OkStatus();
       }
 
-      mutex mu_;
+      tsl::mutex mu_;
       size_t file_index_ TF_GUARDED_BY(mu_) = 0;
-      std::unique_ptr<RandomAccessFile> file_ TF_GUARDED_BY(mu_);
+      std::unique_ptr<tsl::RandomAccessFile> file_ TF_GUARDED_BY(mu_);
       uint64_t file_pos_ TF_GUARDED_BY(mu_);
-      string buffer_ TF_GUARDED_BY(mu_);
+      std::string buffer_ TF_GUARDED_BY(mu_);
       int64_t width_ TF_GUARDED_BY(mu_);
       int64_t height_ TF_GUARDED_BY(mu_);
       ChromaFormat chroma_format_ TF_GUARDED_BY(mu_);
     };
 
-    const vector<string> filenames_;
+    const std::vector<std::string> filenames_;
   };
 };
 
