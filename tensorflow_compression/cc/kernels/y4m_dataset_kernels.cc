@@ -27,6 +27,7 @@ limitations under the License.
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/strip.h"
+#include "absl/types/span.h"
 #include "tensorflow/core/framework/dataset.h"
 #include "tensorflow/core/framework/op_kernel.h"
 #include "tensorflow/core/framework/op_requires.h"
@@ -145,8 +146,9 @@ class Y4MDatasetOp : public tensorflow::data::DatasetOpKernel {
             buffer_.resize(frame_header.size() + frame_size);
 
             // Try to read the next frame.
-            absl::Status status = file_->Read(file_pos_, buffer_.size(),
-                                              &frame_buffer, &buffer_[0]);
+            absl::Status status =
+                file_->Read(file_pos_, frame_buffer,
+                            absl::MakeSpan(&buffer_[0], buffer_.size()));
 
             // Yield frame on successful read of a complete frame.
             if (status.ok()) {
@@ -274,8 +276,8 @@ class Y4MDatasetOp : public tensorflow::data::DatasetOpKernel {
           const uint64_t offset = header.size();
           header.resize(offset + chunk_size);
           absl::string_view chunk;
-          absl::Status status =
-              file.Read(offset, chunk_size, &chunk, &header[offset]);
+          absl::Status status = file.Read(
+              offset, chunk, absl::MakeSpan(&header[offset], chunk_size));
           // End of file error is fine, as long as the header is complete.
           if (!(status.ok() || absl::IsOutOfRange(status))) {
             return status;

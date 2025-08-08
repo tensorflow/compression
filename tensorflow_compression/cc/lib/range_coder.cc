@@ -23,13 +23,14 @@ limitations under the License.
 #include "tensorflow_compression/cc/lib/range_coder.h"
 
 #include <cstdint>
-#include <limits>
 #include <string>
 
+#include "absl/base/optimization.h"
+#include "absl/log/check.h"
 #include "absl/status/status.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
-#include "tensorflow/core/platform/logging.h"
 
 namespace tensorflow_compression {
 
