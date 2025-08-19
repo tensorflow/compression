@@ -24,8 +24,10 @@ limitations under the License.
 #include <type_traits>
 #include <vector>
 
+#include "absl/status/status.h"
 #include "absl/types/span.h"
 #include "tensorflow/core/framework/op_kernel.h"
+#include "tensorflow/core/framework/op_requires.h"
 #include "tensorflow/core/framework/tensor.h"
 #include "tensorflow/core/framework/tensor_shape.h"
 #include "tensorflow/core/framework/tensor_types.h"
@@ -45,13 +47,6 @@ using tensorflow::Tensor;
 using tensorflow::TensorShape;
 using tensorflow::TensorShapeUtils;
 using tensorflow::tstring;
-
-#define OP_REQUIRES_OK_ABSL(context, status) \
-  {                                                                    \
-    auto s = (status);                                                 \
-    OP_REQUIRES(context, s.ok(), tensorflow::Status(                   \
-        static_cast<tensorflow::errors::Code>(s.code()), s.message())); \
-  }
 
 class RunLengthGammaEncodeOp : public OpKernel {
  public:
@@ -140,7 +135,7 @@ class RunLengthGammaDecodeOp : public OpKernel {
     for (int64_t i = 0; i < data.size(); i++) {
       // Get number of zeros.
       auto num_zeros = dec.ReadGamma();
-      OP_REQUIRES_OK_ABSL(context, num_zeros.status());
+      OP_REQUIRES_OK(context, num_zeros.status());
 
       // Advance the index to the next non-zero element.
       i += *num_zeros - 1;
@@ -155,11 +150,11 @@ class RunLengthGammaDecodeOp : public OpKernel {
 
       // Get sign of value.
       auto positive = dec.ReadOneBit();
-      OP_REQUIRES_OK_ABSL(context, positive.status());
+      OP_REQUIRES_OK(context, positive.status());
 
       // Get magnitude.
       auto magnitude = dec.ReadGamma();
-      OP_REQUIRES_OK_ABSL(context, magnitude.status());
+      OP_REQUIRES_OK(context, magnitude.status());
 
       // Write value to data tensor element at index.
       data(i) = *positive ? *magnitude : -*magnitude;
@@ -169,8 +164,6 @@ class RunLengthGammaDecodeOp : public OpKernel {
 
 REGISTER_KERNEL_BUILDER(Name("RunLengthGammaDecode").Device(DEVICE_CPU),
                         RunLengthGammaDecodeOp);
-
-#undef OP_REQUIRES_OK_ABSL
 
 }  // namespace
 }  // namespace tensorflow_compression

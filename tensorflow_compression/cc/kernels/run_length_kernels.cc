@@ -24,8 +24,10 @@ limitations under the License.
 #include <type_traits>
 #include <vector>
 
+#include "absl/status/status.h"
 #include "absl/types/span.h"
 #include "tensorflow/core/framework/op_kernel.h"
+#include "tensorflow/core/framework/op_requires.h"
 #include "tensorflow/core/framework/tensor.h"
 #include "tensorflow/core/framework/tensor_shape.h"
 #include "tensorflow/core/framework/tensor_types.h"
@@ -45,15 +47,6 @@ using tensorflow::Tensor;
 using tensorflow::TensorShape;
 using tensorflow::TensorShapeUtils;
 using tensorflow::tstring;
-
-#define OP_REQUIRES_OK_ABSL(context, status)                                \
-  {                                                                         \
-    auto s = (status);                                                      \
-    OP_REQUIRES(                                                            \
-        context, s.ok(),                                                    \
-        tensorflow::Status(static_cast<tensorflow::errors::Code>(s.code()), \
-                           s.message()));                                   \
-  }
 
 // TODO(jonarchist): Try to avoid in-loop branches based on attributes.
 
@@ -227,7 +220,7 @@ class RunLengthDecodeOp : public OpKernel {
     while (p < end) {
       // Skip to the next non-zero element.
       auto run_length = ReadRunLength(context, dec);
-      OP_REQUIRES_OK_ABSL(context, run_length.status());
+      OP_REQUIRES_OK(context, run_length.status());
 
       p += *run_length + run_length_offset;
 
@@ -240,19 +233,19 @@ class RunLengthDecodeOp : public OpKernel {
 
       if (use_run_length_for_non_zeros_) {
         run_length = ReadRunLength(context, dec);
-        OP_REQUIRES_OK_ABSL(context, run_length.status());
+        OP_REQUIRES_OK(context, run_length.status());
         const int32_t* const next_zero = p + *run_length + 1;
         OP_REQUIRES(context, next_zero <= end,
                     errors::DataLoss("Decoded past end of tensor."));
         while (p < next_zero) {
           auto nonzero = ReadNonZero(context, dec);
-          OP_REQUIRES_OK_ABSL(context, nonzero.status());
+          OP_REQUIRES_OK(context, nonzero.status());
           *p++ = *nonzero;
         }
         run_length_offset = 1;
       } else {
         auto nonzero = ReadNonZero(context, dec);
-        OP_REQUIRES_OK_ABSL(context, nonzero.status());
+        OP_REQUIRES_OK(context, nonzero.status());
         *p++ = *nonzero;
       }
     }
@@ -266,8 +259,6 @@ class RunLengthDecodeOp : public OpKernel {
 
 REGISTER_KERNEL_BUILDER(Name("RunLengthDecode").Device(DEVICE_CPU),
                         RunLengthDecodeOp);
-
-#undef OP_REQUIRES_OK_ABSL
 
 }  // namespace
 }  // namespace tensorflow_compression
