@@ -157,7 +157,7 @@ docker run -i --rm \
     -v /tmp/tensorflow_compression_ops:/tmp/tensorflow_compression_ops \
     -v /tensorflow_compression:/tensorflow_compression \
     -w /tensorflow_compression \
-    -e "BAZEL_OPT=--config=manylinux_2_17_x86_64" \
+    -e "BAZEL_OPT=--config=manylinux_2_24_x86_64" \
     tensorflow/build:latest-python3.10 \
     bash tensorflow_compression_ops/build_pip_pkg.sh /tmp/tensorflow_compression_ops <custom-version>
 ```
