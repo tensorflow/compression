@@ -56,6 +56,10 @@ maintenance mode. This means concretely:
   which only contains the C++ ops. These will be updated as long as possible for
   newer TF versions.
 
+  - UPDATE: Due to technical challenges in maintaining C++ custom ops with newer
+    TensorFlow releases, TF 2.18 will be the last version supported by
+    `tensorflow-compression-ops`.
+
 - Binary packages are provided for both options on pypi.org:
   [TFC](https://pypi.org/project/tensorflow-compression/) and
   [TFC ops](https://pypi.org/project/tensorflow-compression-ops/).
